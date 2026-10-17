@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>dfngen</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1>dfngen <span class="subtitle">Discrete Fracture Network generator</span></h1>
+      <div class="toolbar-actions">
+        <label class="toolbar-field">
+          Example
+          <select id="example-select">
+            <option value="">Choose…</option>
+          </select>
+        </label>
+        <label class="button file-button" title="Open a TOML input file, with its mesh and fracture files">
+          Open files…
+          <input id="open-files" type="file" accept=".toml,.vtu,.vtp" multiple />
+        </label>
+        <button id="save-toml" class="button" type="button" title="Save the input of the form as a TOML file">
+          Save TOML
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <p id="example-description" class="example-description" hidden></p>
+        <div id="form" class="form"></div>
+        <div class="run-panel">
+          <div class="run-buttons">
+            <button id="check-button" class="button" type="button">Check input</button>
+            <button id="run-button" class="button button-primary" type="button">Generate</button>
+            <button id="cancel-button" class="button" type="button" hidden>Cancel</button>
+          </div>
+          <progress id="progress" max="1" value="0" hidden></progress>
+          <pre id="status" class="status" hidden></pre>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <div class="viewer">
+          <div class="viewer-toolbar">
+            <label class="toolbar-field">
+              Color by
+              <select id="color-select" disabled>
+                <option value="">One color</option>
+              </select>
+            </label>
+            <label class="toolbar-check"><input id="show-mesh" type="checkbox" checked /> Mesh</label>
+            <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
+            <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
+            <button id="reset-camera" class="button-small" type="button">Reset view</button>
+          </div>
+          <div class="viewer-canvas">
+            <canvas id="viewer-canvas"></canvas>
+            <div id="viewer-message" class="viewer-message">Loading the 3D viewer…</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="tabs" role="tablist">
+            <button class="tab is-active" type="button" data-tab="results">Results</button>
+            <button class="tab" type="button" data-tab="log">Log</button>
+            <button class="tab" type="button" data-tab="toml">TOML</button>
+          </div>
+          <div class="tab-body" data-tab-body="results">
+            <p id="results-empty" class="form-note">No network yet. Select an example or open files, then click Generate.</p>
+            <div id="results" hidden>
+              <dl id="results-stats" class="stats"></dl>
+              <div class="downloads">
+                <button id="download-all" class="button-small" type="button">Download all (.zip)</button>
+                <ul id="download-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="tab-body" data-tab-body="log" hidden>
+            <pre id="log" class="code"></pre>
+          </div>
+          <div class="tab-body" data-tab-body="toml" hidden>
+            <div class="toml-actions">
+              <button id="copy-toml" class="button-small" type="button">Copy</button>
+            </div>
+            <pre id="toml-preview" class="code"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
