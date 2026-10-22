@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import { check_input, run_generation } from "../src/pkg/dfngen_wasm.js";
-import { caseNames, initWasm, readCase, repoDir, runNativeBinary } from "./cases";
+import { caseNames, initWasm, readCase, dfngenDir, runNativeBinary } from "./cases";
 
 const TOLERANCE = "1e-9";
 
@@ -17,7 +17,7 @@ beforeAll(initWasm);
 
 function compareOutputFolders(nativeDir: string, wasmDir: string): string {
   try {
-    execFileSync("python3", [join(repoDir, "scripts/compare_output.py"), nativeDir, wasmDir, TOLERANCE], {
+    execFileSync("python3", [join(dfngenDir, "scripts/compare_output.py"), nativeDir, wasmDir, TOLERANCE], {
       encoding: "utf8",
     });
     return "";

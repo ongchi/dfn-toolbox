@@ -6,11 +6,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { initSync, input_file_names } from "../src/pkg/dfngen_wasm.js";
 
-export const repoDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const dataDir = join(repoDir, "tests/data");
+const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// The library repository, a sibling folder of this project
+export const dfngenDir = resolve(appDir, "../../dfngen-rs");
+const dataDir = join(dfngenDir, "tests/data");
 
 export function initWasm(): void {
-  const bytes = readFileSync(join(repoDir, "web/app/src/pkg/dfngen_wasm_bg.wasm"));
+  const bytes = readFileSync(join(appDir, "src/pkg/dfngen_wasm_bg.wasm"));
   initSync({ module: bytes });
 }
 
@@ -46,7 +48,7 @@ export function readCase(caseName: string, toml?: string): CaseFiles {
 
 /** Runs the native binary (target/release/dfngen) on a case; returns the output folder. */
 export function runNativeBinary(caseName: string): string {
-  const binary = join(repoDir, "target/release/dfngen");
+  const binary = join(dfngenDir, "target/release/dfngen");
   if (!existsSync(binary)) {
     throw new Error(`${binary} is missing: run "cargo build --release" in the repository`);
   }

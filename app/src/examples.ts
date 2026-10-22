@@ -1,4 +1,4 @@
-// The test cases of tests/data as examples (copied by web/build-wasm.sh).
+// The test cases of tests/data as examples (copied by build-wasm.sh).
 import { tomlToFormState } from "./form/toml";
 import type { FormState } from "./form/state";
 import type { InputFiles } from "./inputFiles";

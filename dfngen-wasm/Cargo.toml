@@ -13,7 +13,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-dfngen-rs = { path = "../..", default-features = false }
+dfngen-rs = { path = "../../dfngen-rs", default-features = false }
 js-sys = "0.3.106"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }

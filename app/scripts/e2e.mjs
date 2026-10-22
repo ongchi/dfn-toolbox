@@ -7,7 +7,7 @@ import puppeteer from "puppeteer-core";
 const url = process.argv[2] ?? "http://localhost:5173/";
 const screenshotDir = process.argv[3] ?? ".";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const repoDir = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
+const dfngenDir = new URL("../../../dfngen-rs", import.meta.url).pathname.replace(/\/$/, "");
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -75,7 +75,7 @@ try {
   // Bad input: a fracture file as the domain mesh gives an error of the library
   await selectExample(page, "base");
   const [meshInput] = await page.$$(".file-row input[type=file]");
-  await meshInput.uploadFile(`${repoDir}/tests/data/user_fractures/user_fractures.vtp`);
+  await meshInput.uploadFile(`${dfngenDir}/tests/data/user_fractures/user_fractures.vtp`);
   await page.waitForFunction(() => document.querySelector(".file-status").textContent.startsWith("user_fractures.vtp"));
   await page.click("#check-button");
   await waitIdle(page);

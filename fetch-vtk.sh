@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downloads the VTK.wasm bundle into web/app/public/vtk and generates its
+# Downloads the VTK.wasm bundle into app/public/vtk and generates its
 # TypeScript types. The bundle is a fixed weekly build of VTK (with the
 # type manifests which `vtk-wasm gen-types` needs).
 set -euo pipefail

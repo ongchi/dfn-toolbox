@@ -1,15 +1,20 @@
-# dfngen web app
+# dfn-web
 
-A static web app for dfngen. The generation runs in the browser
-(WebAssembly), and the 3D view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
+A static web app for dfngen. The project needs the repository of the
+library, `dfngen-rs`, in the sibling folder `../dfngen-rs`: `dfngen-wasm`
+uses it as a Cargo path dependency, and the build and the tests use its
+test cases (`tests/data`), its binary and its scripts.
+
+The generation runs in the browser (WebAssembly), and the 3D view uses
+[VTK.wasm](https://kitware.github.io/vtk-wasm/).
 There is no server: `npm run build` gives a folder of static files.
 
 - Input: a form with one field for each key of the input file (see "Input
-  file" in `../README.md`), and the mesh file and the user-defined fracture
-  file. The 20 cases of `tests/data` are examples. "Open files…" reads a TOML
-  input file with its mesh and fracture files (select all of them; the files
-  are found by their names). "Save TOML" writes the input of the form, for the
-  `dfngen` binary.
+  file" in `../dfngen-rs/README.md`), and the mesh file and the
+  user-defined fracture file. The 20 cases of `tests/data` are examples.
+  "Open files…" reads a TOML input file with its mesh and fracture files
+  (select all of them; the files are found by their names). "Save TOML"
+  writes the input of the form, for the `dfngen` binary.
 - "Check input" shows the error of the library for the input, without a
   generation. "Generate" runs the generation in a Web Worker; "Cancel" stops it.
 - Output: the 3D view of `fractures.vtp` (color by a cell array),
@@ -45,7 +50,7 @@ rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --version 0.2.129 --locked
 ```
 
-Then, in `web/app`:
+Then, in `app`:
 
 ```bash
 npm ci
@@ -64,8 +69,8 @@ TypeScript types are generated from the bundle.
 ## Tests
 
 ```bash
-cargo build --release   # in the repository root: the tests compare with the binary
-npm test                # in web/app
+cargo build --release   # in ../dfngen-rs: the tests compare with the binary
+npm test                # in app
 npm run dev & npm run e2e -- http://localhost:5173/
 ```
 

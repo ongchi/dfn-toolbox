@@ -7,7 +7,8 @@
 set -euo pipefail
 
 web_dir="$(cd "$(dirname "$0")" && pwd)"
-repo_dir="$(dirname "$web_dir")"
+# The library repository, a sibling folder of this project
+dfngen_dir="$(dirname "$web_dir")/dfngen-rs"
 app_dir="$web_dir/app"
 
 cargo build --release --target wasm32-unknown-unknown \
@@ -19,7 +20,7 @@ wasm-bindgen --target web --out-dir "$app_dir/src/pkg" \
 examples_dir="$app_dir/public/examples"
 rm -rf "$examples_dir"
 mkdir -p "$examples_dir"
-cp -R "$repo_dir/tests/data/." "$examples_dir/"
+cp -R "$dfngen_dir/tests/data/." "$examples_dir/"
 {
     echo "["
     first=true
