@@ -1,14 +1,17 @@
 # dfn-web
 
 A static web app for dfngen (generation of a discrete fracture network) and
-fehm (steady water flow in the network). The project needs the repositories
-of the two libraries in sibling folders:
+fehm (steady water flow in the network): <https://ongchi.github.io/dfn-web/>.
+This is a preliminary version.
 
-- `../dfngen-rs`: `dfn-wasm` uses it as a Cargo path dependency, and the
-  build and the tests use its test cases (`tests/data`), its binary and its
-  scripts.
-- `../fehm-rs`: `dfn-wasm` uses it as a Cargo path dependency, and the tests
-  use its binary.
+The project needs the repositories of the two libraries in sibling folders:
+
+- `../dfngen-rs` ([ongchi/dfngen-rs](https://github.com/ongchi/dfngen-rs)):
+  `dfn-wasm` uses it as a Cargo path dependency, and the build and the tests
+  use its test cases (`tests/data`), its binary and its scripts.
+- `../fehm-rs` ([ongchi/fehm-rs](https://github.com/ongchi/fehm-rs)):
+  `dfn-wasm` uses it as a Cargo path dependency, and the tests use its
+  binary.
 
 The generation and the flow run in the browser (WebAssembly), and the 3D
 view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
@@ -85,6 +88,22 @@ SHA-256 check) into `public/vtk`. The app loads it from there, not from a
 CDN. To use another build, change `VERSION` and `SHA256` in the script; the
 TypeScript types are generated from the bundle.
 
+## Publication
+
+`.github/workflows/pages.yml` publishes the site on GitHub Pages at each
+push to `master` (or when it is started by hand). It checks out
+`dfngen-rs` and `fehm-rs` (branch `master`) next to `dfn-web` and runs
+`build-site.sh <base path>`: install, VTK.wasm, WebAssembly module, native
+binaries, `npm test`, and `npm run build`. A failed test stops the
+workflow before the deploy. The same script makes the site locally
+(`npm ci` replaces `app/node_modules`):
+
+```bash
+./build-site.sh /dfn-web/   # the site in app/dist, for the path /dfn-web/
+```
+
+The Pages source of the repository must be "GitHub Actions".
+
 ## Tests
 
 ```bash
@@ -121,3 +140,11 @@ npm run dev & npm run e2e -- http://localhost:5173/
   (`mapper.scalarVisibility = 1`) can set other properties back: it gave the
   mapper its old lookup table.
 - Add 2D actors (scalar bar) with `addViewProp`.
+
+## License
+
+dfn-web: LGPL-3.0 (`LICENSE.md`), as dfngen-rs. The site includes compiled
+code of [dfngen-rs](https://github.com/ongchi/dfngen-rs) (LGPL-3.0; it is a
+port of dfnWorks, LANL), [fehm-rs](https://github.com/ongchi/fehm-rs)
+(BSD-3-Clause; based on FEHM, LANL) and
+[VTK.wasm](https://kitware.github.io/vtk-wasm/) (BSD-3-Clause).

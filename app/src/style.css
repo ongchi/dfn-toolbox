@@ -90,6 +90,7 @@ pre {
   color: var(--text);
   font: inherit;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .button {
