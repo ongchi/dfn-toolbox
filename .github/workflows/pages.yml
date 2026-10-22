@@ -1,0 +1,90 @@
+# Builds the site (after the tests of build-site.sh) and publishes it on
+# GitHub Pages. dfngen-rs and fehm-rs are checked out as sibling folders of
+# dfn-web, as on a local computer.
+name: Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a running deploy is not cancelled
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: dfn-web
+      - uses: actions/checkout@v7
+        with:
+          repository: ongchi/dfngen-rs
+          ref: master
+          path: dfngen-rs
+      - uses: actions/checkout@v7
+        with:
+          repository: ongchi/fehm-rs
+          ref: master
+          path: fehm-rs
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            dfngen-rs -> target
+            fehm-rs -> target
+            dfn-web/dfn-wasm -> target
+
+      # wasm-bindgen-cli must have the version of wasm-bindgen in dfn-wasm/Cargo.toml
+      - name: Read the version of wasm-bindgen
+        id: wasm-bindgen
+        run: echo "version=$(sed -n 's/^wasm-bindgen = "=\(.*\)"$/\1/p' dfn-web/dfn-wasm/Cargo.toml)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        id: wasm-bindgen-cache
+        with:
+          path: ~/.cargo/bin/wasm-bindgen
+          key: wasm-bindgen-cli-${{ runner.os }}-${{ steps.wasm-bindgen.outputs.version }}
+      - name: Install wasm-bindgen-cli
+        if: steps.wasm-bindgen-cache.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version "${{ steps.wasm-bindgen.outputs.version }}" --locked
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dfn-web/app/package-lock.json
+      # fetch-vtk.sh downloads the bundle only if the cached file does not have its SHA-256
+      - uses: actions/cache@v6
+        with:
+          path: dfn-web/app/public/vtk/vtk-wasm32-emscripten.tar.gz
+          key: vtk-wasm-${{ hashFiles('dfn-web/fetch-vtk.sh') }}
+
+      - uses: actions/configure-pages@v6
+        id: pages
+      - name: Test and build the site
+        run: dfn-web/build-site.sh "${{ steps.pages.outputs.base_path }}/"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dfn-web/app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment
