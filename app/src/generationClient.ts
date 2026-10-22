@@ -1,4 +1,4 @@
-// Interface of the generation worker for the page.
+// Interface of the worker (generation of dfngen and flow of fehm) for the page.
 
 export interface GenerationInput {
   toml: string;
@@ -6,9 +6,18 @@ export interface GenerationInput {
   userFractures: string | undefined;
 }
 
+export interface FlowInput {
+  /** The TOML of fehm */
+  toml: string;
+  /** The triangle mesh of the generation (dfn_mesh.vtu) */
+  mesh: string;
+}
+
 export type WorkerRequest =
   | ({ type: "check" } & GenerationInput)
-  | ({ type: "run"; seedIfZero: bigint } & GenerationInput);
+  | ({ type: "run"; seedIfZero: bigint } & GenerationInput)
+  | ({ type: "checkFlow" } & FlowInput)
+  | ({ type: "runFlow" } & FlowInput);
 
 export interface GenerationOutput {
   /** Error message; then there are no files */
@@ -23,12 +32,29 @@ export interface GenerationOutput {
   rejectedCount: number;
 }
 
+export interface BoundaryFlow {
+  name: string;
+  /** Mass flow into the network (kg/s); negative for an out-flow */
+  massFlow: number;
+}
+
+export interface FlowOutput {
+  /** Error message; then there are no files */
+  error: string | null;
+  log: string;
+  /** (name, text) of each output file */
+  files: [string, string][];
+  boundaryFlows: BoundaryFlow[];
+  newtonIterations: number;
+}
+
 export type WorkerResponse =
   | { type: "checked"; error: string | null }
   | { type: "progress"; acceptedCount: number; fraction: number }
   /** The WebAssembly module failed (a panic); the worker must be replaced */
   | { type: "crashed"; message: string }
-  | ({ type: "result" } & GenerationOutput);
+  | ({ type: "result" } & GenerationOutput)
+  | ({ type: "flowResult" } & FlowOutput);
 
 export class CancelledError extends Error {
   constructor() {
@@ -58,6 +84,20 @@ export class GenerationClient {
     const seedIfZero = BigInt(1 + Math.floor(Math.random() * 2 ** 32));
     const response = await this.request({ type: "run", seedIfZero, ...input }, onProgress);
     if (response.type !== "result") {
+      throw new Error(`unexpected answer of the worker: ${response.type}`);
+    }
+    return response;
+  }
+
+  /** Returns the error message of the flow input, or null for a valid input */
+  async checkFlow(input: FlowInput): Promise<string | null> {
+    const response = await this.request({ type: "checkFlow", ...input });
+    return response.type === "checked" ? response.error : null;
+  }
+
+  async runFlow(input: FlowInput): Promise<FlowOutput> {
+    const response = await this.request({ type: "runFlow", ...input });
+    if (response.type !== "flowResult") {
       throw new Error(`unexpected answer of the worker: ${response.type}`);
     }
     return response;

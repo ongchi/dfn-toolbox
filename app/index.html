@@ -28,8 +28,13 @@
 
     <main class="layout">
       <aside class="sidebar">
+        <div class="tabs sidebar-tabs" role="tablist">
+          <button class="tab is-active" type="button" data-sidebar-tab="network">Network</button>
+          <button class="tab" type="button" data-sidebar-tab="flow">Flow</button>
+        </div>
         <p id="example-description" class="example-description" hidden></p>
         <div id="form" class="form"></div>
+        <div id="flow-form" class="form" hidden></div>
         <div class="run-panel">
           <div class="run-buttons">
             <button id="check-button" class="button" type="button">Check input</button>
@@ -53,6 +58,7 @@
             <label class="toolbar-check"><input id="show-mesh" type="checkbox" checked /> Mesh</label>
             <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
             <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
+            <label class="toolbar-check"><input id="show-pressure" type="checkbox" disabled /> Pressure</label>
             <button id="reset-camera" class="button-small" type="button">Reset view</button>
           </div>
           <div class="viewer-canvas">
@@ -76,9 +82,19 @@
                 <ul id="download-list"></ul>
               </div>
             </div>
+            <div id="flow-results" hidden>
+              <h4>Flow</h4>
+              <dl id="flow-stats" class="stats"></dl>
+              <div class="downloads">
+                <button id="flow-download-all" class="button-small" type="button">Download flow (.zip)</button>
+                <ul id="flow-download-list"></ul>
+              </div>
+            </div>
           </div>
           <div class="tab-body" data-tab-body="log" hidden>
             <pre id="log" class="code"></pre>
+            <h4 id="flow-log-title" hidden>Flow</h4>
+            <pre id="flow-log" class="code"></pre>
           </div>
           <div class="tab-body" data-tab-body="toml" hidden>
             <div class="toml-actions">

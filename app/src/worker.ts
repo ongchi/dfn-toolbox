@@ -1,6 +1,6 @@
-// Runs the generation (WebAssembly) in a Web Worker, so the page stays
-// responsive. Messages: see `generationClient.ts`.
-import init, { check_input, run_generation } from "./pkg/dfn_wasm.js";
+// Runs the generation and the flow (WebAssembly) in a Web Worker, so the page
+// stays responsive. Messages: see `generationClient.ts`.
+import init, { check_flow_input, check_input, run_flow, run_generation } from "./pkg/dfn_wasm.js";
 import type { WorkerRequest, WorkerResponse } from "./generationClient";
 
 const PROGRESS_INTERVAL_MS = 50;
@@ -24,6 +24,24 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 function handle(request: WorkerRequest): void {
   if (request.type === "check") {
     post({ type: "checked", error: check_input(request.toml, request.mesh, request.userFractures) ?? null });
+    return;
+  }
+  if (request.type === "checkFlow") {
+    post({ type: "checked", error: check_flow_input(request.toml, request.mesh) ?? null });
+    return;
+  }
+  if (request.type === "runFlow") {
+    const result = run_flow(request.toml, request.mesh);
+    const flows: Float64Array = result.boundary_flows;
+    post({
+      type: "flowResult",
+      error: result.error ?? null,
+      log: result.log,
+      files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
+      boundaryFlows: result.boundary_names.map((name: string, index: number) => ({ name, massFlow: flows[index] })),
+      newtonIterations: result.newton_iterations,
+    });
+    result.free();
     return;
   }
 

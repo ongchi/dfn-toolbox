@@ -31,17 +31,17 @@ export class InputFormError extends Error {
 // ---------------------------------------------------------------- writing
 
 /** TOML float: always with a decimal point or an exponent */
-function float(value: number): string {
+export function float(value: number): string {
   const text = String(value);
   return /[.eE]/.test(text) || !Number.isFinite(value) ? text : `${text}.0`;
 }
 
-function integer(value: number): string {
+export function integer(value: number): string {
   return String(Math.trunc(value));
 }
 
 /** TOML basic string (the escapes of JSON are valid in TOML) */
-function string(value: string): string {
+export function string(value: string): string {
   return JSON.stringify(value);
 }
 

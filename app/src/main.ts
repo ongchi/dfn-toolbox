@@ -1,17 +1,32 @@
-// The page: input form, generation in the worker, 3D view and output files.
+// The page: input forms (network and flow), generation and flow in the
+// worker, 3D view and output files.
 import "./style.css";
 import { strToU8, zipSync } from "fflate";
 import { exampleDescription, listExamples, loadExample } from "./examples";
+import { renderFlowForm } from "./flow/form";
+import { triangleGridToPolyData } from "./flow/polyData";
+import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
+import { flowStateToToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
 import type { FileHandlers } from "./form/files";
 import { defaultFormState, type FormState } from "./form/state";
 import { formStateToToml, InputFormError, tomlToFormState } from "./form/toml";
-import { CancelledError, GenerationClient, type GenerationInput, type GenerationOutput } from "./generationClient";
+import {
+  CancelledError,
+  GenerationClient,
+  type FlowInput,
+  type FlowOutput,
+  type GenerationInput,
+  type GenerationOutput,
+} from "./generationClient";
 import { baseName, meshRegionNames, type InputFiles } from "./inputFiles";
 import { NetworkViewer, type FractureLayer } from "./viewer";
 
 const DEFAULT_COLOR_ARRAY = "family";
+const PRESSURE_FILE = "pressure.vtu";
+
+type SidebarTab = "network" | "flow";
 
 function byId<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -27,6 +42,7 @@ const ui = {
   openFiles: byId<HTMLInputElement>("open-files"),
   saveToml: byId<HTMLButtonElement>("save-toml"),
   form: byId<HTMLDivElement>("form"),
+  flowForm: byId<HTMLDivElement>("flow-form"),
   checkButton: byId<HTMLButtonElement>("check-button"),
   runButton: byId<HTMLButtonElement>("run-button"),
   cancelButton: byId<HTMLButtonElement>("cancel-button"),
@@ -36,6 +52,7 @@ const ui = {
   showMesh: byId<HTMLInputElement>("show-mesh"),
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
+  showPressure: byId<HTMLInputElement>("show-pressure"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
@@ -44,7 +61,13 @@ const ui = {
   resultsStats: byId<HTMLDListElement>("results-stats"),
   downloadAll: byId<HTMLButtonElement>("download-all"),
   downloadList: byId<HTMLUListElement>("download-list"),
+  flowResults: byId<HTMLDivElement>("flow-results"),
+  flowStats: byId<HTMLDListElement>("flow-stats"),
+  flowDownloadAll: byId<HTMLButtonElement>("flow-download-all"),
+  flowDownloadList: byId<HTMLUListElement>("flow-download-list"),
   log: byId<HTMLPreElement>("log"),
+  flowLogTitle: byId<HTMLHeadingElement>("flow-log-title"),
+  flowLog: byId<HTMLPreElement>("flow-log"),
   tomlPreview: byId<HTMLPreElement>("toml-preview"),
   copyToml: byId<HTMLButtonElement>("copy-toml"),
 };
@@ -53,6 +76,9 @@ let state: FormState = defaultFormState();
 let files: InputFiles = { mesh: null, userFractures: null };
 let regionNames: string[] = [];
 let output: GenerationOutput | null = null;
+const flowState: FlowState = defaultFlowState();
+let flowOutput: FlowOutput | null = null;
+let activeSidebarTab: SidebarTab = "network";
 let isBusy = false;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
@@ -113,13 +139,42 @@ const fileHandlers: FileHandlers = {
   },
 };
 
+const flowContext: FormContext = {
+  regionNames: [],
+  changed: () => updateTomlPreview(),
+  rerender: () => renderFlow(),
+};
+
 function render(): void {
   renderForm(ui.form, state, files, formContext, fileHandlers);
   updateTomlPreview();
 }
 
+function renderFlow(): void {
+  renderFlowForm(ui.flowForm, flowState, flowMesh() !== null, flowContext);
+  updateTomlPreview();
+}
+
+/** The TOML of the form of the active sidebar tab */
+function activeToml(): string {
+  return activeSidebarTab === "flow" ? flowStateToToml(flowState) : formStateToToml(state);
+}
+
 function updateTomlPreview(): void {
-  ui.tomlPreview.textContent = formStateToToml(state);
+  ui.tomlPreview.textContent = activeToml();
+}
+
+function selectSidebarTab(name: SidebarTab): void {
+  activeSidebarTab = name;
+  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
+    tab.classList.toggle("is-active", tab.dataset.sidebarTab === name);
+  }
+  ui.form.hidden = name !== "network";
+  ui.flowForm.hidden = name !== "flow";
+  ui.exampleDescription.hidden = name !== "network" || ui.exampleDescription.textContent === "";
+  ui.runButton.textContent = name === "flow" ? "Solve flow" : "Generate";
+  showStatus("");
+  updateTomlPreview();
 }
 
 async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
@@ -140,7 +195,7 @@ async function loadInput(newState: FormState, newFiles: InputFiles, description:
   files = { mesh: null, userFractures: newFiles.userFractures };
   await setMesh(newFiles.mesh);
   ui.exampleDescription.textContent = description;
-  ui.exampleDescription.hidden = description === "";
+  ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "network";
   showStatus("");
   render();
 }
@@ -251,6 +306,65 @@ async function runGeneration(): Promise<void> {
   }
 }
 
+/** The flow input for the worker, or an error message */
+function flowInput(): FlowInput | string {
+  const mesh = flowMesh();
+  if (mesh === null) {
+    return `Generate a network with the mesh on first: the flow needs ${FLOW_MESH_FILE}.`;
+  }
+  if (ui.flowForm.querySelector(".is-invalid")) {
+    return "A field of the form has an invalid value (red border). Correct it first.";
+  }
+  return { toml: flowStateToToml(flowState), mesh };
+}
+
+async function checkFlowInput(): Promise<void> {
+  const input = flowInput();
+  if (typeof input === "string") {
+    showStatus(input, true);
+    return;
+  }
+  setBusy(true);
+  try {
+    const error = await client.checkFlow(input);
+    showStatus(error ?? "The flow input is valid.", error !== null);
+  } catch (error) {
+    showStatus(errorText(error), true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function runFlow(): Promise<void> {
+  const input = flowInput();
+  if (typeof input === "string") {
+    showStatus(input, true);
+    return;
+  }
+  setBusy(true, true);
+  // fehm reports no progress: an indeterminate bar
+  ui.progress.removeAttribute("value");
+  showStatus("Solving the flow…");
+  const startTime = performance.now();
+  try {
+    const result = await client.runFlow(input);
+    ui.flowLog.textContent = result.log;
+    ui.flowLogTitle.hidden = false;
+    if (result.error !== null) {
+      showStatus(result.error, true);
+      return;
+    }
+    showStatus(
+      `Done in ${durationText(performance.now() - startTime)}: ${result.newtonIterations} Newton iterations.`,
+    );
+    await showFlowOutput(result);
+  } catch (error) {
+    showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
+  } finally {
+    setBusy(false);
+  }
+}
+
 // ---------------------------------------------------------------- output
 
 function clearOutput(): void {
@@ -265,24 +379,40 @@ function clearOutput(): void {
     }
     void viewer.render();
   }
+  clearFlowOutput();
+  renderFlow();
+}
+
+/** The flow output belongs to the mesh of one generation */
+function clearFlowOutput(): void {
+  flowOutput = null;
+  ui.flowResults.hidden = true;
+  ui.flowLog.textContent = "";
+  ui.flowLogTitle.hidden = true;
+  ui.showPressure.checked = false;
+  ui.showPressure.disabled = true;
+  if (viewer) {
+    void viewer.setPressure(null);
+    applyLayerVisibility(viewer);
+    void viewer.render();
+  }
 }
 
 function outputFile(name: string): string | null {
   return output?.files.find(([fileName]) => fileName === name)?.[1] ?? null;
 }
 
-async function showOutput(result: GenerationOutput): Promise<void> {
-  output = result;
-  ui.resultsEmpty.hidden = true;
-  ui.results.hidden = false;
+/** The triangle mesh of the last generation, the mesh of the flow */
+function flowMesh(): string | null {
+  return outputFile(FLOW_MESH_FILE);
+}
 
-  const stats: [string, string][] = [
-    ["Final fractures", String(result.finalCount)],
-    ["Accepted fractures", String(result.acceptedCount)],
-    ["Rejected fractures", String(result.rejectedCount)],
-    ["Seed", result.seed],
-  ];
-  ui.resultsStats.replaceChildren(
+function flowOutputFile(name: string): string | null {
+  return flowOutput?.files.find(([fileName]) => fileName === name)?.[1] ?? null;
+}
+
+function showStats(list: HTMLDListElement, stats: [string, string][]): void {
+  list.replaceChildren(
     ...stats.flatMap(([label, value]) => {
       const term = document.createElement("dt");
       term.textContent = label;
@@ -291,9 +421,11 @@ async function showOutput(result: GenerationOutput): Promise<void> {
       return [term, description];
     }),
   );
+}
 
-  ui.downloadList.replaceChildren(
-    ...result.files.map(([name, text]) => {
+function showDownloadLinks(list: HTMLUListElement, outputFiles: [string, string][]): void {
+  list.replaceChildren(
+    ...outputFiles.map(([name, text]) => {
       const item = document.createElement("li");
       const link = document.createElement("a");
       link.href = "#";
@@ -306,9 +438,71 @@ async function showOutput(result: GenerationOutput): Promise<void> {
       return item;
     }),
   );
+}
+
+function downloadZip(name: string, outputFiles: [string, string][]): void {
+  const archive = zipSync(Object.fromEntries(outputFiles.map(([fileName, text]) => [fileName, strToU8(text)])));
+  downloadText(name, archive, "application/zip");
+}
+
+async function showOutput(result: GenerationOutput): Promise<void> {
+  clearFlowOutput();
+  output = result;
+  ui.resultsEmpty.hidden = true;
+  ui.results.hidden = false;
+  const mesh = flowMesh();
+  updateBoundaries(flowState, mesh === null ? [] : meshBoundaryNames(mesh));
+  renderFlow();
+
+  showStats(ui.resultsStats, [
+    ["Final fractures", String(result.finalCount)],
+    ["Accepted fractures", String(result.acceptedCount)],
+    ["Rejected fractures", String(result.rejectedCount)],
+    ["Seed", result.seed],
+  ]);
+  showDownloadLinks(ui.downloadList, result.files);
 
   ui.showRejected.disabled = outputFile("fractures_rejected.vtp") === null;
   await showOutputInViewer();
+}
+
+function massFlowText(massFlow: number): string {
+  return `${massFlow.toExponential(4)} kg/s`;
+}
+
+async function showFlowOutput(result: FlowOutput): Promise<void> {
+  flowOutput = result;
+  ui.flowResults.hidden = false;
+  const netFlow = result.boundaryFlows.reduce((sum, boundary) => sum + boundary.massFlow, 0);
+  showStats(ui.flowStats, [
+    ...result.boundaryFlows.map(({ name, massFlow }): [string, string] => [`Into the network at ${name}`, massFlowText(massFlow)]),
+    ["Net flow", massFlowText(netFlow)],
+    ["Newton iterations", String(result.newtonIterations)],
+  ]);
+  showDownloadLinks(ui.flowDownloadList, result.files);
+
+  ui.showPressure.disabled = false;
+  ui.showPressure.checked = true;
+  await showFlowInViewer();
+}
+
+async function showFlowInViewer(): Promise<void> {
+  const pressure = flowOutputFile(PRESSURE_FILE);
+  if (!viewer || pressure === null) {
+    return;
+  }
+  await viewer.setPressure(triangleGridToPolyData(pressure));
+  applyLayerVisibility(viewer);
+  await viewer.render();
+}
+
+/** The pressure layer hides the fracture layers: they have the same surfaces */
+function applyLayerVisibility(view: NetworkViewer): void {
+  const isPressureVisible = ui.showPressure.checked && flowOutput !== null;
+  view.showPressure(isPressureVisible);
+  view.setVisible("final", !isPressureVisible);
+  view.setVisible("removed", !isPressureVisible && ui.showRemoved.checked);
+  view.setVisible("rejected", !isPressureVisible && ui.showRejected.checked);
 }
 
 async function showOutputInViewer(): Promise<void> {
@@ -318,8 +512,7 @@ async function showOutputInViewer(): Promise<void> {
   await viewer.setLayer("final", outputFile("fractures.vtp"));
   await viewer.setLayer("removed", outputFile("fractures_removed.vtp"));
   await viewer.setLayer("rejected", outputFile("fractures_rejected.vtp"));
-  viewer.setVisible("removed", ui.showRemoved.checked);
-  viewer.setVisible("rejected", ui.showRejected.checked);
+  applyLayerVisibility(viewer);
 
   const previous = ui.colorSelect.value;
   const names = await viewer.cellArrayNames();
@@ -346,6 +539,7 @@ async function startViewer(): Promise<void> {
     viewer.setVisible("mesh", ui.showMesh.checked);
   }
   await showOutputInViewer();
+  await showFlowInViewer();
   viewer.resetCamera();
   await viewer.render();
 }
@@ -360,7 +554,7 @@ async function updateViewer(action: (viewer: NetworkViewer) => void | Promise<vo
 // ---------------------------------------------------------------- events
 
 function selectTab(name: string): void {
-  for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
+  for (const tab of document.querySelectorAll<HTMLButtonElement>(".panel .tab")) {
     tab.classList.toggle("is-active", tab.dataset.tab === name);
   }
   for (const body of document.querySelectorAll<HTMLElement>(".tab-body")) {
@@ -390,15 +584,21 @@ function bindEvents(): void {
     }
     ui.openFiles.value = "";
   });
-  ui.saveToml.addEventListener("click", () => downloadText("input.toml", formStateToToml(state)));
-  ui.copyToml.addEventListener("click", () => void navigator.clipboard.writeText(formStateToToml(state)));
-  ui.checkButton.addEventListener("click", () => void checkInput());
-  ui.runButton.addEventListener("click", () => void runGeneration());
+  ui.saveToml.addEventListener("click", () =>
+    downloadText(activeSidebarTab === "flow" ? "flow.toml" : "input.toml", activeToml()),
+  );
+  ui.copyToml.addEventListener("click", () => void navigator.clipboard.writeText(activeToml()));
+  ui.checkButton.addEventListener("click", () => void (activeSidebarTab === "flow" ? checkFlowInput() : checkInput()));
+  ui.runButton.addEventListener("click", () => void (activeSidebarTab === "flow" ? runFlow() : runGeneration()));
   ui.cancelButton.addEventListener("click", () => client.cancel());
   ui.downloadAll.addEventListener("click", () => {
     if (output) {
-      const archive = zipSync(Object.fromEntries(output.files.map(([name, text]) => [name, strToU8(text)])));
-      downloadText("dfngen_output.zip", archive, "application/zip");
+      downloadZip("dfngen_output.zip", output.files);
+    }
+  });
+  ui.flowDownloadAll.addEventListener("click", () => {
+    if (flowOutput) {
+      downloadZip("fehm_output.zip", flowOutput.files);
     }
   });
 
@@ -406,16 +606,16 @@ function bindEvents(): void {
     updateViewer((view) => view.colorBy(ui.colorSelect.value === "" ? null : ui.colorSelect.value)),
   );
   ui.showMesh.addEventListener("change", () => updateViewer((view) => view.setVisible("mesh", ui.showMesh.checked)));
-  ui.showRemoved.addEventListener("change", () =>
-    updateViewer((view) => view.setVisible("removed", ui.showRemoved.checked)),
-  );
-  ui.showRejected.addEventListener("change", () =>
-    updateViewer((view) => view.setVisible("rejected", ui.showRejected.checked)),
-  );
+  for (const checkbox of [ui.showRemoved, ui.showRejected, ui.showPressure]) {
+    checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
+  }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
 
-  for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
+  for (const tab of document.querySelectorAll<HTMLButtonElement>(".panel .tab")) {
     tab.addEventListener("click", () => selectTab(tab.dataset.tab ?? "results"));
+  }
+  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
+    tab.addEventListener("click", () => selectSidebarTab(tab.dataset.sidebarTab === "flow" ? "flow" : "network"));
   }
 }
 
@@ -431,5 +631,6 @@ async function fillExampleList(): Promise<void> {
 
 bindEvents();
 render();
+renderFlow();
 void fillExampleList();
 void startViewer();
