@@ -11,7 +11,7 @@ There is no server: `npm run build` gives a folder of static files.
 
 - Input: a form with one field for each key of the input file (see "Input
   file" in `../dfngen-rs/README.md`), and the mesh file and the
-  user-defined fracture file. The 20 cases of `tests/data` are examples.
+  user-defined fracture file. The 27 cases of `tests/data` are examples.
   "Open files…" reads a TOML input file with its mesh and fracture files
   (select all of them; the files are found by their names). "Save TOML"
   writes the input of the form, for the `dfngen` binary.
@@ -25,7 +25,10 @@ The output is that of the `dfngen` binary for the same input and seed.
 The math functions of WebAssembly (`libm`) and of the native platform can
 round differently in the last digits, thus the decimal numbers can differ
 by about 1e-15 (relative). A FRAM decision can then also be different, and
-the network changes; the 20 cases have no such difference.
+the network changes; the 27 cases have no such difference. The triangle mesh
+(`dfn_mesh.vtu`, with `[mesh]`) is different: the mesh step makes a
+difference in the last digit large, thus the mesh of WebAssembly can have
+other points and triangles than the mesh of the binary. This is accepted.
 
 ## Folders
 
@@ -76,10 +79,13 @@ npm run dev & npm run e2e -- http://localhost:5173/
 
 - `tests/wasm.test.ts`: each case of `tests/data` gives, in WebAssembly, the
   output files of the binary (decimal numbers within 1e-9, with
-  `scripts/compare_output.py`); errors and progress.
+  `scripts/compare_output.py`), except `dfn_mesh.vtu`: it must be a
+  triangle mesh with the arrays of the mesh of the binary; errors and
+  progress.
 - `tests/form.test.ts`: each case, TOML → form → TOML, is a valid input and
-  gives the same output files; an unknown key, a missing key and
-  `p32_target` with `n_poly` are errors of the form.
+  gives the same output files; an unknown key, a missing key,
+  `p32_target` with `n_poly` and an unknown aperture distribution are
+  errors of the form.
 - `scripts/e2e.mjs`: in Chrome (headless), each example, a bad input, the
   cancel, and the layers of the view; it saves screenshots.
 
