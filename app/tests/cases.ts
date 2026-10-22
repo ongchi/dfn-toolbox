@@ -4,7 +4,7 @@ import { mkdtempSync, readdirSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { initSync, input_file_names } from "../src/pkg/dfngen_wasm.js";
+import { initSync, input_file_names } from "../src/pkg/dfn_wasm.js";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // The library repository, a sibling folder of this project
@@ -12,7 +12,7 @@ export const dfngenDir = resolve(appDir, "../../dfngen-rs");
 const dataDir = join(dfngenDir, "tests/data");
 
 export function initWasm(): void {
-  const bytes = readFileSync(join(appDir, "src/pkg/dfngen_wasm_bg.wasm"));
+  const bytes = readFileSync(join(appDir, "src/pkg/dfn_wasm_bg.wasm"));
   initSync({ module: bytes });
 }
 

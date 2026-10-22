@@ -1,5 +1,5 @@
 [package]
-name = "dfngen-wasm"
+name = "dfn-wasm"
 version = "0.1.0"
 description = "WebAssembly bindings of dfngen for the web app"
 edition = "2021"

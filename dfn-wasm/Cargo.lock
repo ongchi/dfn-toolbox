@@ -60,6 +60,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
+name = "dfn-wasm"
+version = "0.1.0"
+dependencies = [
+ "dfngen-rs",
+ "js-sys",
+ "tracing",
+ "tracing-subscriber",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "dfngen-rs"
 version = "0.13.0"
 dependencies = [
@@ -75,17 +86,6 @@ dependencies = [
  "thiserror",
  "toml",
  "tracing",
-]
-
-[[package]]
-name = "dfngen-wasm"
-version = "0.1.0"
-dependencies = [
- "dfngen-rs",
- "js-sys",
- "tracing",
- "tracing-subscriber",
- "wasm-bindgen",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 // Runs the generation (WebAssembly) in a Web Worker, so the page stays
 // responsive. Messages: see `generationClient.ts`.
-import init, { check_input, run_generation } from "./pkg/dfngen_wasm.js";
+import init, { check_input, run_generation } from "./pkg/dfn_wasm.js";
 import type { WorkerRequest, WorkerResponse } from "./generationClient";
 
 const PROGRESS_INTERVAL_MS = 50;

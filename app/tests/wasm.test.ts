@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
-import { check_input, run_generation } from "../src/pkg/dfngen_wasm.js";
+import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
 import { caseNames, initWasm, readCase, dfngenDir, runNativeBinary } from "./cases";
 
 const TOLERANCE = "1e-9";
@@ -66,7 +66,7 @@ describe.each(caseNames)("case %s", (caseName) => {
     const result = run_generation(files.toml, files.mesh, files.userFractures, 1n, () => {});
     expect(result.error).toBeUndefined();
 
-    const wasmDir = mkdtempSync(join(tmpdir(), `dfngen-wasm-${caseName}-`));
+    const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${caseName}-`));
     for (const name of result.file_names) {
       if (name !== MESH_FILE) {
         writeFileSync(join(wasmDir, name), result.file(name) ?? "");

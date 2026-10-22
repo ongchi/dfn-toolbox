@@ -1,7 +1,7 @@
 # dfn-web
 
 A static web app for dfngen. The project needs the repository of the
-library, `dfngen-rs`, in the sibling folder `../dfngen-rs`: `dfngen-wasm`
+library, `dfngen-rs`, in the sibling folder `../dfngen-rs`: `dfn-wasm`
 uses it as a Cargo path dependency, and the build and the tests use its
 test cases (`tests/data`), its binary and its scripts.
 
@@ -34,7 +34,7 @@ other points and triangles than the mesh of the binary. This is accepted.
 
 | Folder | Content |
 |---|---|
-| `dfngen-wasm` | Rust crate: `wasm-bindgen` functions of the library (`input_file_names`, `check_input`, `run_generation`). Not a member of a workspace. |
+| `dfn-wasm` | Rust crate: `wasm-bindgen` functions of the library (`input_file_names`, `check_input`, `run_generation`). Not a member of a workspace. |
 | `app` | Vite + TypeScript front end. |
 | `app/src/form` | The input form. `state.ts` has the form state, `toml.ts` the conversion to and from TOML, and one file for each section. |
 | `app/src/viewer.ts` | The 3D view (VTK.wasm). |
@@ -46,7 +46,7 @@ other points and triangles than the mesh of the binary. This is accepted.
 
 Necessary: Node, the Rust target `wasm32-unknown-unknown`, and
 `wasm-bindgen-cli` with the version of `wasm-bindgen` in
-`dfngen-wasm/Cargo.toml`:
+`dfn-wasm/Cargo.toml`:
 
 ```bash
 rustup target add wasm32-unknown-unknown
@@ -62,7 +62,7 @@ npm run dev       # development server
 npm run build     # static files in dist/
 ```
 
-After a change of the library or of `dfngen-wasm`: `npm run wasm`.
+After a change of the library or of `dfn-wasm`: `npm run wasm`.
 
 `fetch-vtk.sh` downloads a fixed weekly build of VTK.wasm (13 MB, with a
 SHA-256 check) into `public/vtk`. The app loads it from there, not from a

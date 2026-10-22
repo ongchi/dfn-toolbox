@@ -3,7 +3,7 @@
 # test cases of tests/data into the app as examples.
 #
 # Needs: the Rust target wasm32-unknown-unknown, and wasm-bindgen-cli with
-# the version of wasm-bindgen in dfngen-wasm/Cargo.toml.
+# the version of wasm-bindgen in dfn-wasm/Cargo.toml.
 set -euo pipefail
 
 web_dir="$(cd "$(dirname "$0")" && pwd)"
@@ -12,9 +12,9 @@ dfngen_dir="$(dirname "$web_dir")/dfngen-rs"
 app_dir="$web_dir/app"
 
 cargo build --release --target wasm32-unknown-unknown \
-    --manifest-path "$web_dir/dfngen-wasm/Cargo.toml"
+    --manifest-path "$web_dir/dfn-wasm/Cargo.toml"
 wasm-bindgen --target web --out-dir "$app_dir/src/pkg" \
-    "$web_dir/dfngen-wasm/target/wasm32-unknown-unknown/release/dfngen_wasm.wasm"
+    "$web_dir/dfn-wasm/target/wasm32-unknown-unknown/release/dfn_wasm.wasm"
 
 # Examples: the folders of tests/data, with an index of the cases
 examples_dir="$app_dir/public/examples"

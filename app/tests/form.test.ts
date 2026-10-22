@@ -2,7 +2,7 @@
 // same network for each case of tests/data.
 import { beforeAll, describe, expect, test } from "vitest";
 import { formStateToToml, InputFormError, tomlToFormState } from "../src/form/toml";
-import { check_input, run_generation } from "../src/pkg/dfngen_wasm.js";
+import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
 import { caseNames, initWasm, readCase } from "./cases";
 
 beforeAll(initWasm);
