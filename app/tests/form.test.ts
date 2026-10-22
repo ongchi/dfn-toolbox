@@ -60,6 +60,18 @@ test("p32_target with n_poly is an error", () => {
   expect(problemsOf(toml)).toContain("family 1: `p32_target` is not allowed with `n_poly`");
 });
 
+test("an unknown key in [mesh] is an error", () => {
+  const toml = readCase("mesh").toml.replace(/^\[mesh\]$/m, "[mesh]\nmin_angle = 20.0");
+  expect(problemsOf(toml)).toEqual(["[mesh]: `min_angle` is an unknown key"]);
+});
+
+test("an unknown aperture distribution is an error", () => {
+  const toml = readCase("mesh").toml.replace('distribution = "correlated"', 'distribution = "cubic"');
+  expect(problemsOf(toml)).toEqual([
+    'family 2: aperture: `distribution` must be "constant", "log_normal", "correlated" or "semi_correlated"',
+  ]);
+});
+
 test("a seed larger than 2^53 is kept", () => {
   const toml = readCase("base").toml.replace("seed = 12345", "seed = 18446744073709551615");
   expect(tomlToFormState(toml).seed).toBe("18446744073709551615");

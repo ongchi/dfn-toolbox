@@ -1,3 +1,4 @@
+import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
 import { element, numberField, optionalNumberField, row, section, selectField } from "./fields";
 import {
@@ -277,6 +278,18 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
     ),
     ...radiusFields(family, context),
     ...orientationFields(family, context),
+    ...apertureFields(
+      {
+        label: "Aperture",
+        key: "aperture",
+        help: state.mesh.enable ? "necessary with the mesh" : "only for the mesh; no effect without it",
+        aperture: family.aperture,
+        onSelect: (aperture) => {
+          family.aperture = aperture;
+        },
+      },
+      context,
+    ),
   );
   return card;
 }

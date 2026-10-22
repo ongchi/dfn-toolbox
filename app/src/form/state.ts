@@ -21,6 +21,27 @@ export interface FramState {
   rejectsPerFracture: number;
 }
 
+export interface RegionBoundariesState {
+  enable: boolean;
+  useFamilyRegion: boolean;
+}
+
+export type ApertureState =
+  | { distribution: "constant"; value: number }
+  | { distribution: "log_normal"; logMean: number; sd: number }
+  | { distribution: "correlated"; alpha: number; beta: number }
+  | { distribution: "semi_correlated"; alpha: number; beta: number; sd: number };
+
+export type ApertureDistribution = ApertureState["distribution"];
+
+export interface MeshState {
+  enable: boolean;
+  maxSizeFactor: number;
+  slope: number;
+  /** null = no key */
+  userFractureAperture: ApertureState | null;
+}
+
 export interface ClustersState {
   keepOnlyLargest: boolean;
   keepIsolatedFractures: boolean;
@@ -58,6 +79,8 @@ export interface FamilyState {
   beta: number | null;
   /** Written only for the stop condition P32 */
   p32Target: number;
+  /** null = no key; necessary with the mesh */
+  aperture: ApertureState | null;
   radius: RadiusState;
   orientation: OrientationState;
 }
@@ -72,6 +95,8 @@ export interface FormState {
   userFractures: string | null;
   generation: GenerationState;
   fram: FramState;
+  regionBoundaries: RegionBoundariesState;
+  mesh: MeshState;
   clusters: ClustersState;
   families: FamilyState[];
 }
@@ -91,6 +116,33 @@ export const FRAM_DEFAULTS: FramState = {
   writeRejectedFractures: false,
   rejectsPerFracture: 10,
 };
+
+/** Default values of `[region_boundaries]`, as in `RegionBoundariesSection::default` */
+export const REGION_BOUNDARIES_DEFAULTS: RegionBoundariesState = {
+  enable: false,
+  useFamilyRegion: true,
+};
+
+/** Default values of `[mesh]`, as in `MeshSection::default` */
+export const MESH_DEFAULTS: MeshState = {
+  enable: false,
+  maxSizeFactor: 10.0,
+  slope: 0.5,
+  userFractureAperture: null,
+};
+
+export function defaultAperture(distribution: ApertureDistribution): ApertureState {
+  switch (distribution) {
+    case "constant":
+      return { distribution, value: 1e-4 };
+    case "log_normal":
+      return { distribution, logMean: -9.0, sd: 0.5 };
+    case "correlated":
+      return { distribution, alpha: 1e-4, beta: 0.5 };
+    case "semi_correlated":
+      return { distribution, alpha: 1e-4, beta: 0.5, sd: 0.5 };
+  }
+}
 
 export function defaultRadius(distribution: RadiusDistribution): RadiusState {
   switch (distribution) {
@@ -113,6 +165,7 @@ export function defaultFamily(): FamilyState {
     region: null,
     beta: null,
     p32Target: 0.5,
+    aperture: null,
     radius: defaultRadius("truncated_power_law"),
     orientation: { convention: "theta_phi", firstAngle: 0.0, secondAngle: 0.0, kappa: 8.0 },
   };
@@ -126,6 +179,8 @@ export function defaultFormState(): FormState {
     userFractures: null,
     generation: { stopCondition: "n_poly", nPoly: 100, forceLargeFractures: false, removeFracturesLessThan: 0.0 },
     fram: { ...FRAM_DEFAULTS, enable: true },
+    regionBoundaries: { ...REGION_BOUNDARIES_DEFAULTS },
+    mesh: { ...MESH_DEFAULTS },
     clusters: { keepOnlyLargest: false, keepIsolatedFractures: false },
     families: [defaultFamily()],
   };

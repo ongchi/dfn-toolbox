@@ -6,6 +6,8 @@ import { filesSection, type FileHandlers } from "./files";
 import { framSection } from "./fram";
 import { generalSection } from "./general";
 import { generationSection } from "./generation";
+import { meshSection } from "./mesh";
+import { regionBoundariesSection } from "./regionBoundaries";
 import type { InputFiles } from "../inputFiles";
 import type { FormState } from "./state";
 
@@ -22,6 +24,8 @@ export function renderForm(
     generalSection(state, context),
     generationSection(state, context),
     framSection(state, context),
+    regionBoundariesSection(state, context),
+    meshSection(state, context),
     clustersSection(state, context),
     familiesSection(state, context),
   );

@@ -8,8 +8,12 @@
 import { parse } from "smol-toml";
 import {
   FRAM_DEFAULTS,
+  MESH_DEFAULTS,
   ORIENTATION_KEYS,
+  REGION_BOUNDARIES_DEFAULTS,
+  defaultAperture,
   defaultFamily,
+  type ApertureState,
   type FamilyState,
   type FormState,
   type OrientationConvention,
@@ -68,6 +72,25 @@ function radiusEntries(radius: RadiusState): [string, string][] {
   return entries;
 }
 
+function apertureEntries(aperture: ApertureState): [string, string][] {
+  const entries: [string, string][] = [["distribution", string(aperture.distribution)]];
+  switch (aperture.distribution) {
+    case "constant":
+      entries.push(["value", float(aperture.value)]);
+      break;
+    case "log_normal":
+      entries.push(["log_mean", float(aperture.logMean)], ["sd", float(aperture.sd)]);
+      break;
+    case "correlated":
+      entries.push(["alpha", float(aperture.alpha)], ["beta", float(aperture.beta)]);
+      break;
+    case "semi_correlated":
+      entries.push(["alpha", float(aperture.alpha)], ["beta", float(aperture.beta)], ["sd", float(aperture.sd)]);
+      break;
+  }
+  return entries;
+}
+
 function orientationEntries(orientation: OrientationState): [string, string][] {
   const [firstKey, secondKey] = ORIENTATION_KEYS[orientation.convention];
   return [
@@ -93,7 +116,10 @@ function familyLines(family: FamilyState, isP32: boolean): string[] {
   if (isP32) {
     lines.push(`p32_target = ${float(family.p32Target)}`);
   }
-  lines.push(`radius = ${inlineTable(radiusEntries(family.radius))}`);
+  if (family.aperture !== null) {
+    lines.push(`aperture = ${inlineTable(apertureEntries(family.aperture))}`);
+  }
+  lines.push(`radius =${inlineTable(radiusEntries(family.radius))}`);
   lines.push(`orientation = ${inlineTable(orientationEntries(family.orientation))}`);
   return lines;
 }
@@ -125,6 +151,22 @@ export function formStateToToml(state: FormState): string {
     lines.push(`check_user_fractures = ${fram.checkUserFractures}`);
     lines.push(`write_rejected_fractures = ${fram.writeRejectedFractures}`);
     lines.push(`rejects_per_fracture = ${integer(fram.rejectsPerFracture)}`);
+  }
+
+  // As [fram]: without `enable`, the other keys have no effect
+  if (state.regionBoundaries.enable) {
+    lines.push("", "[region_boundaries]", "enable = true");
+    lines.push(`use_family_region = ${state.regionBoundaries.useFamilyRegion}`);
+  }
+
+  if (state.mesh.enable) {
+    const mesh = state.mesh;
+    lines.push("", "[mesh]", "enable = true");
+    lines.push(`max_size_factor = ${float(mesh.maxSizeFactor)}`);
+    lines.push(`slope = ${float(mesh.slope)}`);
+    if (mesh.userFractureAperture !== null) {
+      lines.push(`user_fracture_aperture = ${inlineTable(apertureEntries(mesh.userFractureAperture))}`);
+    }
   }
 
   lines.push("", "[clusters]");
@@ -323,6 +365,46 @@ function readRadius(table: Table, path: string, problems: string[]): RadiusState
   return radius;
 }
 
+function readAperture(table: Table, path: string, problems: string[]): ApertureState {
+  const reader = new TableReader(table, path, problems);
+  const distribution = reader.string("distribution", "constant");
+  let aperture: ApertureState;
+  switch (distribution) {
+    case "constant":
+      aperture = { distribution, value: reader.float("value", 0) };
+      break;
+    case "log_normal":
+      aperture = { distribution, logMean: reader.float("log_mean", 0), sd: reader.float("sd", 0) };
+      break;
+    case "correlated":
+      aperture = { distribution, alpha: reader.float("alpha", 0), beta: reader.float("beta", 0) };
+      break;
+    case "semi_correlated":
+      aperture = {
+        distribution,
+        alpha: reader.float("alpha", 0),
+        beta: reader.float("beta", 0),
+        sd: reader.float("sd", 0),
+      };
+      break;
+    default:
+      problems.push(
+        `${path}: \`distribution\` must be "constant", "log_normal", "correlated" or "semi_correlated"`,
+      );
+      return defaultAperture("constant");
+  }
+  reader.checkUnknownKeys();
+  return aperture;
+}
+
+/** An optional aperture table; null when the key is missing */
+function readOptionalAperture(reader: TableReader, key: string, path: string, problems: string[]): ApertureState | null {
+  if (!reader.has(key)) {
+    return null;
+  }
+  return readAperture(reader.subTable(key), path, problems);
+}
+
 function readOrientation(table: Table, path: string, problems: string[]): OrientationState {
   const reader = new TableReader(table, path, problems);
   const conventions = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).filter((convention) =>
@@ -359,6 +441,7 @@ function readFamily(table: Table, path: string, isP32: boolean, problems: string
     region: reader.optionalString("region"),
     beta: reader.optionalFloat("beta"),
     p32Target: p32Target ?? defaultFamily().p32Target,
+    aperture: readOptionalAperture(reader, "aperture", `${path}: aperture`, problems),
     radius: readRadius(reader.subTable("radius"), `${path}: radius`, problems),
     orientation: readOrientation(reader.subTable("orientation"), `${path}: orientation`, problems),
   };
@@ -403,6 +486,35 @@ export function tomlToFormState(text: string): FormState {
   };
   framReader.checkUnknownKeys();
 
+  const regionBoundariesReader = new TableReader(
+    reader.subTable("region_boundaries", true),
+    "[region_boundaries]",
+    problems,
+  );
+  const regionBoundaries = {
+    enable: regionBoundariesReader.boolean("enable", REGION_BOUNDARIES_DEFAULTS.enable, true),
+    useFamilyRegion: regionBoundariesReader.boolean(
+      "use_family_region",
+      REGION_BOUNDARIES_DEFAULTS.useFamilyRegion,
+      true,
+    ),
+  };
+  regionBoundariesReader.checkUnknownKeys();
+
+  const meshReader = new TableReader(reader.subTable("mesh", true), "[mesh]", problems);
+  const mesh = {
+    enable: meshReader.boolean("enable", MESH_DEFAULTS.enable, true),
+    maxSizeFactor: meshReader.optionalFloat("max_size_factor") ?? MESH_DEFAULTS.maxSizeFactor,
+    slope: meshReader.optionalFloat("slope") ?? MESH_DEFAULTS.slope,
+    userFractureAperture: readOptionalAperture(
+      meshReader,
+      "user_fracture_aperture",
+      "[mesh]: user_fracture_aperture",
+      problems,
+    ),
+  };
+  meshReader.checkUnknownKeys();
+
   const clustersReader = new TableReader(reader.subTable("clusters"), "[clusters]", problems);
   const clusters = {
     keepOnlyLargest: clustersReader.boolean("keep_only_largest", false),
@@ -423,6 +535,8 @@ export function tomlToFormState(text: string): FormState {
     userFractures: reader.optionalString("user_fractures"),
     generation,
     fram,
+    regionBoundaries,
+    mesh,
     clusters,
     families,
   };
