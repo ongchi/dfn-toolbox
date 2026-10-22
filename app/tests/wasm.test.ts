@@ -6,30 +6,17 @@
 // difference of the last digit large, thus the triangle mesh (dfn_mesh.vtu)
 // is not compared: the test checks that it is a valid mesh with the arrays
 // of the native file.
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
-import { caseNames, initWasm, readCase, dfngenDir, runNativeBinary } from "./cases";
+import { caseNames, compareOutputFolders, initWasm, readCase, runNativeBinary } from "./cases";
 
-const TOLERANCE = "1e-9";
 const MESH_FILE = "dfn_mesh.vtu";
 const TRIANGLE_TYPE = "5";
 
 beforeAll(initWasm);
-
-function compareOutputFolders(nativeDir: string, wasmDir: string): string {
-  try {
-    execFileSync("python3", [join(dfngenDir, "scripts/compare_output.py"), nativeDir, wasmDir, TOLERANCE], {
-      encoding: "utf8",
-    });
-    return "";
-  } catch (error) {
-    return String((error as { stdout?: string }).stdout ?? error);
-  }
-}
 
 interface MeshSummary {
   pointCount: number;

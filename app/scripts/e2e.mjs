@@ -116,6 +116,49 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_base.png` });
   await page.$eval(".family-card", (node) => node.scrollIntoView());
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
+
+  // Flow without a triangle mesh: the network of "base" has no mesh
+  await page.click('[data-sidebar-tab="flow"]');
+  await page.click("#run-button");
+  const noMeshStatus = await statusText(page);
+  const isNoMeshError = await page.$eval("#status", (node) => node.classList.contains("is-error"));
+  console.log(`${isNoMeshError ? "ok  " : "FAIL"} flow without a mesh: ${noMeshStatus}`);
+  if (!isNoMeshError) {
+    failures.push(`flow without a mesh: ${noMeshStatus}`);
+  }
+
+  // Flow on the mesh of "mesh_regions": in-flow at the mesh surface, out-flow at north
+  await page.click('[data-sidebar-tab="network"]');
+  await selectExample(page, "mesh_regions");
+  await page.click("#run-button");
+  await waitIdle(page);
+  await page.click('[data-sidebar-tab="flow"]');
+  await page.evaluate(() => {
+    const useBoundary = (name, pressure) => {
+      const label = [...document.querySelectorAll("#flow-form .field-checkbox .field-label")].find(
+        (node) => node.textContent === name,
+      );
+      const row = label.closest(".field-row");
+      row.querySelector("input[type=checkbox]").click();
+      const input = row.querySelector("input[type=number]");
+      input.value = String(pressure);
+      input.dispatchEvent(new Event("input"));
+    };
+    useBoundary("mesh_surface", 10.1);
+    useBoundary("north", 10.0);
+  });
+  await page.click("#run-button");
+  await waitIdle(page);
+  const flowStatus = await statusText(page);
+  const hasFlowResults = await page.$eval("#flow-results", (node) => !node.hidden);
+  const isPressureShown = await page.$eval("#show-pressure", (node) => node.checked && !node.disabled);
+  const isFlowDone = flowStatus.startsWith("Done") && hasFlowResults && isPressureShown;
+  console.log(`${isFlowDone ? "ok  " : "FAIL"} flow: ${flowStatus.split("\n")[0]}`);
+  if (!isFlowDone) {
+    failures.push(`flow: ${flowStatus}`);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_flow.png` });
 } finally {
   await browser.close();
 }
