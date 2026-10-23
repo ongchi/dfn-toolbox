@@ -29,9 +29,16 @@ const ARRAY_ACCESS_BY_NAME = 1;
 const DEFAULT_LABEL_FORMAT = "%-#6.3g";
 const PRESSURE_LABEL_FORMAT = "%-#.6g";
 
+// The trajectories: tube radius relative to the diagonal of their bounds,
+// cone height relative to the tube radius, and the number of cones (for
+// each path, and at most). Magenta is not a color of the lookup tables.
+const TUBE_RADIUS_FRACTION = 0.003;
+const CONE_HEIGHT_FACTOR = 4;
+const CONES_PER_PATH = 20;
+const MAX_CONE_COUNT = 500;
+const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
+
 export type FractureLayer = "final" | "removed" | "rejected";
-/** The fracture layers, and the particle paths of the transport (`trajectories.vtp`) */
-export type Layer = FractureLayer | "trajectories";
 
 interface PolyDataLayer {
   reader: vtkXMLPolyDataReader;
@@ -45,7 +52,9 @@ export class NetworkViewer {
   private readonly window: vtkWebAssemblyOpenGLRenderWindow;
   private readonly lookupTable: vtkLookupTable;
   private readonly scalarBar: vtkScalarBarActor;
-  private readonly layers = new Map<Layer, PolyDataLayer>();
+  private readonly layers = new Map<FractureLayer, PolyDataLayer>();
+  /** Tubes and cones */
+  private trajectoryActors: vtkActor[] = [];
   private readonly pressureLookupTable: vtkLookupTable;
   private meshActor: vtkActor | null = null;
   private pressureLayer: PolyDataLayer | null = null;
@@ -118,8 +127,8 @@ export class NetworkViewer {
     this.meshActor = actor;
   }
 
-  /** Shows a fracture or trajectory file (text of a .vtp file), or removes the layer (null). */
-  async setLayer(layer: Layer, vtpText: string | null): Promise<void> {
+  /** Shows a fracture file (text of a .vtp file), or removes the layer (null). */
+  async setLayer(layer: FractureLayer, vtpText: string | null): Promise<void> {
     const old = this.layers.get(layer);
     if (old) {
       this.renderer.removeActor(old.actor);
@@ -144,9 +153,6 @@ export class NetworkViewer {
     } else if (layer === "rejected") {
       property.setColor(0.85, 0.2, 0.2);
       property.setOpacity(0.25);
-    } else if (layer === "trajectories") {
-      property.setColor(0.1, 0.3, 0.85);
-      property.setLineWidth(2);
     }
     this.renderer.addActor(actor);
     this.layers.set(layer, { reader, mapper, actor });
@@ -274,10 +280,72 @@ export class NetworkViewer {
     this.updateScalarBar();
   }
 
-  setVisible(layer: Layer | "mesh", isVisible: boolean): void {
+  /**
+   * Shows the particle paths (text of `trajectories.vtp` with `velocity` as
+   * the active vectors) as tubes, with cones in the direction of the
+   * velocity; or removes them (null).
+   */
+  async setTrajectories(vtpText: string | null): Promise<void> {
+    for (const actor of this.trajectoryActors) {
+      this.renderer.removeActor(actor);
+    }
+    this.trajectoryActors = [];
+    if (vtpText === null) {
+      return;
+    }
+    const reader = this.vtk.vtkXMLPolyDataReader();
+    reader.readFromInputStringOn();
+    reader.setInputString(vtpText);
+    await reader.update(0);
+    const paths = reader.getOutput();
+    const tubeRadius = TUBE_RADIUS_FRACTION * paths.getLength();
+
+    const tubes = this.vtk.vtkTubeFilter();
+    tubes.setInputConnection(0, reader.getOutputPort(0));
+    tubes.setRadius(tubeRadius);
+    tubes.setNumberOfSides(8);
+    const tubeMapper = this.vtk.vtkPolyDataMapper();
+    tubeMapper.setInputConnection(0, tubes.getOutputPort(0));
+    tubeMapper.setScalarVisibility(0);
+
+    // Every n-th point (thus not at equal distances); the speeds differ by
+    // orders of magnitude, thus all cones have one size
+    const coneCount = Math.min(MAX_CONE_COUNT, CONES_PER_PATH * paths.getNumberOfLines());
+    const points = this.vtk.vtkMaskPoints();
+    points.setInputConnection(0, reader.getOutputPort(0));
+    points.setOnRatio(Math.max(1, Math.floor(paths.getNumberOfPoints() / coneCount)));
+    const cone = this.vtk.vtkConeSource();
+    cone.setResolution(12);
+    const cones = this.vtk.vtkGlyph3D();
+    cones.setInputConnection(0, points.getOutputPort(0));
+    cones.setSourceConnection(0, cone.getOutputPort(0));
+    cones.setVectorModeToUseVector();
+    cones.setOrient(1);
+    cones.setScaleModeToDataScalingOff();
+    cones.setScaleFactor(CONE_HEIGHT_FACTOR * tubeRadius);
+    const coneMapper = this.vtk.vtkPolyDataMapper();
+    coneMapper.setInputConnection(0, cones.getOutputPort(0));
+    coneMapper.setScalarVisibility(0);
+
+    for (const mapper of [tubeMapper, coneMapper]) {
+      const actor = this.vtk.vtkActor({ mapper });
+      actor.getProperty().setColor(...TRAJECTORY_COLOR);
+      this.renderer.addActor(actor);
+      this.trajectoryActors.push(actor);
+    }
+  }
+
+  setVisible(layer: FractureLayer | "mesh" | "trajectories", isVisible: boolean): void {
+    const visibility = isVisible ? 1 : 0;
+    if (layer === "trajectories") {
+      for (const actor of this.trajectoryActors) {
+        actor.setVisibility(visibility);
+      }
+      return;
+    }
     const actor = layer === "mesh" ? this.meshActor : this.layers.get(layer)?.actor;
     if (actor) {
-      actor.setVisibility(isVisible ? 1 : 0);
+      actor.setVisibility(visibility);
     }
   }
 

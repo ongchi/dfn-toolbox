@@ -26,6 +26,7 @@ import { baseName, meshRegionNames, type InputFiles } from "./inputFiles";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
 import { transportStateToToml } from "./transport/toml";
+import { markVelocityAsVectors } from "./transport/trajectories";
 import { NetworkViewer, type FractureLayer } from "./viewer";
 
 const DEFAULT_COLOR_ARRAY = "family";
@@ -517,7 +518,7 @@ function clearTransportOutput(): void {
   ui.showTrajectories.checked = false;
   ui.showTrajectories.disabled = true;
   if (viewer) {
-    void viewer.setLayer("trajectories", null);
+    void viewer.setTrajectories(null);
     void viewer.render();
   }
 }
@@ -656,7 +657,7 @@ async function showTransportInViewer(): Promise<void> {
   if (!viewer || trajectories === null) {
     return;
   }
-  await viewer.setLayer("trajectories", trajectories);
+  await viewer.setTrajectories(markVelocityAsVectors(trajectories));
   applyLayerVisibility(viewer);
   await viewer.render();
 }

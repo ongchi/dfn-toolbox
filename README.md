@@ -49,7 +49,9 @@ There is no server: `npm run build` gives a folder of static files.
 - Output: the 3D view of `fractures.vtp` (color by a cell array),
   `fractures_removed.vtp`, `fractures_rejected.vtp`, the mesh, and the
   pressure of the flow (layer "Pressure"; it hides the fracture layers), the
-  particle paths (layer "Trajectories"); the logs; the mass flow of each
+  particle paths (layer "Trajectories": tubes, with cones in the direction
+  of the velocity at every n-th point, about 20 for each path and at most
+  500); the logs; the mass flow of each
   boundary; the particle counts and the volume fluxes of the transport; each
   output file, and the output of the generation, of the flow and of the
   transport as one `.zip` each.
@@ -75,7 +77,7 @@ differences over thousands of time steps (up to about 1e-6, relative).
 | `app` | Vite + TypeScript front end. |
 | `app/src/form` | The network form. `state.ts` has the form state, `toml.ts` the conversion to and from TOML, and one file for each section. |
 | `app/src/flow` | The flow form (`state.ts`, `toml.ts`: only to TOML, `form.ts`), and `polyData.ts`: `pressure.vtu` as PolyData for the view. |
-| `app/src/transport` | The transport form (`state.ts`, `toml.ts`: only to TOML, `form.ts`). |
+| `app/src/transport` | The transport form (`state.ts`, `toml.ts`: only to TOML, `form.ts`), and `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view. |
 | `app/src/viewer.ts` | The 3D view (VTK.wasm). |
 | `app/src/worker.ts`, `app/src/generationClient.ts` | The Web Worker of the generation, the flow and the transport, and its interface for the page. |
 | `app/tests` | `vitest` tests (Node). |

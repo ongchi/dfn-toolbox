@@ -16,6 +16,7 @@ import {
   type TransportState,
 } from "../src/transport/state";
 import { transportStateToToml } from "../src/transport/toml";
+import { markVelocityAsVectors } from "../src/transport/trajectories";
 import { compareOutputFolders, initWasm, readCase, runNativeDfntrans } from "./cases";
 
 // The case with boundary arrays: the mesh surface, and the regions south and north
@@ -99,6 +100,14 @@ test("some particles exit through the out-flow boundary", () => {
   expect(result.particle_count).toBeGreaterThan(0);
   expect(result.exit_count).toBeGreaterThan(0);
   expect(result.inflow_volume_flux).toBeGreaterThan(0);
+});
+
+test("the trajectories have the velocity as the active vectors for the view", () => {
+  const state = transportState(ROLES);
+  state.hasTrajectories = true;
+  const result = run_transport(transportStateToToml(state), flowToml, mesh, 1);
+  const trajectories = markVelocityAsVectors(result.file("trajectories.vtp") ?? "");
+  expect(trajectories).toMatch(/<PointData Vectors="velocity">[\s\S]*Name="velocity" NumberOfComponents="3"/);
 });
 
 test("seed 0 uses the seed of the page", () => {
