@@ -1,7 +1,7 @@
 [package]
 name = "dfn-wasm"
 version = "0.1.0"
-description = "WebAssembly bindings of dfngen and fehm for the web app"
+description = "WebAssembly bindings of dfngen, fehm and dfntrans for the web app"
 edition = "2021"
 license = "LGPL-3.0"
 publish = false
@@ -14,6 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dfngen-rs = { path = "../../dfngen-rs", default-features = false }
+dfntrans-rs = { path = "../../dfntrans-rs", default-features = false }
 fehm-rs = { path = "../../fehm-rs", default-features = false }
 js-sys = "0.3.106"
 tracing = "0.1"

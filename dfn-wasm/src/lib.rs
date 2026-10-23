@@ -1,4 +1,4 @@
-//! WebAssembly bindings of dfngen and fehm for the web app.
+//! WebAssembly bindings of dfngen, fehm and dfntrans for the web app.
 //!
 //! The web app runs these functions in a Web Worker. Each function takes the
 //! text of the input files and gives the text of the output files: there is
@@ -6,6 +6,7 @@
 
 mod flow;
 mod generation;
+mod transport;
 
 use std::cell::RefCell;
 use std::io::{self, Write};
@@ -14,7 +15,7 @@ use std::sync::{Arc, Mutex};
 
 use tracing_subscriber::fmt::MakeWriter;
 
-/// The `create_file` callback of `write_output` of dfngen and fehm
+/// The `create_file` callback of `write_output` of dfngen, fehm and dfntrans
 type CreateFile<'a> = dyn FnMut(&str) -> io::Result<Box<dyn Write>> + 'a;
 
 /// Runs `action` with a log subscriber; returns its result and the log lines,

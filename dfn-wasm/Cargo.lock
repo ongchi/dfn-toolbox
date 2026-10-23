@@ -90,6 +90,7 @@ name = "dfn-wasm"
 version = "0.1.0"
 dependencies = [
  "dfngen-rs",
+ "dfntrans-rs",
  "fehm-rs",
  "js-sys",
  "tracing",
@@ -110,6 +111,17 @@ dependencies = [
  "serde",
  "spade",
  "statrs",
+ "thiserror 2.0.21",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "dfntrans-rs"
+version = "0.1.0"
+dependencies = [
+ "fehm-rs",
+ "serde",
  "thiserror 2.0.21",
  "toml",
  "tracing",
