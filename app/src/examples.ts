@@ -1,7 +1,6 @@
-// The test cases of tests/data as examples (copied by build-wasm.sh).
-import { tomlToFormState } from "./form/toml";
-import type { FormState } from "./form/state";
+// The workflow examples of ../examples (copied by build-wasm.sh).
 import type { InputFiles } from "./inputFiles";
+import { tomlToWorkflow, type Workflow } from "./workflow";
 
 const EXAMPLES_URL = new URL(`${import.meta.env.BASE_URL}examples/`, window.location.href);
 
@@ -21,26 +20,14 @@ async function fetchText(url: URL): Promise<string> {
   return response.text();
 }
 
-/** The comment at the top of the TOML (the feature of a case), or "" */
-export function exampleDescription(toml: string): string {
-  const lines = toml.split("\n");
-  const end = lines.findIndex((line) => !line.startsWith("#"));
-  return lines
-    .slice(0, end === -1 ? lines.length : end)
-    .map((line) => line.replace(/^#\s?/, ""))
-    .join(" ");
-}
-
-export async function loadExample(
-  name: string,
-): Promise<{ state: FormState; files: InputFiles; description: string }> {
+export async function loadExample(name: string): Promise<{ workflow: Workflow; files: InputFiles }> {
   const tomlUrl = new URL(`${name}/${name}.toml`, EXAMPLES_URL);
-  const toml = await fetchText(tomlUrl);
-  const state = tomlToFormState(toml);
-  const mesh = { name: state.domain, text: await fetchText(new URL(state.domain, tomlUrl)) };
+  const workflow = tomlToWorkflow(await fetchText(tomlUrl));
+  const network = workflow.network;
+  const mesh = { name: network.domain, text: await fetchText(new URL(network.domain, tomlUrl)) };
   const userFractures =
-    state.userFractures === null
+    network.userFractures === null
       ? null
-      : { name: state.userFractures, text: await fetchText(new URL(state.userFractures, tomlUrl)) };
-  return { state, files: { mesh, userFractures }, description: exampleDescription(toml) };
+      : { name: network.userFractures, text: await fetchText(new URL(network.userFractures, tomlUrl)) };
+  return { workflow, files: { mesh, userFractures } };
 }

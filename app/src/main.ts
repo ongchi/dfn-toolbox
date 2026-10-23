@@ -2,16 +2,16 @@
 // transport in the worker, 3D view and output files.
 import "./style.css";
 import { strToU8, zipSync } from "fflate";
-import { exampleDescription, listExamples, loadExample } from "./examples";
+import { listExamples, loadExample } from "./examples";
 import { renderFlowForm } from "./flow/form";
 import { triangleGridToPolyData } from "./flow/polyData";
 import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
-import { flowStateToToml } from "./flow/toml";
+import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
 import type { FileHandlers } from "./form/files";
 import { defaultFormState, type FormState } from "./form/state";
-import { formStateToToml, InputFormError, tomlToFormState } from "./form/toml";
+import { InputFormError, networkToLibraryToml } from "./form/toml";
 import {
   CancelledError,
   GenerationClient,
@@ -25,9 +25,10 @@ import {
 import { baseName, meshRegionNames, type InputFiles } from "./inputFiles";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
-import { transportStateToToml } from "./transport/toml";
+import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
 import { NetworkViewer, type FractureLayer } from "./viewer";
+import { tomlToWorkflow, workflowToToml, type Workflow } from "./workflow";
 
 const DEFAULT_COLOR_ARRAY = "family";
 const PRESSURE_FILE = "pressure.vtu";
@@ -40,11 +41,7 @@ const RUN_BUTTON_TEXT: Record<SidebarTab, string> = {
   flow: "Solve flow",
   transport: "Track particles",
 };
-const SAVE_FILE_NAME: Record<SidebarTab, string> = {
-  network: "input.toml",
-  flow: "flow.toml",
-  transport: "transport.toml",
-};
+const DEFAULT_INPUT_FILE = "workflow.toml";
 
 function byId<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -58,7 +55,7 @@ const ui = {
   exampleSelect: byId<HTMLSelectElement>("example-select"),
   exampleDescription: byId<HTMLParagraphElement>("example-description"),
   openFiles: byId<HTMLInputElement>("open-files"),
-  saveToml: byId<HTMLButtonElement>("save-toml"),
+  saveInput: byId<HTMLButtonElement>("save-input"),
   form: byId<HTMLDivElement>("form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
@@ -83,11 +80,9 @@ const ui = {
   downloadList: byId<HTMLUListElement>("download-list"),
   flowResults: byId<HTMLDivElement>("flow-results"),
   flowStats: byId<HTMLDListElement>("flow-stats"),
-  flowDownloadAll: byId<HTMLButtonElement>("flow-download-all"),
   flowDownloadList: byId<HTMLUListElement>("flow-download-list"),
   transportResults: byId<HTMLDivElement>("transport-results"),
   transportStats: byId<HTMLDListElement>("transport-stats"),
-  transportDownloadAll: byId<HTMLButtonElement>("transport-download-all"),
   transportDownloadList: byId<HTMLUListElement>("transport-download-list"),
   log: byId<HTMLPreElement>("log"),
   flowLogTitle: byId<HTMLHeadingElement>("flow-log-title"),
@@ -101,13 +96,22 @@ const ui = {
 let state: FormState = defaultFormState();
 let files: InputFiles = { mesh: null, userFractures: null };
 let regionNames: string[] = [];
+/** The description (comment) and the file name of the workflow file */
+let description = "";
+let inputFileName = DEFAULT_INPUT_FILE;
 let output: GenerationOutput | null = null;
-const flowState: FlowState = defaultFlowState();
+/** The network input of `output` */
+let outputNetwork: FormState | null = null;
+let flowState: FlowState = defaultFlowState();
 let flowOutput: FlowOutput | null = null;
+/** The flow input of `flowOutput` */
+let outputFlow: FlowState | null = null;
 /** The flow TOML of `flowOutput`: the transport solves this flow again */
 let flowOutputToml: string | null = null;
-const transportState: TransportState = defaultTransportState();
+let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
+/** The transport input of `transportOutput` */
+let outputTransport: TransportState | null = null;
 let activeSidebarTab: SidebarTab = "network";
 let isBusy = false;
 let viewer: NetworkViewer | null = null;
@@ -196,20 +200,13 @@ function renderTransport(): void {
   updateTomlPreview();
 }
 
-/** The TOML of the form of the active sidebar tab */
-function activeToml(): string {
-  switch (activeSidebarTab) {
-    case "network":
-      return formStateToToml(state);
-    case "flow":
-      return flowStateToToml(flowState);
-    case "transport":
-      return transportStateToToml(transportState);
-  }
+/** The workflow file of the three forms */
+function workflowText(): string {
+  return workflowToToml({ description, network: state, flow: flowState, transport: transportState });
 }
 
 function updateTomlPreview(): void {
-  ui.tomlPreview.textContent = activeToml();
+  ui.tomlPreview.textContent = workflowText();
 }
 
 function selectSidebarTab(name: SidebarTab): void {
@@ -223,7 +220,6 @@ function selectSidebarTab(name: SidebarTab): void {
   ui.exampleDescription.hidden = name !== "network" || ui.exampleDescription.textContent === "";
   ui.runButton.textContent = RUN_BUTTON_TEXT[name];
   showStatus("");
-  updateTomlPreview();
 }
 
 async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
@@ -238,9 +234,13 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   }
 }
 
-/** Loads a new input: the old output does not belong to it */
-async function loadInput(newState: FormState, newFiles: InputFiles, description: string): Promise<void> {
-  state = newState;
+/** Loads a new workflow into the three forms: the old output does not belong to it */
+async function loadInput(workflow: Workflow, newFiles: InputFiles, fileName: string): Promise<void> {
+  state = workflow.network;
+  flowState = workflow.flow;
+  transportState = workflow.transport;
+  description = workflow.description;
+  inputFileName = fileName;
   files = { mesh: null, userFractures: newFiles.userFractures };
   await setMesh(newFiles.mesh);
   ui.exampleDescription.textContent = description;
@@ -259,14 +259,14 @@ async function openFiles(fileList: File[]): Promise<void> {
   };
 
   if (tomlFile) {
-    const toml = await tomlFile.text();
-    const newState = tomlToFormState(toml);
+    const workflow = tomlToWorkflow(await tomlFile.text());
+    const network = workflow.network;
     ui.exampleSelect.value = "";
     delete ui.form.dataset.example;
     await loadInput(
-      newState,
-      { mesh: await findFile(newState.domain), userFractures: await findFile(newState.userFractures) },
-      exampleDescription(toml),
+      workflow,
+      { mesh: await findFile(network.domain), userFractures: await findFile(network.userFractures) },
+      tomlFile.name,
     );
     return;
   }
@@ -303,7 +303,7 @@ function generationInput(): GenerationInput | string {
     return `Choose the user-defined fracture file ${state.userFractures}, or remove it.`;
   }
   return {
-    toml: formStateToToml(state),
+    toml: networkToLibraryToml(state),
     mesh: files.mesh.text,
     userFractures: files.userFractures?.text,
   };
@@ -335,6 +335,7 @@ async function runGeneration(): Promise<void> {
   setBusy(true, true);
   ui.progress.value = 0;
   showStatus("Generating…");
+  const network = structuredClone(state);
   const startTime = performance.now();
   try {
     const result = await client.run(input, (acceptedCount, fraction) => {
@@ -348,6 +349,7 @@ async function runGeneration(): Promise<void> {
     }
     showStatus(`Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`);
     await showOutput(result);
+    outputNetwork = network;
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -359,12 +361,12 @@ async function runGeneration(): Promise<void> {
 function flowInput(): FlowInput | string {
   const mesh = flowMesh();
   if (mesh === null) {
-    return `Generate a network with the mesh on first: the flow needs ${FLOW_MESH_FILE}.`;
+    return `Generate a network first: the flow needs ${FLOW_MESH_FILE}.`;
   }
   if (ui.flowForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
-  return { toml: flowStateToToml(flowState), mesh };
+  return { toml: flowToLibraryToml(flowState), mesh };
 }
 
 async function checkFlowInput(): Promise<void> {
@@ -394,6 +396,7 @@ async function runFlow(): Promise<void> {
   // fehm reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Solving the flow…");
+  const flow = structuredClone(flowState);
   const startTime = performance.now();
   try {
     const result = await client.runFlow(input);
@@ -407,6 +410,7 @@ async function runFlow(): Promise<void> {
       `Done in ${durationText(performance.now() - startTime)}: ${result.newtonIterations} Newton iterations.`,
     );
     await showFlowOutput(result, input.toml);
+    outputFlow = flow;
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -423,7 +427,7 @@ function transportInput(): TransportInput | string {
   if (ui.transportForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
-  return { toml: transportStateToToml(transportState), flowToml: flowOutputToml, mesh };
+  return { toml: transportToLibraryToml(transportState), flowToml: flowOutputToml, mesh };
 }
 
 async function checkTransportInput(): Promise<void> {
@@ -453,6 +457,7 @@ async function runTransport(): Promise<void> {
   // dfntrans reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Tracking the particles…");
+  const transport = structuredClone(transportState);
   const startTime = performance.now();
   try {
     const result = await client.runTransport(input);
@@ -466,6 +471,7 @@ async function runTransport(): Promise<void> {
       `Done in ${durationText(performance.now() - startTime)}: ${result.exitCount} of ${result.particleCount} particles exited.`,
     );
     await showTransportOutput(result);
+    outputTransport = transport;
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -477,6 +483,7 @@ async function runTransport(): Promise<void> {
 
 function clearOutput(): void {
   output = null;
+  outputNetwork = null;
   ui.results.hidden = true;
   ui.resultsEmpty.hidden = false;
   ui.colorSelect.disabled = true;
@@ -494,6 +501,7 @@ function clearOutput(): void {
 /** The flow output belongs to the mesh of one generation */
 function clearFlowOutput(): void {
   flowOutput = null;
+  outputFlow = null;
   flowOutputToml = null;
   ui.flowResults.hidden = true;
   ui.flowLog.textContent = "";
@@ -512,6 +520,7 @@ function clearFlowOutput(): void {
 /** The transport output belongs to one flow output */
 function clearTransportOutput(): void {
   transportOutput = null;
+  outputTransport = null;
   ui.transportResults.hidden = true;
   ui.transportLog.textContent = "";
   ui.transportLogTitle.hidden = true;
@@ -569,9 +578,29 @@ function showDownloadLinks(list: HTMLUListElement, outputFiles: [string, string]
   );
 }
 
-function downloadZip(name: string, outputFiles: [string, string][]): void {
-  const archive = zipSync(Object.fromEntries(outputFiles.map(([fileName, text]) => [fileName, strToU8(text)])));
-  downloadText(name, archive, "application/zip");
+/**
+ * One zip of the workflow: the workflow file with the input of each output
+ * (the form for a step with no output), and the folders network/, flow/ and
+ * transport/ with the output files.
+ */
+function downloadAllOutput(): void {
+  const workflow = workflowToToml({
+    description,
+    network: outputNetwork ?? state,
+    flow: outputFlow ?? flowState,
+    transport: outputTransport ?? transportState,
+  });
+  const folders: [string, [string, string][]][] = [
+    ["network", output?.files ?? []],
+    ["flow", flowOutput?.files ?? []],
+    ["transport", transportOutput?.files ?? []],
+  ];
+  const entries: [string, Uint8Array][] = [[inputFileName, strToU8(workflow)]];
+  for (const [folder, outputFiles] of folders) {
+    entries.push(...outputFiles.map(([name, text]): [string, Uint8Array] => [`${folder}/${name}`, strToU8(text)]));
+  }
+  const archiveName = `${inputFileName.replace(/\.toml$/, "")}_output.zip`;
+  downloadText(archiveName, zipSync(Object.fromEntries(entries)), "application/zip");
 }
 
 async function showOutput(result: GenerationOutput): Promise<void> {
@@ -738,7 +767,7 @@ function bindEvents(): void {
     }
     try {
       const example = await loadExample(name);
-      await loadInput(example.state, example.files, example.description);
+      await loadInput(example.workflow, example.files, `${name}.toml`);
       ui.form.dataset.example = name;
     } catch (error) {
       showStatus(errorText(error), true);
@@ -752,8 +781,8 @@ function bindEvents(): void {
     }
     ui.openFiles.value = "";
   });
-  ui.saveToml.addEventListener("click", () => downloadText(SAVE_FILE_NAME[activeSidebarTab], activeToml()));
-  ui.copyToml.addEventListener("click", () => void navigator.clipboard.writeText(activeToml()));
+  ui.saveInput.addEventListener("click", () => downloadText(inputFileName, workflowText()));
+  ui.copyToml.addEventListener("click", () => void navigator.clipboard.writeText(workflowText()));
   const checkActions: Record<SidebarTab, () => Promise<void>> = {
     network: checkInput,
     flow: checkFlowInput,
@@ -767,21 +796,7 @@ function bindEvents(): void {
   ui.checkButton.addEventListener("click", () => void checkActions[activeSidebarTab]());
   ui.runButton.addEventListener("click", () => void runActions[activeSidebarTab]());
   ui.cancelButton.addEventListener("click", () => client.cancel());
-  ui.downloadAll.addEventListener("click", () => {
-    if (output) {
-      downloadZip("dfngen_output.zip", output.files);
-    }
-  });
-  ui.flowDownloadAll.addEventListener("click", () => {
-    if (flowOutput) {
-      downloadZip("fehm_output.zip", flowOutput.files);
-    }
-  });
-  ui.transportDownloadAll.addEventListener("click", () => {
-    if (transportOutput) {
-      downloadZip("dfntrans_output.zip", transportOutput.files);
-    }
-  });
+  ui.downloadAll.addEventListener("click", downloadAllOutput);
 
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(ui.colorSelect.value === "" ? null : ui.colorSelect.value)),

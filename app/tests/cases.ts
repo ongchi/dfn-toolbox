@@ -1,11 +1,15 @@
-// Test cases of tests/data, read in Node, the WebAssembly module, and the
-// native binaries of dfngen, fehm and dfntrans.
+// Test cases of tests/data and the workflow examples of ../examples, read in
+// Node, the WebAssembly module, and the native binaries of dfngen, fehm and
+// dfntrans.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { initSync, input_file_names } from "../src/pkg/dfn_wasm.js";
+import { FLOW_MESH_FILE } from "../src/flow/state";
+import { networkToLibraryToml } from "../src/form/toml";
+import { initSync, input_file_names, run_generation } from "../src/pkg/dfn_wasm.js";
+import { tomlToWorkflow, type Workflow } from "../src/workflow";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // The library repository, a sibling folder of this project
@@ -49,6 +53,56 @@ export function readCase(caseName: string, toml?: string): CaseFiles {
         ? undefined
         : readFileSync(join(caseDir, names.user_fractures), "utf8"),
   };
+}
+
+// The workflow examples of dfn-web (../examples)
+const examplesDir = resolve(appDir, "../examples");
+
+export const exampleNames: string[] = readdirSync(examplesDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && existsSync(join(examplesDir, entry.name, `${entry.name}.toml`)))
+  .map((entry) => entry.name)
+  .sort();
+
+export interface ExampleFiles {
+  /** The workflow file */
+  toml: string;
+  /** The full path of a file which the workflow file names (relative to its folder) */
+  path(name: string): string;
+  readFile(name: string): string;
+}
+
+export function readExample(exampleName: string): ExampleFiles {
+  const exampleDir = join(examplesDir, exampleName);
+  const path = (name: string) => join(exampleDir, name);
+  return {
+    toml: readFileSync(path(`${exampleName}.toml`), "utf8"),
+    path,
+    readFile: (name) => readFileSync(path(name), "utf8"),
+  };
+}
+
+/** The workflow of an example and the triangle mesh of its network, in WebAssembly (needs `initWasm`). */
+export function generateExample(exampleName: string): { workflow: Workflow; mesh: string } {
+  const example = readExample(exampleName);
+  const workflow = tomlToWorkflow(example.toml);
+  const network = workflow.network;
+  const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
+  const result = run_generation(networkToLibraryToml(network), example.readFile(network.domain), userFractures, 1n, () => {});
+  if (result.error !== undefined) {
+    throw new Error(`the generation of ${exampleName} failed: ${result.error}`);
+  }
+  return { workflow, mesh: result.file(FLOW_MESH_FILE) ?? "" };
+}
+
+/** Runs the native binary of dfngen on an input file in a folder; returns the output folder. */
+export function runNativeDfngen(tomlPath: string): string {
+  const binary = join(dfngenDir, "target/release/dfngen");
+  if (!existsSync(binary)) {
+    throw new Error(`${binary} is missing: run "cargo build --release" in the repository`);
+  }
+  const outputDir = mkdtempSync(join(tmpdir(), "dfngen-"));
+  execFileSync(binary, [tomlPath, outputDir], { stdio: "ignore" });
+  return outputDir;
 }
 
 /** Runs the native binary (target/release/dfngen) on a case; returns the output folder. */

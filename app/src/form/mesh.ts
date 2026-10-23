@@ -1,23 +1,26 @@
-import { apertureFields } from "./aperture";
+import { optionalApertureFields } from "./aperture";
 import type { FormContext } from "./context";
-import { checkboxField, numberField, row, section } from "./fields";
+import { checkboxField, element, numberField, row, section } from "./fields";
 import type { FormState } from "./state";
 
+/** The boundary lines and the mesh are always on: the flow needs them */
 export function meshSection(state: FormState, context: FormContext): HTMLElement {
   const mesh = state.mesh;
-  const isOff = !mesh.enable;
   return section(
-    "Triangle mesh for fehm-rs",
+    "Triangle mesh for the flow",
+    element(
+      "p",
+      "form-note",
+      "The generation always writes the boundary lines of the regions (fracture_boundaries.vtp) and the triangle mesh of the final fractures (dfn_mesh.vtu). The boundary lines give the boundaries of the flow.",
+    ),
     checkboxField({
-      label: "Mesh on",
-      key: "enable",
-      help: state.regionBoundaries.enable
-        ? "write the triangle mesh of the final fractures (`dfn_mesh.vtu`); each family needs an aperture"
-        : "needs the boundary lines of the regions on",
-      value: mesh.enable,
+      label: "Use the family region",
+      key: "use_family_region",
+      help: "off = the lines of each stochastic fracture are at the mesh surface, also if its family has a region",
+      value: state.regionBoundaries.useFamilyRegion,
       onInput: (value) => {
-        mesh.enable = value;
-        context.rerender();
+        state.regionBoundaries.useFamilyRegion = value;
+        context.changed();
       },
     }),
     row(
@@ -27,7 +30,6 @@ export function meshSection(state: FormState, context: FormContext): HTMLElement
         help: "largest triangle size = factor × `min_feature_size`",
         value: mesh.maxSizeFactor,
         min: 1,
-        isDisabled: isOff,
         onInput: (value) => {
           mesh.maxSizeFactor = value;
           context.changed();
@@ -40,19 +42,17 @@ export function meshSection(state: FormState, context: FormContext): HTMLElement
         value: mesh.slope,
         min: 0,
         isMinExclusive: true,
-        isDisabled: isOff,
         onInput: (value) => {
           mesh.slope = value;
           context.changed();
         },
       }),
     ),
-    ...apertureFields(
+    ...optionalApertureFields(
       {
         label: "User-defined fracture aperture",
         key: "user_fracture_aperture",
         help: "necessary with a user-defined fracture file",
-        isDisabled: isOff,
         aperture: mesh.userFractureAperture,
         onSelect: (aperture) => {
           mesh.userFractureAperture = aperture;

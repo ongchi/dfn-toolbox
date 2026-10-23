@@ -1,7 +1,7 @@
-// State of the transport form: the input file of dfntrans (see "Input file"
-// of ../dfntrans-rs/README.md). This is a second copy of the input format of
-// `../dfntrans-rs/src/io/input.rs`: a change of a key there needs a change
-// here, in `toml.ts` and in `form.ts`.
+// State of the transport form: `[transport]` of the workflow file. It follows
+// the input format of `../dfntrans-rs/src/io/input.rs` (see "Input file" of
+// ../dfntrans-rs/README.md): a change of a key there needs a change here, in
+// `toml.ts` and in `form.ts`.
 
 /** Name of the flow file in the TOML; the flow is that of the last "Solve flow" */
 export const TRANSPORT_FLOW_FILE = "flow.toml";
@@ -93,8 +93,12 @@ export function defaultTransportState(): TransportState {
   };
 }
 
-/** One boundary for each name; a boundary with the same name keeps its role */
+/**
+ * One boundary for each name; a boundary with the same name keeps its role.
+ * A used boundary of no name stays at the end: dfntrans reports it as an error.
+ */
 export function updateTransportBoundaries(state: TransportState, names: string[]): void {
   const previous = new Map(state.boundaries.map((boundary) => [boundary.name, boundary]));
-  state.boundaries = names.map((name) => previous.get(name) ?? { name, role: "none" });
+  const missing = state.boundaries.filter((boundary) => boundary.role !== "none" && !names.includes(boundary.name));
+  state.boundaries = [...names.map((name) => previous.get(name) ?? { name, role: "none" as const }), ...missing];
 }

@@ -1,36 +1,42 @@
-// Fields of an aperture distribution (a family `aperture`, and
-// `mesh.user_fracture_aperture`); "None" = no key.
+// Fields of an aperture distribution: a family `aperture` (necessary), and
+// `mesh.user_fracture_aperture` ("None" = no key).
 import type { FormContext } from "./context";
 import { numberField, row, selectField } from "./fields";
 import { defaultAperture, type ApertureDistribution, type ApertureState } from "./state";
 
-export interface ApertureFieldOptions {
+interface ApertureFieldOptions<Aperture extends ApertureState | null> {
   label: string;
   key: string;
   help: string;
-  isDisabled?: boolean;
-  aperture: ApertureState | null;
-  onSelect: (aperture: ApertureState | null) => void;
+  aperture: Aperture;
+  onSelect: (aperture: Aperture) => void;
 }
 
-function parameterFields(aperture: ApertureState, isDisabled: boolean, context: FormContext): HTMLElement[] {
+const DISTRIBUTION_CHOICES: [ApertureDistribution, string][] = [
+  ["constant", "Constant"],
+  ["log_normal", "Log-normal"],
+  ["correlated", "Correlated: α r^β"],
+  ["semi_correlated", "Semi-correlated: α r^β e^(sd N)"],
+];
+
+function parameterFields(aperture: ApertureState, context: FormContext): HTMLElement[] {
   const set = <K extends string>(key: K) => (value: number) => {
     (aperture as unknown as Record<K, number>)[key] = value;
     context.changed();
   };
-  const positive = { min: 0, isMinExclusive: true, isDisabled };
+  const positive = { min: 0, isMinExclusive: true };
   const alpha = (value: number) =>
     numberField({ label: "Factor α (m)", key: "alpha", value, ...positive, onInput: set("alpha") });
-  const beta = (value: number) => numberField({ label: "Exponent β", key: "beta", value, isDisabled, onInput: set("beta") });
+  const beta = (value: number) => numberField({ label: "Exponent β", key: "beta", value, onInput: set("beta") });
   const sd = (value: number) =>
-    numberField({ label: "Standard deviation", key: "sd", value, min: 0, isDisabled, onInput: set("sd") });
+    numberField({ label: "Standard deviation", key: "sd", value, min: 0, onInput: set("sd") });
 
   switch (aperture.distribution) {
     case "constant":
       return [numberField({ label: "Aperture (m)", key: "value", value: aperture.value, ...positive, onInput: set("value") })];
     case "log_normal":
       return [
-        numberField({ label: "Mean of ln(b)", key: "log_mean", value: aperture.logMean, isDisabled, onInput: set("logMean") }),
+        numberField({ label: "Mean of ln(b)", key: "log_mean", value: aperture.logMean, onInput: set("logMean") }),
         sd(aperture.sd),
       ];
     case "correlated":
@@ -40,22 +46,32 @@ function parameterFields(aperture: ApertureState, isDisabled: boolean, context: 
   }
 }
 
-export function apertureFields(options: ApertureFieldOptions, context: FormContext): HTMLElement[] {
+export function apertureFields(options: ApertureFieldOptions<ApertureState>, context: FormContext): HTMLElement[] {
+  const distribution = selectField<ApertureDistribution>({
+    label: options.label,
+    key: options.key,
+    help: options.help,
+    value: options.aperture.distribution,
+    choices: DISTRIBUTION_CHOICES,
+    onInput: (value) => {
+      options.onSelect(defaultAperture(value));
+      context.rerender();
+    },
+  });
+  return [row(distribution), row(...parameterFields(options.aperture, context))];
+}
+
+export function optionalApertureFields(
+  options: ApertureFieldOptions<ApertureState | null>,
+  context: FormContext,
+): HTMLElement[] {
   const aperture = options.aperture;
-  const isDisabled = options.isDisabled ?? false;
   const distribution = selectField<ApertureDistribution | "">({
     label: options.label,
     key: options.key,
     help: options.help,
     value: aperture?.distribution ?? "",
-    isDisabled,
-    choices: [
-      ["", "None"],
-      ["constant", "Constant"],
-      ["log_normal", "Log-normal"],
-      ["correlated", "Correlated: α r^β"],
-      ["semi_correlated", "Semi-correlated: α r^β e^(sd N)"],
-    ],
+    choices: [["", "None"], ...DISTRIBUTION_CHOICES],
     onInput: (value) => {
       options.onSelect(value === "" ? null : defaultAperture(value));
       context.rerender();
@@ -64,5 +80,5 @@ export function apertureFields(options: ApertureFieldOptions, context: FormConte
   if (aperture === null) {
     return [row(distribution)];
   }
-  return [row(distribution), row(...parameterFields(aperture, isDisabled, context))];
+  return [row(distribution), row(...parameterFields(aperture, context))];
 }

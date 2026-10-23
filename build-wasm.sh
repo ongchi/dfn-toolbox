@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 # Builds the WebAssembly module of dfngen for the web app, and copies the
-# test cases of tests/data into the app as examples.
+# workflow examples of examples/ into the app.
 #
 # Needs: the Rust target wasm32-unknown-unknown, and wasm-bindgen-cli with
 # the version of wasm-bindgen in dfn-wasm/Cargo.toml.
 set -euo pipefail
 
 web_dir="$(cd "$(dirname "$0")" && pwd)"
-# The library repository, a sibling folder of this project
-dfngen_dir="$(dirname "$web_dir")/dfngen-rs"
 app_dir="$web_dir/app"
 
 cargo build --release --target wasm32-unknown-unknown \
@@ -16,11 +14,11 @@ cargo build --release --target wasm32-unknown-unknown \
 wasm-bindgen --target web --out-dir "$app_dir/src/pkg" \
     "$web_dir/dfn-wasm/target/wasm32-unknown-unknown/release/dfn_wasm.wasm"
 
-# Examples: the folders of tests/data, with an index of the cases
+# Examples: the folders of examples/, with an index of the examples
 examples_dir="$app_dir/public/examples"
 rm -rf "$examples_dir"
 mkdir -p "$examples_dir"
-cp -R "$dfngen_dir/tests/data/." "$examples_dir/"
+cp -R "$web_dir/examples/." "$examples_dir/"
 {
     echo "["
     first=true

@@ -16,12 +16,12 @@
             <option value="">Choose…</option>
           </select>
         </label>
-        <label class="button file-button" title="Open a TOML input file, with its mesh and fracture files">
+        <label class="button file-button" title="Open a workflow file (.toml), with its mesh and fracture files">
           Open files…
           <input id="open-files" type="file" accept=".toml,.vtu,.vtp" multiple />
         </label>
-        <button id="save-toml" class="button" type="button" title="Save the input of the form as a TOML file">
-          Save TOML
+        <button id="save-input" class="button" type="button" title="Save the input of the three tabs as one workflow file">
+          Save input
         </button>
         <a
           class="button"
@@ -89,7 +89,14 @@
             <div id="results" hidden>
               <dl id="results-stats" class="stats"></dl>
               <div class="downloads">
-                <button id="download-all" class="button-small" type="button">Download all (.zip)</button>
+                <button
+                  id="download-all"
+                  class="button-small"
+                  type="button"
+                  title="The workflow file and the output of the network, the flow and the transport"
+                >
+                  Download all (.zip)
+                </button>
                 <ul id="download-list"></ul>
               </div>
             </div>
@@ -97,7 +104,6 @@
               <h4>Flow</h4>
               <dl id="flow-stats" class="stats"></dl>
               <div class="downloads">
-                <button id="flow-download-all" class="button-small" type="button">Download flow (.zip)</button>
                 <ul id="flow-download-list"></ul>
               </div>
             </div>
@@ -105,7 +111,6 @@
               <h4>Transport</h4>
               <dl id="transport-stats" class="stats"></dl>
               <div class="downloads">
-                <button id="transport-download-all" class="button-small" type="button">Download transport (.zip)</button>
                 <ul id="transport-download-list"></ul>
               </div>
             </div>

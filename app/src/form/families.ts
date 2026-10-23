@@ -282,7 +282,7 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
       {
         label: "Aperture",
         key: "aperture",
-        help: state.mesh.enable ? "necessary with the mesh" : "only for the mesh; no effect without it",
+        help: "of the mesh and the flow",
         aperture: family.aperture,
         onSelect: (aperture) => {
           family.aperture = aperture;

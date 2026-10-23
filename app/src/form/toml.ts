@@ -1,9 +1,11 @@
-// Conversion between the form state and the TOML text of the input file.
+// Conversion between the network form state and `[network]` of the workflow
+// file, and the dfngen input file of the network. Also the TOML helpers of
+// the flow and the transport.
 //
-// `tomlToFormState` checks the keys and the types, as the `*Section` structs
-// of `src/io/input.rs` do: an unknown key or a missing key is an error, so
-// no value of the file is lost in the form. The library checks the values
-// ("Check input").
+// `readNetwork` checks the keys and the types, as the `*Section` structs of
+// `../dfngen-rs/src/io/input.rs` do: an unknown key or a missing key is an
+// error, so no value of the file is lost in the form. The library checks the
+// values ("Check input").
 
 import { parse } from "smol-toml";
 import {
@@ -45,8 +47,32 @@ export function string(value: string): string {
   return JSON.stringify(value);
 }
 
-function inlineTable(entries: [string, string][]): string {
+/** TOML key: a bare key when it can be one, else a quoted key */
+export function key(name: string): string {
+  return /^[A-Za-z0-9_-]+$/.test(name) ? name : string(name);
+}
+
+export function inlineTable(entries: [string, string][]): string {
   return `{ ${entries.map(([key, value]) => `${key} = ${value}`).join(", ")} }`;
+}
+
+/** One table of a TOML text: `name` "" = the top table of its parent; `isArray` = [[name]] */
+export interface TomlTable {
+  name: string;
+  isArray: boolean;
+  lines: string[];
+}
+
+/** The TOML text of the tables, each under the parent table (`parent` "" = the root) */
+export function tablesToToml(tables: TomlTable[], parent: string): string {
+  const blocks = tables.map((table) => {
+    const path = [parent, table.name].filter((part) => part !== "").join(".");
+    if (path === "") {
+      return table.lines;
+    }
+    return [table.isArray ? `[[${path}]]` : `[${path}]`, ...table.lines];
+  });
+  return `${blocks.map((lines) => lines.join("\n")).join("\n\n")}\n`;
 }
 
 function radiusEntries(radius: RadiusState): [string, string][] {
@@ -102,7 +128,6 @@ function orientationEntries(orientation: OrientationState): [string, string][] {
 
 function familyLines(family: FamilyState, isP32: boolean): string[] {
   const lines = [
-    "[[family]]",
     `number_of_points = ${integer(family.numberOfPoints)}`,
     `probability = ${float(family.probability)}`,
     `aspect_ratio = ${float(family.aspectRatio)}`,
@@ -116,79 +141,96 @@ function familyLines(family: FamilyState, isP32: boolean): string[] {
   if (isP32) {
     lines.push(`p32_target = ${float(family.p32Target)}`);
   }
-  if (family.aperture !== null) {
-    lines.push(`aperture = ${inlineTable(apertureEntries(family.aperture))}`);
-  }
-  lines.push(`radius =${inlineTable(radiusEntries(family.radius))}`);
+  lines.push(`aperture = ${inlineTable(apertureEntries(family.aperture))}`);
+  lines.push(`radius = ${inlineTable(radiusEntries(family.radius))}`);
   lines.push(`orientation = ${inlineTable(orientationEntries(family.orientation))}`);
   return lines;
 }
 
-export function formStateToToml(state: FormState): string {
+/** The tables of `[network]` of the workflow file */
+export function networkTables(state: FormState): TomlTable[] {
   const isP32 = state.generation.stopCondition === "p32";
-  const lines = [
+  const rootLines = [
     `seed = ${state.seed}`,
     `min_feature_size = ${float(state.minFeatureSize)}`,
     `domain = ${string(state.domain)}`,
   ];
   if (state.userFractures !== null) {
-    lines.push(`user_fractures = ${string(state.userFractures)}`);
+    rootLines.push(`user_fractures = ${string(state.userFractures)}`);
   }
+  const tables: TomlTable[] = [{ name: "", isArray: false, lines: rootLines }];
 
-  lines.push("", "[generation]");
-  if (!isP32) {
-    lines.push(`n_poly = ${integer(state.generation.nPoly)}`);
-  }
-  lines.push(`force_large_fractures = ${state.generation.forceLargeFractures}`);
-  lines.push(`remove_fractures_less_than = ${float(state.generation.removeFracturesLessThan)}`);
+  const generationLines = isP32 ? [] : [`n_poly = ${integer(state.generation.nPoly)}`];
+  generationLines.push(`force_large_fractures = ${state.generation.forceLargeFractures}`);
+  generationLines.push(`remove_fractures_less_than = ${float(state.generation.removeFracturesLessThan)}`);
+  tables.push({ name: "generation", isArray: false, lines: generationLines });
 
   // Without FRAM, the section is not written: its other keys have no effect
   if (state.fram.enable) {
     const fram = state.fram;
-    lines.push("", "[fram]", "enable = true");
-    lines.push(`relaxed = ${fram.relaxed}`);
-    lines.push(`triple_intersections = ${fram.tripleIntersections}`);
-    lines.push(`check_user_fractures = ${fram.checkUserFractures}`);
-    lines.push(`write_rejected_fractures = ${fram.writeRejectedFractures}`);
-    lines.push(`rejects_per_fracture = ${integer(fram.rejectsPerFracture)}`);
+    tables.push({
+      name: "fram",
+      isArray: false,
+      lines: [
+        "enable = true",
+        `relaxed = ${fram.relaxed}`,
+        `triple_intersections = ${fram.tripleIntersections}`,
+        `check_user_fractures = ${fram.checkUserFractures}`,
+        `write_rejected_fractures = ${fram.writeRejectedFractures}`,
+        `rejects_per_fracture = ${integer(fram.rejectsPerFracture)}`,
+      ],
+    });
   }
 
-  // As [fram]: without `enable`, the other keys have no effect
-  if (state.regionBoundaries.enable) {
-    lines.push("", "[region_boundaries]", "enable = true");
-    lines.push(`use_family_region = ${state.regionBoundaries.useFamilyRegion}`);
-  }
+  tables.push({
+    name: "region_boundaries",
+    isArray: false,
+    lines: [`use_family_region = ${state.regionBoundaries.useFamilyRegion}`],
+  });
 
-  if (state.mesh.enable) {
-    const mesh = state.mesh;
-    lines.push("", "[mesh]", "enable = true");
-    lines.push(`max_size_factor = ${float(mesh.maxSizeFactor)}`);
-    lines.push(`slope = ${float(mesh.slope)}`);
-    if (mesh.userFractureAperture !== null) {
-      lines.push(`user_fracture_aperture = ${inlineTable(apertureEntries(mesh.userFractureAperture))}`);
-    }
+  const mesh = state.mesh;
+  const meshLines = [`max_size_factor = ${float(mesh.maxSizeFactor)}`, `slope = ${float(mesh.slope)}`];
+  if (mesh.userFractureAperture !== null) {
+    meshLines.push(`user_fracture_aperture = ${inlineTable(apertureEntries(mesh.userFractureAperture))}`);
   }
+  tables.push({ name: "mesh", isArray: false, lines: meshLines });
 
-  lines.push("", "[clusters]");
-  lines.push(`keep_only_largest = ${state.clusters.keepOnlyLargest}`);
-  lines.push(`keep_isolated_fractures = ${state.clusters.keepIsolatedFractures}`);
+  tables.push({
+    name: "clusters",
+    isArray: false,
+    lines: [
+      `keep_only_largest = ${state.clusters.keepOnlyLargest}`,
+      `keep_isolated_fractures = ${state.clusters.keepIsolatedFractures}`,
+    ],
+  });
 
   for (const family of state.families) {
-    lines.push("", ...familyLines(family, isP32));
+    tables.push({ name: "family", isArray: true, lines: familyLines(family, isP32) });
   }
-  return `${lines.join("\n")}\n`;
+  return tables;
+}
+
+/** Sections which are always on in dfn-web; the dfngen input needs `enable = true` */
+const ALWAYS_ON_SECTIONS = new Set(["region_boundaries", "mesh"]);
+
+/** The dfngen input file of the network */
+export function networkToLibraryToml(state: FormState): string {
+  const tables = networkTables(state).map((table) =>
+    ALWAYS_ON_SECTIONS.has(table.name) ? { ...table, lines: ["enable = true", ...table.lines] } : table,
+  );
+  return tablesToToml(tables, "");
 }
 
 // ---------------------------------------------------------------- reading
 
-type Table = Record<string, unknown>;
+export type Table = Record<string, unknown>;
 
-function isTable(value: unknown): value is Table {
+export function isTable(value: unknown): value is Table {
   return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
 }
 
 /** Reads the keys of one table and records each problem with the path of the table */
-class TableReader {
+export class TableReader {
   private readonly usedKeys = new Set<string>();
 
   constructor(
@@ -288,6 +330,28 @@ class TableReader {
   string(key: string, fallback: string): string {
     this.value(key, false);
     return this.optionalString(key) ?? fallback;
+  }
+
+  /** One of the given texts */
+  choice<Choice extends string>(key: string, choices: readonly Choice[], fallback: Choice): Choice {
+    const value = this.string(key, fallback);
+    if ((choices as readonly string[]).includes(value)) {
+      return value as Choice;
+    }
+    this.problems.push(`${this.where(key)} must be ${choices.map((choice) => `"${choice}"`).join(", ")}`);
+    return fallback;
+  }
+
+  stringArray(key: string): string[] {
+    const value = this.value(key, false);
+    if (value === undefined) {
+      return [];
+    }
+    if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+      return value;
+    }
+    this.problems.push(`${this.where(key)} must be an array of texts`);
+    return [];
   }
 
   /** A sub-table; an empty table when it is missing or not a table */
@@ -434,6 +498,10 @@ function readFamily(table: Table, path: string, isP32: boolean, problems: string
   if (!isP32 && p32Target !== null) {
     problems.push(`${path}: \`p32_target\` is not allowed with \`n_poly\``);
   }
+  const aperture = readOptionalAperture(reader, "aperture", `${path}: aperture`, problems);
+  if (aperture === null) {
+    problems.push(`${path}: \`aperture\` is missing`);
+  }
   const family: FamilyState = {
     numberOfPoints: reader.integer("number_of_points", 0),
     probability: reader.float("probability", 0),
@@ -441,7 +509,7 @@ function readFamily(table: Table, path: string, isP32: boolean, problems: string
     region: reader.optionalString("region"),
     beta: reader.optionalFloat("beta"),
     p32Target: p32Target ?? defaultFamily().p32Target,
-    aperture: readOptionalAperture(reader, "aperture", `${path}: aperture`, problems),
+    aperture: aperture ?? defaultAperture("constant"),
     radius: readRadius(reader.subTable("radius"), `${path}: radius`, problems),
     orientation: readOrientation(reader.subTable("orientation"), `${path}: orientation`, problems),
   };
@@ -449,19 +517,20 @@ function readFamily(table: Table, path: string, isP32: boolean, problems: string
   return family;
 }
 
-/** Reads a TOML input file into the form state. Throws `InputFormError`. */
-export function tomlToFormState(text: string): FormState {
-  let root: Table;
+/** Parses a TOML text; integers which a number cannot hold exactly are bigints. Throws `InputFormError`. */
+export function parseToml(text: string): Table {
   try {
-    root = parse(text, { integersAsBigInt: "asNeeded" }) as Table;
+    return parse(text, { integersAsBigInt: "asNeeded" }) as Table;
   } catch (error) {
     throw new InputFormError([String(error instanceof Error ? error.message : error)]);
   }
+}
 
-  const problems: string[] = [];
-  const reader = new TableReader(root, "", problems);
+/** Reads the `[network]` table of the workflow file into the form state */
+export function readNetwork(table: Table, problems: string[]): FormState {
+  const reader = new TableReader(table, "[network]", problems);
 
-  const generationReader = new TableReader(reader.subTable("generation"), "[generation]", problems);
+  const generationReader = new TableReader(reader.subTable("generation"), "[network.generation]", problems);
   const nPoly = generationReader.optionalInteger("n_poly");
   const generation = {
     stopCondition: nPoly === null ? ("p32" as const) : ("n_poly" as const),
@@ -471,7 +540,7 @@ export function tomlToFormState(text: string): FormState {
   };
   generationReader.checkUnknownKeys();
 
-  const framReader = new TableReader(reader.subTable("fram", true), "[fram]", problems);
+  const framReader = new TableReader(reader.subTable("fram", true), "[network.fram]", problems);
   const fram = {
     enable: framReader.boolean("enable", FRAM_DEFAULTS.enable, true),
     relaxed: framReader.boolean("relaxed", FRAM_DEFAULTS.relaxed, true),
@@ -488,11 +557,10 @@ export function tomlToFormState(text: string): FormState {
 
   const regionBoundariesReader = new TableReader(
     reader.subTable("region_boundaries", true),
-    "[region_boundaries]",
+    "[network.region_boundaries]",
     problems,
   );
   const regionBoundaries = {
-    enable: regionBoundariesReader.boolean("enable", REGION_BOUNDARIES_DEFAULTS.enable, true),
     useFamilyRegion: regionBoundariesReader.boolean(
       "use_family_region",
       REGION_BOUNDARIES_DEFAULTS.useFamilyRegion,
@@ -501,21 +569,20 @@ export function tomlToFormState(text: string): FormState {
   };
   regionBoundariesReader.checkUnknownKeys();
 
-  const meshReader = new TableReader(reader.subTable("mesh", true), "[mesh]", problems);
+  const meshReader = new TableReader(reader.subTable("mesh", true), "[network.mesh]", problems);
   const mesh = {
-    enable: meshReader.boolean("enable", MESH_DEFAULTS.enable, true),
     maxSizeFactor: meshReader.optionalFloat("max_size_factor") ?? MESH_DEFAULTS.maxSizeFactor,
     slope: meshReader.optionalFloat("slope") ?? MESH_DEFAULTS.slope,
     userFractureAperture: readOptionalAperture(
       meshReader,
       "user_fracture_aperture",
-      "[mesh]: user_fracture_aperture",
+      "[network.mesh]: user_fracture_aperture",
       problems,
     ),
   };
   meshReader.checkUnknownKeys();
 
-  const clustersReader = new TableReader(reader.subTable("clusters"), "[clusters]", problems);
+  const clustersReader = new TableReader(reader.subTable("clusters"), "[network.clusters]", problems);
   const clusters = {
     keepOnlyLargest: clustersReader.boolean("keep_only_largest", false),
     keepIsolatedFractures: clustersReader.boolean("keep_isolated_fractures", false),
@@ -525,7 +592,7 @@ export function tomlToFormState(text: string): FormState {
   const families = reader
     .tables("family")
     .map((table, index) =>
-      readFamily(table, `family ${index + 1}`, generation.stopCondition === "p32", problems),
+      readFamily(table, `network family ${index + 1}`, generation.stopCondition === "p32", problems),
     );
 
   const state: FormState = {
@@ -542,8 +609,5 @@ export function tomlToFormState(text: string): FormState {
   };
   reader.checkUnknownKeys();
 
-  if (problems.length > 0) {
-    throw new InputFormError(problems);
-  }
   return state;
 }

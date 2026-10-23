@@ -1,7 +1,7 @@
-// State of the flow form: the input file of fehm (see "Input file" of
-// ../fehm-rs/README.md). This is a second copy of the input format of
-// `../fehm-rs/src/io/input.rs`: a change of a key there needs a change here,
-// in `toml.ts` and in `form.ts`.
+// State of the flow form: `[flow]` of the workflow file. It follows the input
+// format of `../fehm-rs/src/io/input.rs` (see "Input file" of
+// ../fehm-rs/README.md): a change of a key there needs a change here, in
+// `toml.ts` and in `form.ts`.
 
 /** Name of the mesh file in the TOML; the mesh is that of the last generation */
 export const FLOW_MESH_FILE = "dfn_mesh.vtu";
@@ -39,10 +39,15 @@ export function meshBoundaryNames(vtuText: string): string[] {
   return [...pointData.matchAll(/<DataArray[^>]*Name="boundary__([^"]+)"/g)].map((match) => match[1]);
 }
 
-/** One boundary for each name; a boundary with the same name keeps its values */
+/**
+ * One boundary for each name; a boundary with the same name keeps its values.
+ * A used boundary of no name stays at the end: fehm reports it as an error.
+ */
 export function updateBoundaries(state: FlowState, names: string[]): void {
   const previous = new Map(state.boundaries.map((boundary) => [boundary.name, boundary]));
-  state.boundaries = names.map(
-    (name) => previous.get(name) ?? { name, isUsed: false, pressure: DEFAULT_PRESSURE },
-  );
+  const missing = state.boundaries.filter((boundary) => boundary.isUsed && !names.includes(boundary.name));
+  state.boundaries = [
+    ...names.map((name) => previous.get(name) ?? { name, isUsed: false, pressure: DEFAULT_PRESSURE }),
+    ...missing,
+  ];
 }

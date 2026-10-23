@@ -1,7 +1,8 @@
-// State of the input form: one field for each key of the input file (see the
-// section "Input file" of README.md). This is a second copy of the input
-// format of `src/io/input.rs`: a change of a key there needs a change here,
-// in `toml.ts` and in the form files.
+// State of the network form: one field for each key of `[network]` of the
+// workflow file (see "Workflow file" of README.md). It follows the input
+// format of `../dfngen-rs/src/io/input.rs`, with the boundary lines and the
+// mesh always on: a change of a key there needs a change here, in `toml.ts`
+// and in the form files.
 
 export type StopCondition = "n_poly" | "p32";
 
@@ -21,8 +22,8 @@ export interface FramState {
   rejectsPerFracture: number;
 }
 
+/** Always on: the boundary lines give the boundaries of the flow */
 export interface RegionBoundariesState {
-  enable: boolean;
   useFamilyRegion: boolean;
 }
 
@@ -34,8 +35,8 @@ export type ApertureState =
 
 export type ApertureDistribution = ApertureState["distribution"];
 
+/** Always on: the flow needs the mesh */
 export interface MeshState {
-  enable: boolean;
   maxSizeFactor: number;
   slope: number;
   /** null = no key */
@@ -79,8 +80,8 @@ export interface FamilyState {
   beta: number | null;
   /** Written only for the stop condition P32 */
   p32Target: number;
-  /** null = no key; necessary with the mesh */
-  aperture: ApertureState | null;
+  /** Necessary: the mesh is always on */
+  aperture: ApertureState;
   radius: RadiusState;
   orientation: OrientationState;
 }
@@ -119,13 +120,11 @@ export const FRAM_DEFAULTS: FramState = {
 
 /** Default values of `[region_boundaries]`, as in `RegionBoundariesSection::default` */
 export const REGION_BOUNDARIES_DEFAULTS: RegionBoundariesState = {
-  enable: false,
   useFamilyRegion: true,
 };
 
 /** Default values of `[mesh]`, as in `MeshSection::default` */
 export const MESH_DEFAULTS: MeshState = {
-  enable: false,
   maxSizeFactor: 10.0,
   slope: 0.5,
   userFractureAperture: null,
@@ -165,7 +164,7 @@ export function defaultFamily(): FamilyState {
     region: null,
     beta: null,
     p32Target: 0.5,
-    aperture: null,
+    aperture: defaultAperture("constant"),
     radius: defaultRadius("truncated_power_law"),
     orientation: { convention: "theta_phi", firstAngle: 0.0, secondAngle: 0.0, kappa: 8.0 },
   };
