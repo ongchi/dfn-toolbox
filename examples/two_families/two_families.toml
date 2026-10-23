@@ -1,0 +1,76 @@
+# Two families: the cube of box_west_east with two families of other
+# orientations. Family 1 is perpendicular to the flow direction (normal along
+# x), family 2 is parallel to it (normal along y) with larger fractures and an
+# aperture which grows with the radius. Color the network by "family" and
+# compare the pressure and the particle paths in the two families.
+
+[network]
+seed = 3
+min_feature_size = 0.4
+domain = "../box_west_east/box_west_east.vtu"
+
+[network.generation]
+n_poly = 60
+force_large_fractures = false
+remove_fractures_less_than = 0.0
+
+[network.fram]
+enable = true
+relaxed = false
+triple_intersections = true
+check_user_fractures = false
+write_rejected_fractures = false
+rejects_per_fracture = 10
+
+[network.region_boundaries]
+use_family_region = true
+
+[network.mesh]
+max_size_factor = 5.0
+slope = 0.5
+
+[network.clusters]
+keep_only_largest = true
+keep_isolated_fractures = false
+
+[[network.family]]
+number_of_points = 8
+probability = 0.4
+aspect_ratio = 1.0
+region = "center"
+aperture = { distribution = "constant", value = 1e-4 }
+radius = { distribution = "truncated_power_law", alpha = 2.0, min = 2.0, max = 5.0 }
+orientation = { theta = 90.0, phi = 0.0, kappa = 15.0 }
+
+[[network.family]]
+number_of_points = 8
+probability = 0.6
+aspect_ratio = 1.0
+region = "center"
+aperture = { distribution = "correlated", alpha = 5e-5, beta = 0.5 }
+radius = { distribution = "truncated_power_law", alpha = 1.4, min = 3.0, max = 8.0 }
+orientation = { theta = 90.0, phi = 90.0, kappa = 15.0 }
+
+[flow]
+temperature = 20.0
+gravity = false
+pressure = { west = 10.1, east = 10.0 }
+
+[transport]
+seed = 12345
+time_unit = "days"
+porosity = 1.0
+max_time_steps = 1000000
+inflow = ["west"]
+outflow = ["east"]
+routing = "complete_mixing"
+
+[transport.seeding]
+method = "uniform_per_line"
+particles_per_line = 3
+weight_by_flux = false
+
+[transport.output]
+trajectories = true
+all_particles = false
+velocities = false
