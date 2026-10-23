@@ -4,7 +4,7 @@
 // property (`mapper.scalarVisibility = 1`) can set other properties back
 // (it gave the mapper its old lookup table).
 //
-// The viewer reads the output files of the generation and of the flow (and
+// The viewer reads the output files of the generation, the flow and the transport (and
 // the domain mesh) with the XML readers of VTK from their text. Thus it shows
 // exactly the files which the user downloads.
 
@@ -30,6 +30,8 @@ const DEFAULT_LABEL_FORMAT = "%-#6.3g";
 const PRESSURE_LABEL_FORMAT = "%-#.6g";
 
 export type FractureLayer = "final" | "removed" | "rejected";
+/** The fracture layers, and the particle paths of the transport (`trajectories.vtp`) */
+export type Layer = FractureLayer | "trajectories";
 
 interface PolyDataLayer {
   reader: vtkXMLPolyDataReader;
@@ -43,7 +45,7 @@ export class NetworkViewer {
   private readonly window: vtkWebAssemblyOpenGLRenderWindow;
   private readonly lookupTable: vtkLookupTable;
   private readonly scalarBar: vtkScalarBarActor;
-  private readonly layers = new Map<FractureLayer, PolyDataLayer>();
+  private readonly layers = new Map<Layer, PolyDataLayer>();
   private readonly pressureLookupTable: vtkLookupTable;
   private meshActor: vtkActor | null = null;
   private pressureLayer: PolyDataLayer | null = null;
@@ -116,8 +118,8 @@ export class NetworkViewer {
     this.meshActor = actor;
   }
 
-  /** Shows a fracture file (text of a .vtp file), or removes the layer (null). */
-  async setLayer(layer: FractureLayer, vtpText: string | null): Promise<void> {
+  /** Shows a fracture or trajectory file (text of a .vtp file), or removes the layer (null). */
+  async setLayer(layer: Layer, vtpText: string | null): Promise<void> {
     const old = this.layers.get(layer);
     if (old) {
       this.renderer.removeActor(old.actor);
@@ -142,6 +144,9 @@ export class NetworkViewer {
     } else if (layer === "rejected") {
       property.setColor(0.85, 0.2, 0.2);
       property.setOpacity(0.25);
+    } else if (layer === "trajectories") {
+      property.setColor(0.1, 0.3, 0.85);
+      property.setLineWidth(2);
     }
     this.renderer.addActor(actor);
     this.layers.set(layer, { reader, mapper, actor });
@@ -269,7 +274,7 @@ export class NetworkViewer {
     this.updateScalarBar();
   }
 
-  setVisible(layer: FractureLayer | "mesh", isVisible: boolean): void {
+  setVisible(layer: Layer | "mesh", isVisible: boolean): void {
     const actor = layer === "mesh" ? this.meshActor : this.layers.get(layer)?.actor;
     if (actor) {
       actor.setVisibility(isVisible ? 1 : 0);

@@ -1,6 +1,13 @@
-// Runs the generation and the flow (WebAssembly) in a Web Worker, so the page
-// stays responsive. Messages: see `generationClient.ts`.
-import init, { check_flow_input, check_input, run_flow, run_generation } from "./pkg/dfn_wasm.js";
+// Runs the generation, the flow and the transport (WebAssembly) in a Web
+// Worker, so the page stays responsive. Messages: see `generationClient.ts`.
+import init, {
+  check_flow_input,
+  check_input,
+  check_transport_input,
+  run_flow,
+  run_generation,
+  run_transport,
+} from "./pkg/dfn_wasm.js";
 import type { WorkerRequest, WorkerResponse } from "./generationClient";
 
 const PROGRESS_INTERVAL_MS = 50;
@@ -40,6 +47,29 @@ function handle(request: WorkerRequest): void {
       files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
       boundaryFlows: result.boundary_names.map((name: string, index: number) => ({ name, massFlow: flows[index] })),
       newtonIterations: result.newton_iterations,
+    });
+    result.free();
+    return;
+  }
+  if (request.type === "checkTransport") {
+    post({
+      type: "checked",
+      error: check_transport_input(request.toml, request.flowToml, request.mesh) ?? null,
+    });
+    return;
+  }
+  if (request.type === "runTransport") {
+    const result = run_transport(request.toml, request.flowToml, request.mesh, request.seedIfZero);
+    post({
+      type: "transportResult",
+      error: result.error ?? null,
+      log: result.log,
+      seed: result.seed,
+      files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
+      particleCount: result.particle_count,
+      exitCount: result.exit_count,
+      inflowVolumeFlux: result.inflow_volume_flux,
+      outflowVolumeFlux: result.outflow_volume_flux,
     });
     result.free();
     return;

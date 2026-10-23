@@ -1,4 +1,5 @@
-// Interface of the worker (generation of dfngen and flow of fehm) for the page.
+// Interface of the worker (generation of dfngen, flow of fehm and transport
+// of dfntrans) for the page.
 
 export interface GenerationInput {
   toml: string;
@@ -13,11 +14,22 @@ export interface FlowInput {
   mesh: string;
 }
 
+export interface TransportInput {
+  /** The TOML of dfntrans */
+  toml: string;
+  /** The TOML of fehm of the last flow run */
+  flowToml: string;
+  /** The triangle mesh of the generation (dfn_mesh.vtu) */
+  mesh: string;
+}
+
 export type WorkerRequest =
   | ({ type: "check" } & GenerationInput)
   | ({ type: "run"; seedIfZero: bigint } & GenerationInput)
   | ({ type: "checkFlow" } & FlowInput)
-  | ({ type: "runFlow" } & FlowInput);
+  | ({ type: "runFlow" } & FlowInput)
+  | ({ type: "checkTransport" } & TransportInput)
+  | ({ type: "runTransport"; seedIfZero: number } & TransportInput);
 
 export interface GenerationOutput {
   /** Error message; then there are no files */
@@ -48,13 +60,30 @@ export interface FlowOutput {
   newtonIterations: number;
 }
 
+export interface TransportOutput {
+  /** Error message; then there are no files */
+  error: string | null;
+  log: string;
+  /** Seed which the run used */
+  seed: number;
+  /** (name, text) of each output file */
+  files: [string, string][];
+  particleCount: number;
+  exitCount: number;
+  /** m³/s */
+  inflowVolumeFlux: number;
+  /** m³/s */
+  outflowVolumeFlux: number;
+}
+
 export type WorkerResponse =
   | { type: "checked"; error: string | null }
   | { type: "progress"; acceptedCount: number; fraction: number }
   /** The WebAssembly module failed (a panic); the worker must be replaced */
   | { type: "crashed"; message: string }
   | ({ type: "result" } & GenerationOutput)
-  | ({ type: "flowResult" } & FlowOutput);
+  | ({ type: "flowResult" } & FlowOutput)
+  | ({ type: "transportResult" } & TransportOutput);
 
 export class CancelledError extends Error {
   constructor() {
@@ -98,6 +127,22 @@ export class GenerationClient {
   async runFlow(input: FlowInput): Promise<FlowOutput> {
     const response = await this.request({ type: "runFlow", ...input });
     if (response.type !== "flowResult") {
+      throw new Error(`unexpected answer of the worker: ${response.type}`);
+    }
+    return response;
+  }
+
+  /** Returns the error message of the transport input, or null for a valid input */
+  async checkTransport(input: TransportInput): Promise<string | null> {
+    const response = await this.request({ type: "checkTransport", ...input });
+    return response.type === "checked" ? response.error : null;
+  }
+
+  async runTransport(input: TransportInput): Promise<TransportOutput> {
+    // dfntrans has a u32 seed
+    const seedIfZero = 1 + Math.floor(Math.random() * (2 ** 32 - 1));
+    const response = await this.request({ type: "runTransport", seedIfZero, ...input });
+    if (response.type !== "transportResult") {
       throw new Error(`unexpected answer of the worker: ${response.type}`);
     }
     return response;

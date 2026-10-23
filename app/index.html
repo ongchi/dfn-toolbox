@@ -8,7 +8,7 @@
   </head>
   <body>
     <header class="toolbar">
-      <h1>dfn-web <span class="subtitle">Discrete fracture network: generation and flow</span></h1>
+      <h1>dfn-web <span class="subtitle">Discrete fracture network: generation, flow and transport</span></h1>
       <div class="toolbar-actions">
         <label class="toolbar-field">
           Example
@@ -28,7 +28,7 @@
           href="https://github.com/ongchi/dfn-web"
           target="_blank"
           rel="noopener"
-          title="Source code of dfn-web; it uses dfngen-rs and fehm-rs"
+          title="Source code of dfn-web; it uses dfngen-rs, fehm-rs and dfntrans-rs"
           >Source</a
         >
       </div>
@@ -39,10 +39,12 @@
         <div class="tabs sidebar-tabs" role="tablist">
           <button class="tab is-active" type="button" data-sidebar-tab="network">Network</button>
           <button class="tab" type="button" data-sidebar-tab="flow">Flow</button>
+          <button class="tab" type="button" data-sidebar-tab="transport">Transport</button>
         </div>
         <p id="example-description" class="example-description" hidden></p>
         <div id="form" class="form"></div>
         <div id="flow-form" class="form" hidden></div>
+        <div id="transport-form" class="form" hidden></div>
         <div class="run-panel">
           <div class="run-buttons">
             <button id="check-button" class="button" type="button">Check input</button>
@@ -67,6 +69,7 @@
             <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
             <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
             <label class="toolbar-check"><input id="show-pressure" type="checkbox" disabled /> Pressure</label>
+            <label class="toolbar-check"><input id="show-trajectories" type="checkbox" disabled /> Trajectories</label>
             <button id="reset-camera" class="button-small" type="button">Reset view</button>
           </div>
           <div class="viewer-canvas">
@@ -98,11 +101,21 @@
                 <ul id="flow-download-list"></ul>
               </div>
             </div>
+            <div id="transport-results" hidden>
+              <h4>Transport</h4>
+              <dl id="transport-stats" class="stats"></dl>
+              <div class="downloads">
+                <button id="transport-download-all" class="button-small" type="button">Download transport (.zip)</button>
+                <ul id="transport-download-list"></ul>
+              </div>
+            </div>
           </div>
           <div class="tab-body" data-tab-body="log" hidden>
             <pre id="log" class="code"></pre>
             <h4 id="flow-log-title" hidden>Flow</h4>
             <pre id="flow-log" class="code"></pre>
+            <h4 id="transport-log-title" hidden>Transport</h4>
+            <pre id="transport-log" class="code"></pre>
           </div>
           <div class="tab-body" data-tab-body="toml" hidden>
             <div class="toml-actions">
