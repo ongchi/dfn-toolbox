@@ -4,7 +4,7 @@
 #
 # Usage: ./build-site.sh <base path>   (for example /dfn-web/)
 #
-# Needs: ../dfngen-rs and ../fehm-rs, Node, Python 3, the Rust target
+# Needs: ../dfngen-rs, ../fehm-rs and ../dfntrans-rs, Node, Python 3, the Rust target
 # wasm32-unknown-unknown, and wasm-bindgen-cli with the version of
 # wasm-bindgen in dfn-wasm/Cargo.toml. `npm ci` replaces app/node_modules.
 set -euo pipefail
@@ -26,6 +26,7 @@ app_dir="$web_dir/app"
 # The tests compare the WebAssembly module with the native binaries
 cargo build --release --manifest-path "$projects_dir/dfngen-rs/Cargo.toml"
 cargo build --release --manifest-path "$projects_dir/fehm-rs/Cargo.toml"
+cargo build --release --manifest-path "$projects_dir/dfntrans-rs/Cargo.toml"
 
 cd "$app_dir"
 npm test

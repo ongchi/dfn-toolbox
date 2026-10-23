@@ -1,5 +1,5 @@
 # Builds the site (after the tests of build-site.sh) and publishes it on
-# GitHub Pages. dfngen-rs and fehm-rs are checked out as sibling folders of
+# GitHub Pages. dfngen-rs, fehm-rs and dfntrans-rs are checked out as sibling folders of
 # dfn-web, as on a local computer.
 name: Pages
 
@@ -33,6 +33,11 @@ jobs:
           repository: ongchi/fehm-rs
           ref: master
           path: fehm-rs
+      - uses: actions/checkout@v7
+        with:
+          repository: ongchi/dfntrans-rs
+          ref: master
+          path: dfntrans-rs
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -42,6 +47,7 @@ jobs:
           workspaces: |
             dfngen-rs -> target
             fehm-rs -> target
+            dfntrans-rs -> target
             dfn-web/dfn-wasm -> target
 
       # wasm-bindgen-cli must have the version of wasm-bindgen in dfn-wasm/Cargo.toml
