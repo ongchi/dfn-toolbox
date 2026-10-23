@@ -1,5 +1,5 @@
 // Test cases of tests/data, read in Node, the WebAssembly module, and the
-// native binaries of dfngen and fehm.
+// native binaries of dfngen, fehm and dfntrans.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,6 +11,7 @@ const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // The library repository, a sibling folder of this project
 export const dfngenDir = resolve(appDir, "../../dfngen-rs");
 const fehmDir = resolve(appDir, "../../fehm-rs");
+const dfntransDir = resolve(appDir, "../../dfntrans-rs");
 const dataDir = join(dfngenDir, "tests/data");
 // Tolerance of the decimal numbers, as in the regression check of dfngen
 const TOLERANCE = "1e-9";
@@ -75,10 +76,35 @@ export function runNativeFehm(toml: string, meshFileName: string, mesh: string):
   return outputDir;
 }
 
-/** Differences of two output folders (scripts/compare_output.py of dfngen); "" = none */
-export function compareOutputFolders(expectedDir: string, actualDir: string): string {
+/**
+ * Runs the native binary of dfntrans (../dfntrans-rs/target/release/dfntrans)
+ * with its flow input and mesh; returns the output folder.
+ */
+export function runNativeDfntrans(
+  transportToml: string,
+  flow: { fileName: string; toml: string },
+  mesh: { fileName: string; text: string },
+): string {
+  const binary = join(dfntransDir, "target/release/dfntrans");
+  if (!existsSync(binary)) {
+    throw new Error(`${binary} is missing: run "cargo build --release" in ../dfntrans-rs`);
+  }
+  const inputDir = mkdtempSync(join(tmpdir(), "dfntrans-input-"));
+  writeFileSync(join(inputDir, "transport.toml"), transportToml);
+  writeFileSync(join(inputDir, flow.fileName), flow.toml);
+  writeFileSync(join(inputDir, mesh.fileName), mesh.text);
+  const outputDir = mkdtempSync(join(tmpdir(), "dfntrans-"));
+  execFileSync(binary, [join(inputDir, "transport.toml"), outputDir], { stdio: "ignore" });
+  return outputDir;
+}
+
+/**
+ * Differences of two output folders (scripts/compare_output.py of dfngen); "" = none.
+ * The integers must be equal; `tolerance` is that of the decimal numbers (relative).
+ */
+export function compareOutputFolders(expectedDir: string, actualDir: string, tolerance = TOLERANCE): string {
   try {
-    execFileSync("python3", [join(dfngenDir, "scripts/compare_output.py"), expectedDir, actualDir, TOLERANCE], {
+    execFileSync("python3", [join(dfngenDir, "scripts/compare_output.py"), expectedDir, actualDir, tolerance], {
       encoding: "utf8",
     });
     return "";

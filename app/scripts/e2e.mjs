@@ -1,7 +1,8 @@
 // End-to-end check of the web app in the local Chrome (headless).
 // Start the dev server first (npm run dev), then:
 //   node scripts/e2e.mjs [url] [screenshot folder]
-// It runs each example, a bad input, and a cancel, and saves screenshots.
+// It runs each example, a bad input, a cancel, the flow and the transport,
+// and saves screenshots.
 import puppeteer from "puppeteer-core";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
@@ -127,7 +128,17 @@ try {
     failures.push(`flow without a mesh: ${noMeshStatus}`);
   }
 
-  // Flow on the mesh of "mesh_regions": in-flow at the mesh surface, out-flow at north
+  // Transport without a flow
+  await page.click('[data-sidebar-tab="transport"]');
+  await page.click("#run-button");
+  const noFlowStatus = await statusText(page);
+  const isNoFlowError = await page.$eval("#status", (node) => node.classList.contains("is-error"));
+  console.log(`${isNoFlowError ? "ok  " : "FAIL"} transport without a flow: ${noFlowStatus}`);
+  if (!isNoFlowError) {
+    failures.push(`transport without a flow: ${noFlowStatus}`);
+  }
+
+  // Flow on the mesh of "mesh_regions": in-flow at north, out-flow at the mesh surface
   await page.click('[data-sidebar-tab="network"]');
   await selectExample(page, "mesh_regions");
   await page.click("#run-button");
@@ -144,8 +155,8 @@ try {
       input.value = String(pressure);
       input.dispatchEvent(new Event("input"));
     };
-    useBoundary("mesh_surface", 10.1);
-    useBoundary("north", 10.0);
+    useBoundary("north", 10.1);
+    useBoundary("mesh_surface", 10.0);
   });
   await page.click("#run-button");
   await waitIdle(page);
@@ -159,6 +170,47 @@ try {
   }
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_flow.png` });
+
+  // Transport on this flow: one particle on each in-flow line, with the trajectories
+  await page.click('[data-sidebar-tab="transport"]');
+  const fieldInput = (label) =>
+    page.evaluateHandle(
+      (text) =>
+        [...document.querySelectorAll("#transport-form .field")]
+          .find((field) => field.querySelector(".field-label")?.textContent === text)
+          .querySelector("input, select"),
+      label,
+    );
+  const setSelect = async (label, value) => {
+    const select = await fieldInput(label);
+    await select.evaluate((node, choice) => {
+      node.value = choice;
+      node.dispatchEvent(new Event("change"));
+    }, value);
+  };
+  await setSelect("north", "inflow");
+  await setSelect("mesh_surface", "outflow");
+  await setSelect("Method", "uniform_per_line");
+  const particlesPerLine = await fieldInput("Particles per line");
+  await particlesPerLine.evaluate((node) => {
+    node.value = "1";
+    node.dispatchEvent(new Event("input"));
+  });
+  await (await fieldInput("Trajectories")).evaluate((node) => node.click());
+  await page.click("#run-button");
+  await waitIdle(page);
+  const transportStatus = await statusText(page);
+  const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
+  const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
+  const isTransportDone = transportStatus.startsWith("Done") && hasTransportResults && areTrajectoriesShown;
+  console.log(`${isTransportDone ? "ok  " : "FAIL"} transport: ${transportStatus.split("\n")[0]}`);
+  if (!isTransportDone) {
+    failures.push(`transport: ${transportStatus}`);
+  }
+  // The trajectories in the fractures: without the pressure
+  await page.click("#show-pressure");
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_transport.png` });
 } finally {
   await browser.close();
 }
