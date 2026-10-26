@@ -23,7 +23,14 @@ import {
   type TransportInput,
   type TransportOutput,
 } from "./generationClient";
-import { dataArrayValues, meshRegionBounds, meshRegionNames, type InputFiles, type RegionBounds } from "./inputFiles";
+import {
+  dataArrayValues,
+  meshDescription,
+  meshRegionBounds,
+  meshRegionNames,
+  type InputFiles,
+  type RegionBounds,
+} from "./inputFiles";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TimeUnit, type TransportState } from "./transport/state";
@@ -78,6 +85,7 @@ const ui = {
   exampleRow: byId<HTMLLabelElement>("example-row"),
   exampleDescription: byId<HTMLParagraphElement>("example-description"),
   domainForm: byId<HTMLDivElement>("domain-form"),
+  shapeDescription: byId<HTMLParagraphElement>("shape-description"),
   boundarySurfaces: byId<HTMLDivElement>("boundary-surfaces"),
   fracturesForm: byId<HTMLDivElement>("fractures-form"),
   form: byId<HTMLDivElement>("form"),
@@ -265,6 +273,7 @@ function updateDomainSource(): void {
   ui.exampleRow.hidden = !isDomainTab || !isExample;
   ui.exampleDescription.hidden = !isDomainTab || !isExample || ui.exampleDescription.textContent === "";
   ui.domainForm.hidden = !isDomainTab || isExample;
+  ui.shapeDescription.hidden = !isDomainTab || isExample || ui.shapeDescription.textContent === "";
   ui.boundarySurfaces.hidden = !isDomainTab || boundarySurfaceNames.length === 0;
 }
 
@@ -302,6 +311,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
   boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
+  ui.shapeDescription.textContent = mesh === null ? "" : meshDescription(mesh.text);
   renderBoundarySurfaces();
   clearOutput();
   if (viewer && mesh) {

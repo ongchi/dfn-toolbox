@@ -22,6 +22,12 @@ export function meshRegionNames(vtuText: string): string[] {
   return [...vtuText.matchAll(/<DataArray[^>]*Name="region__([^"]+)"/g)].map((match) => match[1]);
 }
 
+/** The description of a predefined mesh: its comment `<!-- Description: ... -->`; "" without one */
+export function meshDescription(vtuText: string): string {
+  const comment = vtuText.match(/<!--\s*Description:([\s\S]*?)-->/)?.[1] ?? "";
+  return comment.split(/\s+/).filter((word) => word !== "").join(" ");
+}
+
 /** The numbers of the ASCII data array with this name; null if there is none */
 export function dataArrayValues(vtuText: string, name: string): number[] | null {
   const match = vtuText.match(new RegExp(`<DataArray[^>]*Name="${name}"[^>]*>([^<]*)</DataArray>`));

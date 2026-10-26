@@ -7,6 +7,12 @@
      Regions: west_box = cell 0, east_box = cell 2, other_boxes = cells 1, 3.
      Cell 4: the end face of the north box (y = 30), boundary surface north.
      Cell 5: the end face of the east box (x = 25), boundary surface east. -->
+<!-- Description: An L shape of four boxes of 5 m: the west, middle and east
+     boxes along x, and the north box at +y of the west box; from
+     (10, 20, 30) to (25, 30, 35). Regions: west_box, east_box and
+     other_boxes (the middle and the north box). The end face of the north
+     box is the boundary surface north, the end face of the east box the
+     boundary surface east. -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
 <Piece NumberOfPoints="20" NumberOfCells="6">

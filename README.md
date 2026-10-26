@@ -33,8 +33,8 @@ There is no server: `npm run build` gives a folder of static files.
   - Domain tab: two radio buttons. "Example" shows the example (a dropdown
     of `examples/`) and its description; an example loads the full
     workflow. "Predefined domain shape" shows the domain mesh: one of the
-    predefined meshes of `meshes/` (a dropdown); a new shape replaces only
-    the mesh. A switch of the radio buttons resets all the input: "Example"
+    predefined meshes of `meshes/` (a dropdown) and its description; a new
+    shape replaces only the mesh. A switch of the radio buttons resets all the input: "Example"
     loads the example of its dropdown again (the default example if none),
     and "Predefined domain shape" gives the default values of all the forms
     on the last shape (the first mesh at the start). In both modes, the
@@ -173,7 +173,9 @@ region which is not a box) is not checked.
 `<name>.toml` (written by hand). Its domain mesh is a predefined mesh of
 `meshes/` (`Box.vtu`, `L-shape.vtu`; ASCII files written by hand); a new
 `.vtu` file there is a new item of the dropdown, with its file name
-without `.vtu` ("Box", "L-shape"). The in-flow and out-flow boundaries are
+without `.vtu` ("Box", "L-shape"). The comment `<!-- Description: ... -->`
+at the top of a mesh file is its description on the Domain tab (in the
+words of the forms; the other comment is for the developer). The in-flow and out-flow boundaries are
 boundary surfaces of the domain mesh: surface cells (quads) with the cell
 data arrays `boundary__<name>` (see "Domain mesh" in
 ../dfngen-rs/README.md). Where a fracture crosses such a face, its boundary
@@ -299,7 +301,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
   the color choosers of the boundary surfaces, the "Axes" checkbox, the "Next" button, the full workflow of each example, the flow without a
-  mesh, the transport without a flow, the choice of a predefined mesh, the
+  mesh, the transport without a flow, the choice of a predefined mesh and its description, the
   limits of the center of a new user-defined fracture, a bad input and the
   cancel; it saves screenshots.
 

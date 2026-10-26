@@ -4,6 +4,9 @@
      boundary surface west, the face at x = 10 on the boundary surface east:
      they are the in-flow and the out-flow. The other faces are on no
      boundary surface. The hexahedron is the region box. -->
+<!-- Description: A cube of 10 m, from (0, 0, 0) to (10, 10, 10), with the
+     region box. The face at x = 0 is the boundary surface west, the face at
+     x = 10 the boundary surface east. -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
 <Piece NumberOfPoints="8" NumberOfCells="7">

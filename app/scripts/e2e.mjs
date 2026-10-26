@@ -276,11 +276,22 @@ try {
   // The domain mesh dropdown: in the shape mode, a new shape replaces only the mesh
   await page.click('[data-sidebar-tab="domain"]');
   await selectDomainSource(page, "shape");
+  // The description of the shape shows below the dropdown, only in the shape mode
+  const shapeDescription = () =>
+    page.$eval("#shape-description", (node) => (node.hidden ? "(hidden)" : node.textContent));
+  const boxDescription = await shapeDescription();
   await page.select(".file-row select", "L-shape.vtu");
   // The form shows the regions of the mesh when it is loaded
   await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
   const meshLabel = await page.$eval(".file-row select", (node) => node.selectedOptions[0].textContent);
   check(meshLabel === "L-shape", "choose a predefined mesh", meshLabel);
+  const lShapeDescription = await shapeDescription();
+  check(
+    boxDescription.startsWith("A cube of 10 m") && lShapeDescription.startsWith("An L shape"),
+    "shape description",
+    `${boxDescription.slice(0, 20)}… → ${lShapeDescription.slice(0, 20)}…`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_shape_description.png` });
 
   // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
   await selectExample(page, "box_west_east");
