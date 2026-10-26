@@ -26,12 +26,18 @@ There is no server: `npm run build` gives a folder of static files.
   page opens `box_west_east` at the start. The app does not save the
   workflow file or the output files, and it does not write the input files
   of the `dfngen`, `fehm` and `dfntrans` binaries.
-- Network tab: a form with one field for each key of `[network]`: the domain mesh is
-  one of the predefined meshes of `meshes/` (a dropdown), and each
-  user-defined fracture is a card of the form (region, center, shape and
-  orientation; see "User-defined fractures"). The boundary lines of the
-  regions and the triangle mesh are always on (the flow needs them), thus
-  each family needs an aperture.
+- The input of `[network]` is in three tabs: Domain, User fractures and
+  DFN; "Generate" is on the DFN tab. The page opens on the Domain tab.
+  "Next" goes to the next tab (each tab but Transport); on the DFN tab it
+  needs the fracture mesh of a generation, on the Flow tab a solved flow.
+  - Domain tab: the example (a dropdown of `examples/`), its description,
+    and the domain mesh: one of the predefined meshes of `meshes/` (a
+    dropdown).
+  - User fractures tab: each user-defined fracture is a card (region,
+    center, shape and orientation; see "User-defined fractures").
+  - DFN tab: a form with one field for each other key of `[network]`.
+    The boundary lines of the regions and the triangle mesh are always on
+    (the flow needs them), thus each family needs an aperture.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
   `dfn_mesh.vtu` of the last generation; the boundaries are its point
   arrays `boundary__<name>`, each with "use" and a pressure. A new
@@ -44,9 +50,9 @@ There is no server: `npm run build` gives a folder of static files.
   `trajectories.vtp` has a point for each time step: with many particles
   it is very large (about 1 MB for each particle in the examples), thus the
   option is off by default; the examples have it on, with few particles.
-- "Check input" shows the error of the library for the input of the active
-  tab. "Generate", "Solve flow" and "Track particles" run in a Web Worker;
-  "Cancel" stops them.
+- "Generate", "Solve flow" and "Track particles" run in a Web Worker;
+  "Cancel" stops them. An error of the library for the input shows in the
+  status line.
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
   fractures (layer "Mesh", with its edges; color by a cell array, or by
   the point pressure of the flow: "Pressure", selected when the flow is
@@ -273,11 +279,11 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the output files agree with the `dfntrans` binary (the integers exactly,
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
-- `scripts/e2e.mjs`: in Chrome (headless), the default example, the full
-  workflow of each example, the flow without a mesh, the transport without
-  a flow, the choice of a predefined mesh, the limits of the center of a
-  new user-defined fracture, a bad input and the cancel; it saves
-  screenshots.
+- `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
+  the "Next" button, the full workflow of each example, the flow without a
+  mesh, the transport without a flow, the choice of a predefined mesh, the
+  limits of the center of a new user-defined fracture, a bad input and the
+  cancel; it saves screenshots.
 
 ## VTK.wasm notes
 

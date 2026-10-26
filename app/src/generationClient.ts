@@ -24,11 +24,8 @@ export interface TransportInput {
 }
 
 export type WorkerRequest =
-  | ({ type: "check" } & GenerationInput)
   | ({ type: "run"; seedIfZero: bigint } & GenerationInput)
-  | ({ type: "checkFlow" } & FlowInput)
   | ({ type: "runFlow" } & FlowInput)
-  | ({ type: "checkTransport" } & TransportInput)
   | ({ type: "runTransport"; seedIfZero: number } & TransportInput);
 
 export interface GenerationOutput {
@@ -74,7 +71,6 @@ export interface TransportOutput {
 }
 
 export type WorkerResponse =
-  | { type: "checked"; error: string | null }
   | { type: "progress"; acceptedCount: number; fraction: number }
   /** The WebAssembly module failed (a panic); the worker must be replaced */
   | { type: "crashed"; message: string }
@@ -97,12 +93,6 @@ export class GenerationClient {
     return new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   }
 
-  /** Returns the error message of the input, or null for a valid input */
-  async check(input: GenerationInput): Promise<string | null> {
-    const response = await this.request({ type: "check", ...input });
-    return response.type === "checked" ? response.error : null;
-  }
-
   async run(
     input: GenerationInput,
     onProgress: (acceptedCount: number, fraction: number) => void,
@@ -115,24 +105,12 @@ export class GenerationClient {
     return response;
   }
 
-  /** Returns the error message of the flow input, or null for a valid input */
-  async checkFlow(input: FlowInput): Promise<string | null> {
-    const response = await this.request({ type: "checkFlow", ...input });
-    return response.type === "checked" ? response.error : null;
-  }
-
   async runFlow(input: FlowInput): Promise<FlowOutput> {
     const response = await this.request({ type: "runFlow", ...input });
     if (response.type !== "flowResult") {
       throw new Error(`unexpected answer of the worker: ${response.type}`);
     }
     return response;
-  }
-
-  /** Returns the error message of the transport input, or null for a valid input */
-  async checkTransport(input: TransportInput): Promise<string | null> {
-    const response = await this.request({ type: "checkTransport", ...input });
-    return response.type === "checked" ? response.error : null;
   }
 
   async runTransport(input: TransportInput): Promise<TransportOutput> {

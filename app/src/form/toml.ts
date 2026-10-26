@@ -5,7 +5,7 @@
 // `readNetwork` checks the keys and the types, as the `*Section` structs of
 // `../dfngen-rs/src/io/input.rs` do: an unknown key or a missing key is an
 // error, so no value of the file is lost in the form. The library checks the
-// values ("Check input").
+// values ("Generate").
 
 import { parse } from "smol-toml";
 import {

@@ -38,9 +38,14 @@ const DEFAULT_EXAMPLE = "box_west_east";
 const PRESSURE_OPTION = colorOptionValue(PRESSURE_ARRAY);
 const TRAJECTORIES_FILE = "trajectories.vtp";
 
-type SidebarTab = "network" | "flow" | "transport";
+// The domain, the user fractures and the network are the three tabs of the network input
+const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
+type SidebarTab = (typeof SIDEBAR_TABS)[number];
 
-const RUN_BUTTON_TEXT: Record<SidebarTab, string> = {
+/** The text of the run button; null = no run button (the domain and the user fractures: "Generate" is on the DFN tab) */
+const RUN_BUTTON_TEXT: Record<SidebarTab, string | null> = {
+  domain: null,
+  fractures: null,
   network: "Generate",
   flow: "Solve flow",
   transport: "Track particles",
@@ -56,13 +61,16 @@ function byId<T extends HTMLElement>(id: string): T {
 
 const ui = {
   exampleSelect: byId<HTMLSelectElement>("example-select"),
+  exampleRow: byId<HTMLLabelElement>("example-row"),
   exampleDescription: byId<HTMLParagraphElement>("example-description"),
+  domainForm: byId<HTMLDivElement>("domain-form"),
+  fracturesForm: byId<HTMLDivElement>("fractures-form"),
   form: byId<HTMLDivElement>("form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
-  checkButton: byId<HTMLButtonElement>("check-button"),
   runButton: byId<HTMLButtonElement>("run-button"),
   cancelButton: byId<HTMLButtonElement>("cancel-button"),
+  nextButton: byId<HTMLButtonElement>("next-button"),
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
   colorSelect: byId<HTMLSelectElement>("color-select"),
@@ -98,7 +106,7 @@ let flowOutput: FlowOutput | null = null;
 let flowOutputToml: string | null = null;
 let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
-let activeSidebarTab: SidebarTab = "network";
+let activeSidebarTab: SidebarTab = "domain";
 let isBusy = false;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
@@ -122,13 +130,26 @@ function durationText(milliseconds: number): string {
   return milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(1)} s`;
 }
 
-function setBusy(busy: boolean, canCancel = false): void {
+/** A run in the worker: the buttons are disabled, and "Cancel" and the progress bar show */
+function setBusy(busy: boolean): void {
   isBusy = busy;
-  ui.checkButton.disabled = busy;
   ui.runButton.disabled = busy;
   ui.exampleSelect.disabled = busy;
-  ui.cancelButton.hidden = !canCancel;
-  ui.progress.hidden = !canCancel;
+  ui.cancelButton.hidden = !busy;
+  ui.progress.hidden = !busy;
+  updateNextButton();
+}
+
+/**
+ * "Next" goes to the next tab; the Transport tab has none. On the DFN tab it
+ * needs the fracture mesh of a generation, on the Flow tab a solved flow.
+ */
+function updateNextButton(): void {
+  const isLastTab = activeSidebarTab === SIDEBAR_TABS[SIDEBAR_TABS.length - 1];
+  const isOutputMissing =
+    (activeSidebarTab === "network" && flowMesh() === null) || (activeSidebarTab === "flow" && flowOutput === null);
+  ui.nextButton.hidden = isLastTab;
+  ui.nextButton.disabled = isBusy || isOutputMissing;
 }
 
 // ---------------------------------------------------------------- form
@@ -177,7 +198,7 @@ const transportContext: FormContext = {
 };
 
 function render(): void {
-  renderForm(ui.form, state, formContext, fileHandlers);
+  renderForm({ domain: ui.domainForm, fractures: ui.fracturesForm, network: ui.form }, state, formContext, fileHandlers);
   updateUserFracturesInViewer();
 }
 
@@ -194,11 +215,17 @@ function selectSidebarTab(name: SidebarTab): void {
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
     tab.classList.toggle("is-active", tab.dataset.sidebarTab === name);
   }
+  ui.exampleRow.hidden = name !== "domain";
+  ui.domainForm.hidden = name !== "domain";
+  ui.fracturesForm.hidden = name !== "fractures";
   ui.form.hidden = name !== "network";
   ui.flowForm.hidden = name !== "flow";
   ui.transportForm.hidden = name !== "transport";
-  ui.exampleDescription.hidden = name !== "network" || ui.exampleDescription.textContent === "";
-  ui.runButton.textContent = RUN_BUTTON_TEXT[name];
+  ui.exampleDescription.hidden = name !== "domain" || ui.exampleDescription.textContent === "";
+  const runText = RUN_BUTTON_TEXT[name];
+  ui.runButton.hidden = runText === null;
+  ui.runButton.textContent = runText ?? "";
+  updateNextButton();
   showStatus("");
 }
 
@@ -224,7 +251,7 @@ async function loadInput(workflow: Workflow, newFiles: InputFiles): Promise<void
   files = { mesh: null };
   await setMesh(newFiles.mesh);
   ui.exampleDescription.textContent = description;
-  ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "network";
+  ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "domain";
   showStatus("");
   render();
 }
@@ -233,7 +260,7 @@ async function loadInput(workflow: Workflow, newFiles: InputFiles): Promise<void
 
 /** The input for the worker, or an error message */
 function generationInput(): GenerationInput | string {
-  if (ui.form.querySelector(".is-invalid")) {
+  if ([ui.domainForm, ui.fracturesForm, ui.form].some((tab) => tab.querySelector(".is-invalid"))) {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
   if (files.mesh === null) {
@@ -252,30 +279,13 @@ function generationInput(): GenerationInput | string {
   };
 }
 
-async function checkInput(): Promise<void> {
-  const input = generationInput();
-  if (typeof input === "string") {
-    showStatus(input, true);
-    return;
-  }
-  setBusy(true);
-  try {
-    const error = await client.check(input);
-    showStatus(error ?? "The input is valid.", error !== null);
-  } catch (error) {
-    showStatus(errorText(error), true);
-  } finally {
-    setBusy(false);
-  }
-}
-
 async function runGeneration(): Promise<void> {
   const input = generationInput();
   if (typeof input === "string") {
     showStatus(input, true);
     return;
   }
-  setBusy(true, true);
+  setBusy(true);
   ui.progress.value = 0;
   showStatus("Generating…");
   const startTime = performance.now();
@@ -309,30 +319,13 @@ function flowInput(): FlowInput | string {
   return { toml: flowToLibraryToml(flowState), mesh };
 }
 
-async function checkFlowInput(): Promise<void> {
-  const input = flowInput();
-  if (typeof input === "string") {
-    showStatus(input, true);
-    return;
-  }
-  setBusy(true);
-  try {
-    const error = await client.checkFlow(input);
-    showStatus(error ?? "The flow input is valid.", error !== null);
-  } catch (error) {
-    showStatus(errorText(error), true);
-  } finally {
-    setBusy(false);
-  }
-}
-
 async function runFlow(): Promise<void> {
   const input = flowInput();
   if (typeof input === "string") {
     showStatus(input, true);
     return;
   }
-  setBusy(true, true);
+  setBusy(true);
   // fehm reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Solving the flow…");
@@ -366,30 +359,13 @@ function transportInput(): TransportInput | string {
   return { toml: transportToLibraryToml(transportState), flowToml: flowOutputToml, mesh };
 }
 
-async function checkTransportInput(): Promise<void> {
-  const input = transportInput();
-  if (typeof input === "string") {
-    showStatus(input, true);
-    return;
-  }
-  setBusy(true);
-  try {
-    const error = await client.checkTransport(input);
-    showStatus(error ?? "The transport input is valid.", error !== null);
-  } catch (error) {
-    showStatus(errorText(error), true);
-  } finally {
-    setBusy(false);
-  }
-}
-
 async function runTransport(): Promise<void> {
   const input = transportInput();
   if (typeof input === "string") {
     showStatus(input, true);
     return;
   }
-  setBusy(true, true);
+  setBusy(true);
   // dfntrans reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Tracking the particles…");
@@ -415,6 +391,7 @@ async function runTransport(): Promise<void> {
 
 function clearOutput(): void {
   output = null;
+  updateNextButton();
   ui.results.hidden = true;
   ui.resultsEmpty.hidden = false;
   ui.colorSelect.disabled = true;
@@ -431,6 +408,7 @@ function clearOutput(): void {
 /** The flow output belongs to the mesh of one generation */
 function clearFlowOutput(): void {
   flowOutput = null;
+  updateNextButton();
   flowOutputToml = null;
   ui.flowResults.hidden = true;
   clearTransportOutput();
@@ -481,6 +459,7 @@ function showStats(list: HTMLDListElement, stats: [string, string][]): void {
 async function showOutput(result: GenerationOutput): Promise<void> {
   clearFlowOutput();
   output = result;
+  updateNextButton();
   ui.resultsEmpty.hidden = true;
   ui.results.hidden = false;
   const mesh = flowMesh();
@@ -507,6 +486,7 @@ function massFlowText(massFlow: number): string {
 async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
   clearTransportOutput();
   flowOutput = result;
+  updateNextButton();
   flowOutputToml = toml;
   renderTransport();
   ui.flowResults.hidden = false;
@@ -675,18 +655,15 @@ async function openExample(name: string): Promise<void> {
 
 function bindEvents(): void {
   ui.exampleSelect.addEventListener("change", () => void openExample(ui.exampleSelect.value));
-  const checkActions: Record<SidebarTab, () => Promise<void>> = {
-    network: checkInput,
-    flow: checkFlowInput,
-    transport: checkTransportInput,
-  };
-  const runActions: Record<SidebarTab, () => Promise<void>> = {
+  const runActions: Partial<Record<SidebarTab, () => Promise<void>>> = {
     network: runGeneration,
     flow: runFlow,
     transport: runTransport,
   };
-  ui.checkButton.addEventListener("click", () => void checkActions[activeSidebarTab]());
-  ui.runButton.addEventListener("click", () => void runActions[activeSidebarTab]());
+  ui.runButton.addEventListener("click", () => void runActions[activeSidebarTab]?.());
+  ui.nextButton.addEventListener("click", () =>
+    selectSidebarTab(SIDEBAR_TABS[SIDEBAR_TABS.indexOf(activeSidebarTab) + 1] ?? activeSidebarTab),
+  );
   ui.cancelButton.addEventListener("click", () => client.cancel());
 
   ui.colorSelect.addEventListener("change", () =>
@@ -700,8 +677,8 @@ function bindEvents(): void {
 
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
     tab.addEventListener("click", () => {
-      const name = tab.dataset.sidebarTab;
-      selectSidebarTab(name === "flow" || name === "transport" ? name : "network");
+      const name = SIDEBAR_TABS.find((candidate) => candidate === tab.dataset.sidebarTab);
+      selectSidebarTab(name ?? "network");
     });
   }
 }
@@ -732,6 +709,7 @@ async function fillMeshList(): Promise<void> {
 }
 
 bindEvents();
+selectSidebarTab(activeSidebarTab);
 render();
 renderFlow();
 renderTransport();

@@ -1,9 +1,6 @@
 // Runs the generation, the flow and the transport (WebAssembly) in a Web
 // Worker, so the page stays responsive. Messages: see `generationClient.ts`.
 import init, {
-  check_flow_input,
-  check_input,
-  check_transport_input,
   run_flow,
   run_generation,
   run_transport,
@@ -29,14 +26,6 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 };
 
 function handle(request: WorkerRequest): void {
-  if (request.type === "check") {
-    post({ type: "checked", error: check_input(request.toml, request.mesh, request.userFractures) ?? null });
-    return;
-  }
-  if (request.type === "checkFlow") {
-    post({ type: "checked", error: check_flow_input(request.toml, request.mesh) ?? null });
-    return;
-  }
   if (request.type === "runFlow") {
     const result = run_flow(request.toml, request.mesh);
     const flows: Float64Array = result.boundary_flows;
@@ -48,13 +37,6 @@ function handle(request: WorkerRequest): void {
       newtonIterations: result.newton_iterations,
     });
     result.free();
-    return;
-  }
-  if (request.type === "checkTransport") {
-    post({
-      type: "checked",
-      error: check_transport_input(request.toml, request.flowToml, request.mesh) ?? null,
-    });
     return;
   }
   if (request.type === "runTransport") {

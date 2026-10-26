@@ -72,6 +72,19 @@ try {
   await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined);
   const startExample = await page.$eval("#example-select", (node) => node.value);
   check(startExample === "box_west_east", "default example", startExample);
+  const startTab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
+  check(startTab === "domain", "start on the domain tab", startTab);
+  await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
+
+  // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
+  const tabWalk = [];
+  for (let step = 0; step < 2; step++) {
+    const isRunHidden = await page.$eval("#run-button", (node) => node.hidden);
+    await page.click("#next-button");
+    const tab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
+    tabWalk.push(`${isRunHidden ? "no run" : "run"} → ${tab}`);
+  }
+  check(tabWalk.join(", ") === "no run → fractures, no run → network", "next button", tabWalk.join(", "));
 
   // The full workflow of each example
   const examples = await page.$$eval("#example-select option", (options) =>
@@ -80,13 +93,27 @@ try {
   for (const name of examples) {
     await page.click('[data-sidebar-tab="network"]');
     await selectExample(page, name);
+    // "Next" of the DFN tab needs the fracture mesh, "Next" of the Flow tab a solved flow
+    const isNextDisabled = () => page.$eval("#next-button", (node) => node.disabled);
+    const isNetworkNextDisabled = await isNextDisabled();
     const networkStatus = await runStep(page, "network");
-    check(networkStatus.startsWith("Done"), `${name}: network`, networkStatus);
+    check(
+      networkStatus.startsWith("Done") && isNetworkNextDisabled && !(await isNextDisabled()),
+      `${name}: network`,
+      networkStatus,
+    );
 
+    await page.click('[data-sidebar-tab="flow"]');
+    const isFlowNextDisabled = await isNextDisabled();
     const flowStatus = await runStep(page, "flow");
+    const isFlowNextEnabled = !(await isNextDisabled());
     const hasFlowResults = await page.$eval("#flow-results", (node) => !node.hidden);
     const isPressureShown = await page.$eval("#color-select", (node) => node.value === "point:pressure");
-    check(flowStatus.startsWith("Done") && hasFlowResults && isPressureShown, `${name}: flow`, flowStatus);
+    check(
+      flowStatus.startsWith("Done") && hasFlowResults && isPressureShown && isFlowNextDisabled && isFlowNextEnabled,
+      `${name}: flow`,
+      flowStatus,
+    );
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow.png` });
 
@@ -138,12 +165,13 @@ try {
 
   // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
   await selectExample(page, "box_west_east");
+  await page.click('[data-sidebar-tab="fractures"]');
   await page.evaluate(() =>
-    [...document.querySelectorAll("#form button")].find((node) => node.textContent === "Add fracture").click(),
+    [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
   );
-  await page.waitForFunction(() => [...document.querySelectorAll("#form h4")].some((node) => node.textContent === "Fracture 1"));
+  await page.waitForFunction(() => [...document.querySelectorAll("#fractures-form h4")].some((node) => node.textContent === "Fracture 1"));
   const center = await page.evaluate(() => {
-    const input = [...document.querySelectorAll("#form .field")]
+    const input = [...document.querySelectorAll("#fractures-form .field")]
       .find((field) => field.querySelector(".field-label")?.textContent === "Center x (m)")
       .querySelector("input");
     const limits = `${input.value} in ${input.min} to ${input.max}`;
@@ -154,12 +182,12 @@ try {
   check(center.limits === "5 in 0 to 10" && center.isOutsideInvalid, "user fracture center in its region", center.limits);
   // The 3D view shows the polygon at once: a larger radius for the screenshot
   await page.evaluate(() => {
-    const input = [...document.querySelectorAll("#form .field")]
+    const input = [...document.querySelectorAll("#fractures-form .field")]
       .find((field) => field.querySelector(".field-label")?.textContent === "Radius (m)")
       .querySelector("input");
     input.value = "4";
     input.dispatchEvent(new Event("input"));
-    [...document.querySelectorAll("#form h3")].find((node) => node.textContent === "User-defined fractures").scrollIntoView();
+    [...document.querySelectorAll("#fractures-form h3")].find((node) => node.textContent === "User-defined fractures").scrollIntoView();
   });
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture.png` });
@@ -171,9 +199,8 @@ try {
   await page.waitForFunction(() =>
     [...document.querySelectorAll("#form option")].some((node) => node.textContent.endsWith("(not in the mesh)")),
   );
-  await page.click("#check-button");
-  await waitIdle(page);
-  check(await isStatusError(page), "check of a bad input", await statusText(page));
+  await runStep(page, "network");
+  check(await isStatusError(page), "generate with a bad input", await statusText(page));
 
   // Cancel: a large run, cancelled at once
   await selectExample(page, "box_west_east");
