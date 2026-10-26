@@ -95,6 +95,7 @@ const ui = {
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
+  showAxes: byId<HTMLInputElement>("show-axes"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
@@ -714,6 +715,7 @@ async function startViewer(): Promise<void> {
     return;
   }
   ui.viewerMessage.hidden = true;
+  viewer.setAxesVisible(ui.showAxes.checked);
   if (files.mesh) {
     await showDomainInViewer(viewer, files.mesh);
   }
@@ -795,7 +797,9 @@ function bindEvents(): void {
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
   );
-  ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
+  ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
+  ui.showAxes.addEventListener("change", () => updateViewer((view) => view.setAxesVisible(ui.showAxes.checked)));
+  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));

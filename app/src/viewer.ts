@@ -14,6 +14,7 @@ import {
   type VtkNamespace,
   type vtkActor,
   type vtkLookupTable,
+  type vtkOrientationMarkerWidget,
   type vtkPolyDataMapper,
   type vtkRenderer,
   type vtkScalarBarActor,
@@ -47,6 +48,9 @@ const MAX_CONE_COUNT = 500;
 const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
 // The boundary surfaces of the domain do not hide the fractures behind them
 const BOUNDARY_SURFACE_OPACITY = 0.5;
+// The x, y, z axes in the top-left corner (fractions of the view: x min, y min, x max, y max);
+// the results bezel is at the bottom-left, the scalar bar at the right
+const AXES_VIEWPORT = [0, 0.8, 0.2, 1] as const;
 
 /** "user": the polygons of the user-defined fractures of the form, before the generation */
 export type FractureLayer = "final" | "removed" | "rejected" | "user";
@@ -104,14 +108,17 @@ export class NetworkViewer {
   private boundarySurfaceActors = new Map<string, vtkActor>();
   private colorArray: ColorArray | null = null;
   private readonly canvas: HTMLCanvasElement;
+  private readonly axesWidget: vtkOrientationMarkerWidget;
 
   private constructor(
     session: StandaloneSession,
     renderer: vtkRenderer,
     window: vtkWebAssemblyOpenGLRenderWindow,
     canvas: HTMLCanvasElement,
+    axesWidget: vtkOrientationMarkerWidget,
   ) {
     this.canvas = canvas;
+    this.axesWidget = axesWidget;
     this.vtk = session.vtk;
     this.renderer = renderer;
     this.window = window;
@@ -152,7 +159,29 @@ export class NetworkViewer {
     await window.render();
     interactor.start();
 
-    return new NetworkViewer(session, renderer, window, canvas);
+    // The x, y, z arrows turn with the camera; the user cannot move or resize them
+    const axes = vtk.vtkAxesActor();
+    // The default labels are white, italic and with a shadow; the background is white
+    for (const caption of [axes.getXAxisCaptionActor2D(), axes.getYAxisCaptionActor2D(), axes.getZAxisCaptionActor2D()]) {
+      const text = caption.getCaptionTextProperty();
+      text.setColor(0.1, 0.1, 0.1);
+      text.setFontFamilyToArial();
+      text.setItalic(0);
+      text.setShadow(0);
+    }
+    const axesWidget = vtk.vtkOrientationMarkerWidget();
+    axesWidget.setOrientationMarker(axes);
+    axesWidget.setInteractor(interactor);
+    axesWidget.setViewport(...AXES_VIEWPORT);
+    axesWidget.setEnabled(1);
+    axesWidget.setInteractive(0);
+
+    return new NetworkViewer(session, renderer, window, canvas, axesWidget);
+  }
+
+  /** Shows or hides the x, y, z axes in the corner */
+  setAxesVisible(isVisible: boolean): void {
+    this.axesWidget.setEnabled(isVisible ? 1 : 0);
   }
 
   /** Shows the domain mesh (text of an ASCII .vtu file) as a wireframe. */

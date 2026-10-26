@@ -77,7 +77,8 @@ There is no server: `npm run build` gives a folder of static files.
   fractures of the form (layer "User fractures", blue; updated at each
   change of the form, also before "Generate"), the particle paths (layer "Trajectories": tubes, with cones in the direction
   of the velocity at every n-th point, about 20 for each path and at most
-  500); the mass flow of each boundary; the particle counts and the volume
+  500), the x, y, z axes in the top-left corner (they turn with the camera;
+  checkbox "Axes"); the mass flow of each boundary; the particle counts and the volume
   fluxes of the transport.
 
 The output is that of the `dfngen` binary for the same input and seed.
@@ -297,7 +298,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
-  the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example, the flow without a
+  the color choosers of the boundary surfaces, the "Axes" checkbox, the "Next" button, the full workflow of each example, the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh, the
   limits of the center of a new user-defined fracture, a bad input and the
   cancel; it saves screenshots.
