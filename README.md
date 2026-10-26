@@ -56,8 +56,11 @@ There is no server: `npm run build` gives a folder of static files.
   it is very large (about 1 MB for each particle in the examples), thus the
   option is off by default; the examples have it on, with few particles.
 - "Generate", "Solve flow" and "Track particles" run in a Web Worker;
-  "Cancel" stops them. An error of the library for the input shows in the
-  status line.
+  "Cancel" stops them. An error of the library shows in the status line,
+  as a text of the app with the words of the forms (`app/src/errors.ts`:
+  one text for each kind of error; a kind which the user cannot cause,
+  such as the format of a file, is "Internal error" with the text of the
+  library).
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
   fractures (layer "Mesh", with its edges; color by a cell array, or by
   the point pressure of the flow: "Pressure", selected when the flow is
@@ -191,7 +194,7 @@ intersection outside the mesh), and "Solve flow" reports it.
 
 | Folder | Content |
 |---|---|
-| `dfn-wasm` | Rust crate: `wasm-bindgen` functions of the libraries: `generation.rs` (`input_file_names`, `check_input`, `run_generation`), `flow.rs` (`check_flow_input`, `run_flow`) and `transport.rs` (`check_transport_input`, `run_transport`). Not a member of a workspace. |
+| `dfn-wasm` | Rust crate: `wasm-bindgen` functions of the libraries: `generation.rs` (`input_file_names`, `check_input`, `run_generation`), `flow.rs` (`check_flow_input`, `run_flow`) and `transport.rs` (`check_transport_input`, `run_transport`). `errors.rs`: `ErrorReport`, the kind (`<library>.<variant>`), the values and the text of each library error. Not a member of a workspace. |
 | `examples` | The workflow examples (see "Examples"); `build-wasm.sh` copies them into `app/public/examples`. |
 | `meshes` | The predefined domain meshes (see "Examples"); `build-wasm.sh` copies them into `app/public/meshes`, with `index.json`. |
 | `app` | Vite + TypeScript front end. |
@@ -201,6 +204,7 @@ intersection outside the mesh), and "Solve flow" reports it.
 | `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: the pressure and the flow velocity of `pressure.vtu` in the data of `dfn_mesh.vtu`, and a triangle mesh as PolyData for the view. |
 | `app/src/transport` | The transport form (`state.ts`, `toml.ts`: `[transport]` and the dfntrans input, `form.ts`), `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view, and `velocities.ts`: the speed at each mesh point from `velocities.vtp`. |
 | `app/src/viewer.ts` | The 3D view (VTK.wasm). |
+| `app/src/errors.ts` | The text for the user of each kind of library error. |
 | `app/src/worker.ts`, `app/src/generationClient.ts` | The Web Worker of the generation, the flow and the transport, and its interface for the page. |
 | `app/tests` | `vitest` tests (Node). |
 | `app/scripts/e2e.mjs` | End-to-end check in the local Chrome. |

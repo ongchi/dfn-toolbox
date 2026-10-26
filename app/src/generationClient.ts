@@ -1,5 +1,6 @@
 // Interface of the worker (generation of dfngen, flow of fehm and transport
 // of dfntrans) for the page.
+import type { ToolError } from "./errors";
 
 export interface GenerationInput {
   toml: string;
@@ -29,8 +30,8 @@ export type WorkerRequest =
   | ({ type: "runTransport"; seedIfZero: number } & TransportInput);
 
 export interface GenerationOutput {
-  /** Error message; then there are no files */
-  error: string | null;
+  /** The error of the library; then there are no files */
+  error: ToolError | null;
   /** Seed which the generation used (decimal digits) */
   seed: string;
   /** (name, text) of each output file */
@@ -47,8 +48,8 @@ export interface BoundaryFlow {
 }
 
 export interface FlowOutput {
-  /** Error message; then there are no files */
-  error: string | null;
+  /** The error of the library; then there are no files */
+  error: ToolError | null;
   /** (name, text) of each output file */
   files: [string, string][];
   boundaryFlows: BoundaryFlow[];
@@ -56,8 +57,8 @@ export interface FlowOutput {
 }
 
 export interface TransportOutput {
-  /** Error message; then there are no files */
-  error: string | null;
+  /** The error of the library; then there are no files */
+  error: ToolError | null;
   /** Seed which the run used */
   seed: number;
   /** (name, text) of each output file */

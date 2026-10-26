@@ -85,7 +85,7 @@ describe.each(caseNames)("case %s", (caseName) => {
 test("bad input gives the error message of the library", () => {
   const files = readCase("base");
   const toml = files.toml.replace("seed = 12345", "seed = 12345\nsede = 1");
-  expect(check_input(toml, files.mesh, files.userFractures)).toMatch(/unknown field `sede`/);
+  expect(check_input(toml, files.mesh, files.userFractures)?.message).toMatch(/unknown field `sede`/);
 });
 
 test("progress is reported", () => {

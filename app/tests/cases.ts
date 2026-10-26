@@ -100,7 +100,7 @@ export function generateExample(exampleName: string): { workflow: Workflow; mesh
   const network = workflow.network;
   const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFracturesFile(network), 1n, () => {});
   if (result.error !== undefined) {
-    throw new Error(`the generation of ${exampleName} failed: ${result.error}`);
+    throw new Error(`the generation of ${exampleName} failed: ${result.error.message}`);
   }
   return { workflow, mesh: result.file(FLOW_MESH_FILE) ?? "" };
 }

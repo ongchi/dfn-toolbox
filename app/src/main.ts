@@ -1,6 +1,7 @@
 // The page: input forms (network, flow and transport), generation, flow and
 // transport in the worker, 3D view and output files.
 import "./style.css";
+import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm } from "./flow/form";
 import { addArray, addPointArray, pointCount, triangleGridToPolyData, vectorMagnitudes } from "./flow/polyData";
@@ -326,7 +327,7 @@ async function runGeneration(): Promise<void> {
       showStatus(`Generating… ${acceptedCount} fractures accepted`);
     });
     if (result.error !== null) {
-      showStatus(result.error, true);
+      showStatus(toolErrorText(result.error), true);
       return;
     }
     showStatus(`Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`);
@@ -364,7 +365,7 @@ async function runFlow(): Promise<void> {
   try {
     const result = await client.runFlow(input);
     if (result.error !== null) {
-      showStatus(result.error, true);
+      showStatus(toolErrorText(result.error), true);
       return;
     }
     showStatus(
@@ -405,7 +406,7 @@ async function runTransport(): Promise<void> {
   try {
     const result = await client.runTransport(input);
     if (result.error !== null) {
-      showStatus(result.error, true);
+      showStatus(toolErrorText(result.error), true);
       return;
     }
     showStatus(

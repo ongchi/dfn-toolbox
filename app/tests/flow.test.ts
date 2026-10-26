@@ -91,11 +91,11 @@ test("a boundary array with no point is an error", () => {
   const meshWithEmptyArray = mesh.replace("<PointData>", `<PointData>\n${emptyArray}`);
   const toml = flowToLibraryToml(flowState({ empty: 10.0, north: 10.0 }, meshWithEmptyArray));
   const error = check_flow_input(toml, meshWithEmptyArray);
-  expect(error).toMatch(/boundary "empty": the array boundary__empty has no point/);
+  expect([error?.kind, error?.field_values]).toEqual(["fehm.EmptyBoundary", ["empty"]]);
 });
 
 test("no boundary is an error", () => {
-  expect(check_flow_input(flowToLibraryToml(flowState({})), mesh)).toMatch(/there is no \[\[boundary\]\]/);
+  expect(check_flow_input(flowToLibraryToml(flowState({})), mesh)?.kind).toBe("fehm.NoBoundaryDefined");
 });
 
 test("the pressure file as PolyData has the triangles and the pressure", () => {

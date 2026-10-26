@@ -3,20 +3,21 @@
 use fehm::{build_input_from_text, solve, write_output};
 use wasm_bindgen::prelude::*;
 
+use crate::errors::{fehm_report, ErrorReport};
 use crate::{find_file, with_log, write_files_to_memory};
 
-/// Checks the flow input. Returns the error message, or `None` for a valid input.
+/// Checks the flow input. Returns the error, or `None` for a valid input.
 #[wasm_bindgen]
-pub fn check_flow_input(toml_text: &str, mesh_text: &str) -> Option<String> {
+pub fn check_flow_input(toml_text: &str, mesh_text: &str) -> Option<ErrorReport> {
     build_input_from_text(toml_text, mesh_text)
         .err()
-        .map(|error| error.to_string())
+        .map(|error| fehm_report(&error))
 }
 
 /// Result of `run_flow`. With an error, there are no output files.
 #[wasm_bindgen]
 pub struct FlowResult {
-    error: Option<String>,
+    error: Option<ErrorReport>,
     log: String,
     files: Vec<(String, String)>,
     boundary_names: Vec<String>,
@@ -26,9 +27,9 @@ pub struct FlowResult {
 
 #[wasm_bindgen]
 impl FlowResult {
-    /// Error message of a failed run
+    /// Error of a failed run
     #[wasm_bindgen(getter)]
-    pub fn error(&self) -> Option<String> {
+    pub fn error(&self) -> Option<ErrorReport> {
         self.error.clone()
     }
 
@@ -72,11 +73,11 @@ impl FlowResult {
 pub fn run_flow(toml_text: &str, mesh_text: &str) -> FlowResult {
     let (outcome, log) = with_log(|| {
         let input =
-            build_input_from_text(toml_text, mesh_text).map_err(|error| error.to_string())?;
-        let solution = solve(&input).map_err(|error| error.to_string())?;
+            build_input_from_text(toml_text, mesh_text).map_err(|error| fehm_report(&error))?;
+        let solution = solve(&input).map_err(|error| fehm_report(&error))?;
         let files =
             write_files_to_memory(|create_file| write_output(&input, &solution, create_file))?;
-        Ok::<_, String>((input, solution, files))
+        Ok::<_, ErrorReport>((input, solution, files))
     });
 
     let mut result = FlowResult {
@@ -98,7 +99,7 @@ pub fn run_flow(toml_text: &str, mesh_text: &str) -> FlowResult {
             result.boundary_flows = solution.boundary_flows;
             result.newton_iterations = solution.newton_iterations;
         }
-        Err(message) => result.error = Some(message),
+        Err(report) => result.error = Some(report),
     }
     result
 }

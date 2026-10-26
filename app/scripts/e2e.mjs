@@ -303,7 +303,14 @@ try {
     [...document.querySelectorAll("#form option")].some((node) => node.textContent.endsWith("(not in the mesh)")),
   );
   await runStep(page, "network");
-  check(await isStatusError(page), "generate with a bad input", await statusText(page));
+  // The text of the app for the error of the library
+  const badInputStatus = await statusText(page);
+  check(
+    (await isStatusError(page)) &&
+      badInputStatus === "Family 1 (DFN tab): the domain has no region west_box. Choose another region.",
+    "generate with a bad input",
+    badInputStatus,
+  );
 
   // Cancel: a large run, cancelled at once
   await selectExample(page, "box_west_east");

@@ -4,6 +4,7 @@
 //! text of the input files and gives the text of the output files: there is
 //! no file system.
 
+mod errors;
 mod flow;
 mod generation;
 mod transport;
@@ -14,6 +15,8 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use tracing_subscriber::fmt::MakeWriter;
+
+use crate::errors::ErrorReport;
 
 /// The `create_file` callback of `write_output` of dfngen, fehm and dfntrans
 type CreateFile<'a> = dyn FnMut(&str) -> io::Result<Box<dyn Write>> + 'a;
@@ -37,7 +40,7 @@ fn with_log<T>(action: impl FnOnce() -> T) -> (T, String) {
 /// returns (name, text) for each file, in the order of the calls.
 fn write_files_to_memory<E: ToString>(
     write: impl FnOnce(&mut CreateFile) -> Result<(), E>,
-) -> Result<Vec<(String, String)>, String> {
+) -> Result<Vec<(String, String)>, ErrorReport> {
     // `write_output` needs writers which own their buffer, thus the buffers are shared
     let mut buffers: Vec<(String, Rc<RefCell<Vec<u8>>>)> = Vec::new();
     write(&mut |file_name| {
@@ -45,12 +48,13 @@ fn write_files_to_memory<E: ToString>(
         buffers.push((file_name.to_string(), Rc::clone(&buffer)));
         Ok(Box::new(SharedBufferWriter(buffer)))
     })
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| ErrorReport::output(error.to_string()))?;
 
     buffers
         .into_iter()
         .map(|(name, buffer)| {
-            let text = String::from_utf8(buffer.take()).map_err(|error| error.to_string())?;
+            let text = String::from_utf8(buffer.take())
+                .map_err(|error| ErrorReport::output(error.to_string()))?;
             Ok((name, text))
         })
         .collect()

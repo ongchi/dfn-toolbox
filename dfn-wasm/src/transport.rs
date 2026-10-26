@@ -3,19 +3,20 @@
 use dfntrans::{build_input_from_text, track_particles, write_output};
 use wasm_bindgen::prelude::*;
 
+use crate::errors::{dfntrans_report, fehm_report, ErrorReport};
 use crate::{find_file, with_log, write_files_to_memory};
 
-/// Checks the transport input and its flow input. Returns the error message,
-/// or `None` for a valid input. The boundary names are checked by `run_transport`.
+/// Checks the transport input and its flow input. Returns the error, or
+/// `None` for a valid input. The boundary names are checked by `run_transport`.
 #[wasm_bindgen]
 pub fn check_transport_input(
     transport_toml: &str,
     flow_toml: &str,
     mesh_text: &str,
-) -> Option<String> {
-    let check = || -> Result<(), String> {
-        build_input_from_text(transport_toml).map_err(|error| error.to_string())?;
-        fehm::build_input_from_text(flow_toml, mesh_text).map_err(|error| error.to_string())?;
+) -> Option<ErrorReport> {
+    let check = || -> Result<(), ErrorReport> {
+        build_input_from_text(transport_toml).map_err(|error| dfntrans_report(&error))?;
+        fehm::build_input_from_text(flow_toml, mesh_text).map_err(|error| fehm_report(&error))?;
         Ok(())
     };
     check().err()
@@ -24,7 +25,7 @@ pub fn check_transport_input(
 /// Result of `run_transport`. With an error, there are no output files.
 #[wasm_bindgen]
 pub struct TransportResult {
-    error: Option<String>,
+    error: Option<ErrorReport>,
     log: String,
     seed: u32,
     files: Vec<(String, String)>,
@@ -36,9 +37,9 @@ pub struct TransportResult {
 
 #[wasm_bindgen]
 impl TransportResult {
-    /// Error message of a failed run
+    /// Error of a failed run
     #[wasm_bindgen(getter)]
-    pub fn error(&self) -> Option<String> {
+    pub fn error(&self) -> Option<ErrorReport> {
         self.error.clone()
     }
 
@@ -105,20 +106,21 @@ pub fn run_transport(
 ) -> TransportResult {
     let mut seed = 0;
     let (outcome, log) = with_log(|| {
-        let mut input = build_input_from_text(transport_toml).map_err(|error| error.to_string())?;
+        let mut input =
+            build_input_from_text(transport_toml).map_err(|error| dfntrans_report(&error))?;
         if input.seed == 0 {
             input.seed = seed_if_zero;
         }
         seed = input.seed;
 
-        let flow =
-            fehm::build_input_from_text(flow_toml, mesh_text).map_err(|error| error.to_string())?;
-        let solution = fehm::solve(&flow).map_err(|error| error.to_string())?;
+        let flow = fehm::build_input_from_text(flow_toml, mesh_text)
+            .map_err(|error| fehm_report(&error))?;
+        let solution = fehm::solve(&flow).map_err(|error| fehm_report(&error))?;
         let transport =
-            track_particles(&input, &flow, &solution).map_err(|error| error.to_string())?;
+            track_particles(&input, &flow, &solution).map_err(|error| dfntrans_report(&error))?;
         let files =
             write_files_to_memory(|create_file| write_output(&input, &transport, create_file))?;
-        Ok::<_, String>((transport, files))
+        Ok::<_, ErrorReport>((transport, files))
     });
 
     let mut result = TransportResult {
@@ -139,7 +141,7 @@ pub fn run_transport(
             result.inflow_volume_flux = transport.inflow_volume_flux;
             result.outflow_volume_flux = transport.outflow_volume_flux;
         }
-        Err(message) => result.error = Some(message),
+        Err(report) => result.error = Some(report),
     }
     result
 }

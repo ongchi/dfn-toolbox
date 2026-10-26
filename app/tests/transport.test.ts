@@ -120,12 +120,13 @@ test("seed 0 uses the seed of the page", () => {
 
 test("no in-flow boundary is an error", () => {
   const error = check_transport_input(transportToLibraryToml(transportState({ east: "outflow" })), flowToml, mesh);
-  expect(error).toMatch(/inflow and outflow must each name at least one boundary/);
+  expect(error?.kind).toBe("dfntrans.InflowOutflowMissing");
 });
 
 test("an unknown boundary is an error of the run", () => {
   const toml = transportToLibraryToml(transportState(ROLES)).replace('inflow = ["north"]', 'inflow = ["west"]');
-  expect(run_transport(toml, flowToml, mesh, 1).error).toMatch(/no point data array boundary__west/);
+  const error = run_transport(toml, flowToml, mesh, 1).error;
+  expect([error?.kind, error?.field_values]).toEqual(["dfntrans.UnknownBoundary", ["west"]]);
 });
 
 test("the transport velocities give a speed at the points of the mesh", () => {

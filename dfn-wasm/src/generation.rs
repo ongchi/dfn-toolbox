@@ -3,6 +3,7 @@
 use dfngen::{build_input_from_text, generate, read_input_file_names, write_output};
 use wasm_bindgen::prelude::*;
 
+use crate::errors::{dfngen_report, ErrorReport};
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// The files which an input file needs, from its text
@@ -24,7 +25,7 @@ pub fn input_file_names(toml_text: &str) -> Result<InputFileNames, JsError> {
     })
 }
 
-/// Checks the input. Returns the error message, or `None` for a valid input.
+/// Checks the input. Returns the error, or `None` for a valid input.
 #[wasm_bindgen]
 #[expect(
     clippy::needless_pass_by_value,
@@ -34,17 +35,17 @@ pub fn check_input(
     toml_text: &str,
     domain_mesh_text: &str,
     user_fractures_text: Option<String>,
-) -> Option<String> {
+) -> Option<ErrorReport> {
     build_input_from_text(toml_text, domain_mesh_text, user_fractures_text.as_deref())
         .err()
-        .map(|error| error.to_string())
+        .map(|error| dfngen_report(&error))
 }
 
 /// Result of `run_generation`. With an error, there are no output files,
 /// and the log tells what was done before the error.
 #[wasm_bindgen]
 pub struct GenerationResult {
-    error: Option<String>,
+    error: Option<ErrorReport>,
     log: String,
     seed: u64,
     files: Vec<(String, String)>,
@@ -55,9 +56,9 @@ pub struct GenerationResult {
 
 #[wasm_bindgen]
 impl GenerationResult {
-    /// Error message of a failed generation
+    /// Error of a failed generation
     #[wasm_bindgen(getter)]
-    pub fn error(&self) -> Option<String> {
+    pub fn error(&self) -> Option<ErrorReport> {
         self.error.clone()
     }
 
@@ -126,7 +127,7 @@ pub fn run_generation(
     let (outcome, log) = with_log(|| {
         let (mut input, family_collection) =
             build_input_from_text(toml_text, domain_mesh_text, user_fractures_text.as_deref())
-                .map_err(|error| error.to_string())?;
+                .map_err(|error| dfngen_report(&error))?;
         if input.seed == 0 {
             input.seed = seed_if_zero;
         }
@@ -140,10 +141,10 @@ pub fn run_generation(
                 &JsValue::from(update.fraction),
             );
         })
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| dfngen_report(&error))?;
 
         let files = write_files_to_memory(|create_file| write_output(&network, create_file))?;
-        Ok::<_, String>((network, files))
+        Ok::<_, ErrorReport>((network, files))
     });
 
     let mut result = GenerationResult {
@@ -162,7 +163,7 @@ pub fn run_generation(
             result.final_count = network.final_fractures.len();
             result.rejected_count = network.dfn.rejected_polys.len();
         }
-        Err(message) => result.error = Some(message),
+        Err(report) => result.error = Some(report),
     }
     result
 }
