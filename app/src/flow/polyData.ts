@@ -44,3 +44,39 @@ export function triangleGridToPolyData(vtuText: string): string {
     .replace("</Cells>", "</Polys>")
     .replace(TYPES_ARRAY, "");
 }
+
+/** The length of each 3D vector of a list of components (x, y, z of each vector one after the other) */
+export function vectorMagnitudes(components: number[]): number[] {
+  const magnitudes: number[] = [];
+  for (let index = 0; index + 2 < components.length; index += 3) {
+    magnitudes.push(Math.hypot(components[index], components[index + 1], components[index + 2]));
+  }
+  return magnitudes;
+}
+
+/** The text of the ASCII .vtu file `meshVtu` with a new array `name`: one value for each cell or each point */
+export function addArray(meshVtu: string, association: "cell" | "point", name: string, values: number[]): string {
+  const piece = meshVtu.match(PIECE);
+  if (piece === null) {
+    throw new Error("the mesh has no <Piece> with NumberOfPoints and NumberOfCells");
+  }
+  const count = Number(association === "cell" ? piece[2] : piece[1]);
+  if (values.length !== count) {
+    throw new Error(`the array ${name} has ${values.length} values for ${count} ${association}s`);
+  }
+  const end = association === "cell" ? "</CellData>" : "</PointData>";
+  if (!meshVtu.includes(end)) {
+    throw new Error(`the mesh has no ${association} data`);
+  }
+  const array = `<DataArray type="Float64" Name="${name}" format="ascii">${values.join(" ")}</DataArray>\n`;
+  return meshVtu.replace(end, `${array}${end}`);
+}
+
+/** The number of points of an ASCII .vtu file */
+export function pointCount(vtuText: string): number {
+  const piece = vtuText.match(PIECE);
+  if (piece === null) {
+    throw new Error("the mesh has no <Piece> with NumberOfPoints and NumberOfCells");
+  }
+  return Number(piece[1]);
+}

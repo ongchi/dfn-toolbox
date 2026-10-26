@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
+import { pointCount } from "../src/flow/polyData";
 import { FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_transport_input, run_transport } from "../src/pkg/dfn_wasm.js";
@@ -17,6 +18,7 @@ import {
 } from "../src/transport/state";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { markVelocityAsVectors } from "../src/transport/trajectories";
+import { nodeVelocityMagnitudes } from "../src/transport/velocities";
 import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans } from "./cases";
 
 // The example with the boundary arrays of the mesh surface, and of the boundary surfaces north and east
@@ -124,4 +126,13 @@ test("no in-flow boundary is an error", () => {
 test("an unknown boundary is an error of the run", () => {
   const toml = transportToLibraryToml(transportState(ROLES)).replace('inflow = ["north"]', 'inflow = ["west"]');
   expect(run_transport(toml, flowToml, mesh, 1).error).toMatch(/no point data array boundary__west/);
+});
+
+test("the transport velocities give a speed at the points of the mesh", () => {
+  const state = transportState(ROLES);
+  state.hasVelocities = true;
+  const result = run_transport(transportToLibraryToml(state), flowToml, mesh, 1);
+  expect(result.error).toBeUndefined();
+  const speeds = nodeVelocityMagnitudes(result.file("velocities.vtp") ?? "", pointCount(mesh), state.timeUnit);
+  expect(speeds.every((speed) => Number.isFinite(speed) && speed >= 0) && speeds.some((speed) => speed > 0)).toBe(true);
 });

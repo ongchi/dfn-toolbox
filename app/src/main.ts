@@ -3,7 +3,7 @@
 import "./style.css";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm } from "./flow/form";
-import { addPointArray, triangleGridToPolyData } from "./flow/polyData";
+import { addArray, addPointArray, pointCount, triangleGridToPolyData, vectorMagnitudes } from "./flow/polyData";
 import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
@@ -21,14 +21,22 @@ import {
   type TransportInput,
   type TransportOutput,
 } from "./generationClient";
-import { meshRegionBounds, meshRegionNames, type InputFiles, type RegionBounds } from "./inputFiles";
+import { dataArrayValues, meshRegionBounds, meshRegionNames, type InputFiles, type RegionBounds } from "./inputFiles";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm } from "./transport/form";
-import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
+import { defaultTransportState, updateTransportBoundaries, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
+import { nodeVelocityMagnitudes } from "./transport/velocities";
 import { userFracturesToVtp } from "./userFractures";
-import { NetworkViewer, PRESSURE_ARRAY, type ColorArray, type FractureLayer } from "./viewer";
+import {
+  FLOW_VELOCITY_ARRAY,
+  NetworkViewer,
+  PRESSURE_ARRAY,
+  TRANSPORT_VELOCITY_ARRAY,
+  type ColorArray,
+  type FractureLayer,
+} from "./viewer";
 import type { Workflow } from "./workflow";
 
 const DEFAULT_COLOR_OPTION = "cell:fracture_id";
@@ -37,6 +45,9 @@ const PRESSURE_FILE = "pressure.vtu";
 const DEFAULT_EXAMPLE = "box_west_east";
 const PRESSURE_OPTION = colorOptionValue(PRESSURE_ARRAY);
 const TRAJECTORIES_FILE = "trajectories.vtp";
+const VELOCITIES_FILE = "velocities.vtp";
+const FLOW_VELOCITY_OPTION = colorOptionValue(FLOW_VELOCITY_ARRAY);
+const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
 
 // The domain, the user fractures and the network are the three tabs of the network input
 const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
@@ -107,6 +118,8 @@ let flowOutput: FlowOutput | null = null;
 let flowOutputToml: string | null = null;
 let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
+/** The time unit of the input of `transportOutput`: the unit of its velocities */
+let transportTimeUnit: TimeUnit = "days";
 let activeSidebarTab: SidebarTab = "domain";
 /** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
 let lastShape: string | null = null;
@@ -384,6 +397,7 @@ async function runTransport(): Promise<void> {
     return;
   }
   setBusy(true);
+  const timeUnit = transportState.timeUnit;
   // dfntrans reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Tracking the particles…");
@@ -397,7 +411,7 @@ async function runTransport(): Promise<void> {
     showStatus(
       `Done in ${durationText(performance.now() - startTime)}: ${result.exitCount} of ${result.particleCount} particles exited.`,
     );
-    await showTransportOutput(result);
+    await showTransportOutput(result, timeUnit);
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -522,8 +536,9 @@ function volumeFluxText(volumeFlux: number): string {
   return `${volumeFlux.toExponential(4)} m³/s`;
 }
 
-async function showTransportOutput(result: TransportOutput): Promise<void> {
+async function showTransportOutput(result: TransportOutput, timeUnit: TimeUnit): Promise<void> {
   transportOutput = result;
+  transportTimeUnit = timeUnit;
   ui.transportResults.hidden = false;
   showStats(ui.transportStats, [
     ["Particles", String(result.particleCount)],
@@ -537,6 +552,8 @@ async function showTransportOutput(result: TransportOutput): Promise<void> {
   ui.showTrajectories.disabled = !hasTrajectories;
   ui.showTrajectories.checked = hasTrajectories;
   await showTransportInViewer();
+  // "Color by" gets the velocities of the transport, or loses those of the last one
+  await showOutputInViewer();
 }
 
 async function showTransportInViewer(): Promise<void> {
@@ -572,31 +589,54 @@ function colorArrayOf(optionValue: string): ColorArray | null {
   return { name: optionValue.slice(separator + 1), association };
 }
 
-/** The triangle mesh of the final fractures, with the pressure of the flow if there is one */
-function meshWithPressure(mesh: string): string {
+/**
+ * The triangle mesh of the final fractures, with the pressure and the flow
+ * velocity of the flow, and the velocity of the transport, if they exist
+ */
+function meshWithFlowArrays(mesh: string): string {
   const pressure = flowOutputFile(PRESSURE_FILE);
-  return pressure === null ? mesh : addPointArray(mesh, pressure, PRESSURE_ARRAY.name);
+  if (pressure === null) {
+    return mesh;
+  }
+  const darcyVelocities = dataArrayValues(pressure, "darcy_velocity") ?? [];
+  const flowMeshText = addArray(
+    addPointArray(mesh, pressure, PRESSURE_ARRAY.name),
+    "cell",
+    FLOW_VELOCITY_ARRAY.name,
+    vectorMagnitudes(darcyVelocities),
+  );
+  const velocities = transportOutputFile(VELOCITIES_FILE);
+  if (velocities === null) {
+    return flowMeshText;
+  }
+  const speeds = nodeVelocityMagnitudes(velocities, pointCount(mesh), transportTimeUnit);
+  return addArray(flowMeshText, "point", TRANSPORT_VELOCITY_ARRAY.name, speeds);
 }
 
 /**
- * Shows the output of the generation and the pressure of the flow. "Color
- * by" selects `selected`; else it keeps its array if the new mesh has it;
- * else `fracture_id`.
+ * Shows the output of the generation, and the arrays of the flow and the
+ * transport. "Color by" selects `selected`; else it keeps its array if the
+ * new mesh has it; else `fracture_id`.
  */
 async function showOutputInViewer(selected: string | null = null): Promise<void> {
   if (!viewer || !output) {
     return;
   }
   const mesh = flowMesh();
-  await viewer.setLayer("final", mesh === null ? null : triangleGridToPolyData(meshWithPressure(mesh)));
+  await viewer.setLayer("final", mesh === null ? null : triangleGridToPolyData(meshWithFlowArrays(mesh)));
   await viewer.setLayer("removed", outputFile("fractures_removed.vtp"));
   await viewer.setLayer("rejected", outputFile("fractures_rejected.vtp"));
   applyLayerVisibility(viewer);
 
   const previous = ui.colorSelect.value;
-  const options = (await viewer.cellArrayNames()).map((name) => new Option(name, colorOptionValue({ name, association: "cell" })));
+  const options = (await viewer.cellArrayNames())
+    .filter((name) => name !== FLOW_VELOCITY_ARRAY.name)
+    .map((name) => new Option(name, colorOptionValue({ name, association: "cell" })));
   if (flowOutputFile(PRESSURE_FILE) !== null) {
-    options.push(new Option("Pressure", PRESSURE_OPTION));
+    options.push(new Option("Pressure", PRESSURE_OPTION), new Option("Flow velocity", FLOW_VELOCITY_OPTION));
+  }
+  if (transportOutputFile(VELOCITIES_FILE) !== null) {
+    options.push(new Option("Transport velocity", TRANSPORT_VELOCITY_OPTION));
   }
   ui.colorSelect.replaceChildren(new Option("One color", ""), ...options);
   const values = options.map((option) => option.value);

@@ -72,6 +72,11 @@ async function selectExample(page, name) {
   await page.waitForFunction((exampleName) => document.querySelector("#form").dataset.example === exampleName, {}, name);
 }
 
+/** The values of the options of "Color by" */
+async function colorOptions(page) {
+  return page.$$eval("#color-select option", (options) => options.map((option) => option.value));
+}
+
 /** Runs the step of a sidebar tab; returns the status text */
 async function runStep(page, tab) {
   await page.click(`[data-sidebar-tab="${tab}"]`);
@@ -184,7 +189,22 @@ try {
     );
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow.png` });
+    const hasFlowVelocity = (await colorOptions(page)).includes("cell:flow_velocity");
+    check(hasFlowVelocity, `${name}: flow velocity in Color by`, String(hasFlowVelocity));
+    await page.select("#color-select", "cell:flow_velocity");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow_velocity.png` });
 
+    // The velocities of the transport: the checkbox of the Transport tab
+    await page.click('[data-sidebar-tab="transport"]');
+    await page.evaluate(() => {
+      const checkbox = [...document.querySelectorAll("#transport-form input[type=checkbox]")].find(
+        (node) => node.closest(".field")?.querySelector(".field-label")?.textContent === "Velocities",
+      );
+      if (!checkbox.checked) {
+        checkbox.click();
+      }
+    });
     const transportStatus = await runStep(page, "transport");
     const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
@@ -193,6 +213,11 @@ try {
       `${name}: transport`,
       transportStatus,
     );
+    const hasTransportVelocity = (await colorOptions(page)).includes("point:transport_velocity");
+    check(hasTransportVelocity, `${name}: transport velocity in Color by`, String(hasTransportVelocity));
+    await page.select("#color-select", "point:transport_velocity");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await page.screenshot({ path: `${screenshotDir}/e2e_${name}_transport_velocity.png` });
     // The trajectories in the fractures: colored by fracture, not by the pressure
     await page.select("#color-select", "cell:fracture_id");
     await new Promise((resolve) => setTimeout(resolve, 500));

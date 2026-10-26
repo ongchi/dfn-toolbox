@@ -364,7 +364,7 @@ function outputSection(state: TransportState, context: FormContext): HTMLElement
     checkboxField({
       label: "Velocities",
       key: "velocities",
-      help: "velocities.vtp: the velocity at each point of the mesh",
+      help: "the velocity of the particle tracking at each point of the mesh: Color by → Transport velocity",
       value: state.hasVelocities,
       onInput: (value) => {
         state.hasVelocities = value;

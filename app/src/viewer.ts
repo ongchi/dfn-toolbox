@@ -25,9 +25,11 @@ const VTK_BUNDLE_URL = `${import.meta.env.BASE_URL}vtk/vtk-wasm32-emscripten.tar
 
 // VTK_GET_ARRAY_BY_NAME of vtkMapper
 const ARRAY_ACCESS_BY_NAME = 1;
-// The default of vtkScalarBarActor, and 6 significant digits for the pressure
+// The default of vtkScalarBarActor, 6 significant digits for the pressure,
+// and an exponent for the velocities (they are small)
 const DEFAULT_LABEL_FORMAT = "%-#6.3g";
 const PRESSURE_LABEL_FORMAT = "%-#.6g";
+const VELOCITY_LABEL_FORMAT = "%-#.3e";
 // The text of the scalar bar has the size of the text of the page (`:root` of style.css),
 // in CSS pixels; the bar is at most this wide
 const SCALAR_BAR_FONT_SIZE = 14;
@@ -55,6 +57,18 @@ export interface ColorArray {
 
 /** The pressure of the flow, which `addPointArray` adds to the mesh */
 export const PRESSURE_ARRAY: ColorArray = { name: "pressure", association: "point" };
+/** The magnitude of the Darcy velocity of each triangle of the flow */
+export const FLOW_VELOCITY_ARRAY: ColorArray = { name: "flow_velocity", association: "cell" };
+/** The mean speed of the particle tracking at each point */
+export const TRANSPORT_VELOCITY_ARRAY: ColorArray = { name: "transport_velocity", association: "point" };
+
+/** The title and the label format of the scalar bar of the arrays which the app adds; other arrays: their name */
+const SCALAR_BARS = new Map<string, { title: string; labelFormat: string }>([
+  // The pressure differences are small against the pressure
+  [PRESSURE_ARRAY.name, { title: "pressure (MPa)", labelFormat: PRESSURE_LABEL_FORMAT }],
+  [FLOW_VELOCITY_ARRAY.name, { title: "flow velocity (m/s)", labelFormat: VELOCITY_LABEL_FORMAT }],
+  [TRANSPORT_VELOCITY_ARRAY.name, { title: "transport velocity (m/s)", labelFormat: VELOCITY_LABEL_FORMAT }],
+]);
 
 interface PolyDataLayer {
   reader: vtkXMLPolyDataReader;
@@ -210,7 +224,7 @@ export class NetworkViewer {
     return names;
   }
 
-  /** The scalar bar of the color array; the pressure has its unit and more digits */
+  /** The scalar bar of the color array; the arrays of `SCALAR_BARS` have their title and label format */
   private updateScalarBar(): void {
     // The canvas can have more pixels than CSS pixels (a high-resolution screen)
     const pixelRatio = this.canvas.clientWidth > 0 ? this.canvas.width / this.canvas.clientWidth : 1;
@@ -219,13 +233,9 @@ export class NetworkViewer {
     this.scalarBar.setMaximumWidthInPixels(Math.round(SCALAR_BAR_WIDTH * pixelRatio));
     this.scalarBar.setVerticalTitleSeparation(Math.round(SCALAR_BAR_TITLE_SPACE * pixelRatio));
     const isColored = this.colorArray !== null && this.layers.has("final");
-    const isPressure =
-      isColored &&
-      this.colorArray?.name === PRESSURE_ARRAY.name &&
-      this.colorArray.association === PRESSURE_ARRAY.association;
-    this.scalarBar.setTitle(isPressure ? "pressure (MPa)" : (this.colorArray?.name ?? ""));
-    // The pressure differences are small against the pressure
-    this.scalarBar.setLabelFormat(isPressure ? PRESSURE_LABEL_FORMAT : DEFAULT_LABEL_FORMAT);
+    const style = this.colorArray === null ? undefined : SCALAR_BARS.get(this.colorArray.name);
+    this.scalarBar.setTitle(style?.title ?? this.colorArray?.name ?? "");
+    this.scalarBar.setLabelFormat(style?.labelFormat ?? DEFAULT_LABEL_FORMAT);
     this.scalarBar.setVisibility(isColored ? 1 : 0);
   }
 

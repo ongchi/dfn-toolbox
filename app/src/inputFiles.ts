@@ -23,7 +23,7 @@ export function meshRegionNames(vtuText: string): string[] {
 }
 
 /** The numbers of the ASCII data array with this name; null if there is none */
-function dataArrayValues(vtuText: string, name: string): number[] | null {
+export function dataArrayValues(vtuText: string, name: string): number[] | null {
   const match = vtuText.match(new RegExp(`<DataArray[^>]*Name="${name}"[^>]*>([^<]*)</DataArray>`));
   return match === null ? null : match[1].trim().split(/\s+/).filter((word) => word !== "").map(Number);
 }

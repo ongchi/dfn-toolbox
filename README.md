@@ -61,7 +61,10 @@ There is no server: `npm run build` gives a folder of static files.
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
   fractures (layer "Mesh", with its edges; color by a cell array, or by
   the point pressure of the flow: "Pressure", selected when the flow is
-  done), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
+  done; "Flow velocity": the magnitude of the `darcy_velocity` of each
+  triangle of `pressure.vtu`, m/s; "Transport velocity", with the output
+  `velocities` of the transport: the mean speed of the sectors of each
+  point in `velocities.vtp`, in m/s), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
   (layer "Domain", a wireframe), the polygons of the user-defined
   fractures of the form (layer "User fractures", blue; updated at each
   change of the form, also before "Generate"), the particle paths (layer "Trajectories": tubes, with cones in the direction
@@ -195,8 +198,8 @@ intersection outside the mesh), and "Solve flow" reports it.
 | `app/src/workflow.ts` | The workflow file: reading (strict) and writing of the three sections. |
 | `app/src/form` | The network form. `state.ts` has the form state, `toml.ts` the conversion between `[network]` and the state, the dfngen input, and the TOML helpers; one file for each section. |
 | `app/src/userFractures.ts` | The polygon file of the user-defined fractures (see "User-defined fractures"). |
-| `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: the pressure of `pressure.vtu` in the point data of `dfn_mesh.vtu`, and a triangle mesh as PolyData for the view. |
-| `app/src/transport` | The transport form (`state.ts`, `toml.ts`: `[transport]` and the dfntrans input, `form.ts`), and `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view. |
+| `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: the pressure and the flow velocity of `pressure.vtu` in the data of `dfn_mesh.vtu`, and a triangle mesh as PolyData for the view. |
+| `app/src/transport` | The transport form (`state.ts`, `toml.ts`: `[transport]` and the dfntrans input, `form.ts`), `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view, and `velocities.ts`: the speed at each mesh point from `velocities.vtp`. |
 | `app/src/viewer.ts` | The 3D view (VTK.wasm). |
 | `app/src/worker.ts`, `app/src/generationClient.ts` | The Web Worker of the generation, the flow and the transport, and its interface for the page. |
 | `app/tests` | `vitest` tests (Node). |
