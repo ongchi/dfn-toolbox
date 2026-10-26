@@ -1,14 +1,10 @@
 // End-to-end check of the web app in the local Chrome (headless).
 // Start the dev server first (npm run dev), then:
 //   node scripts/e2e.mjs [url] [screenshot folder]
-// It runs the full workflow (network, flow, transport) of each example, the
-// single zip of the output, the save and the open of the workflow file, a bad
-// input, a cancel, and the flow and the transport without their input; it
-// saves screenshots.
-import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { unzipSync } from "fflate";
+// It checks the default example, runs the full workflow (network, flow,
+// transport) of each example, the flow and the transport without their
+// input, the choice of a predefined mesh, a new user-defined fracture, a bad
+// input and a cancel; it saves screenshots.
 import puppeteer from "puppeteer-core";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
@@ -58,18 +54,6 @@ async function runStep(page, tab) {
   return statusText(page);
 }
 
-/** Waits for a new file in the download folder; returns its path */
-async function waitDownload(downloadDir, name) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const path = join(downloadDir, name);
-    if (existsSync(path) && !readdirSync(downloadDir).some((file) => file.endsWith(".crdownload"))) {
-      return path;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`no download ${name} in ${downloadDir}`);
-}
-
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
@@ -79,13 +63,15 @@ try {
       console.log(`[console.error] ${message.text()}`);
     }
   });
-  const downloadDir = mkdtempSync(join(tmpdir(), "dfn-web-e2e-"));
-  const cdp = await page.createCDPSession();
-  await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: downloadDir });
 
   await page.goto(url);
   await page.waitForFunction(() => document.querySelector("#example-select").options.length > 1);
   await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+
+  // The page opens the default example
+  await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined);
+  const startExample = await page.$eval("#example-select", (node) => node.value);
+  check(startExample === "box_west_east", "default example", startExample);
 
   // The full workflow of each example
   const examples = await page.$$eval("#example-select option", (options) =>
@@ -118,17 +104,21 @@ try {
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_transport.png` });
   }
 
-  // One zip of the last example: the workflow file and the three output folders
-  const lastExample = examples[examples.length - 1];
-  await page.click("#download-all");
-  const archive = unzipSync(readFileSync(await waitDownload(downloadDir, `${lastExample}_output.zip`)));
-  const entries = Object.keys(archive);
-  const hasAllParts =
-    entries.includes(`${lastExample}.toml`) &&
-    ["network/fractures.vtp", "network/dfn_mesh.vtu", "flow/pressure.vtu", "transport/trajectories.vtp"].every((entry) =>
-      entries.includes(entry),
-    );
-  check(hasAllParts, "download all", `${entries.length} files: ${entries.slice(0, 6).join(", ")}…`);
+  // The accordion of each result section: a click on the title of the flow
+  // closes only the flow, a second click opens it again
+  const openSections = () =>
+    page.$$eval(".results-section", (nodes) => nodes.map((node) => (node.open ? node.id : "")).join(" "));
+  const sectionStates = [await openSections()];
+  await page.click("#flow-results summary");
+  sectionStates.push(await openSections());
+  await page.click("#flow-results summary");
+  sectionStates.push(await openSections());
+  check(
+    sectionStates.join(" | ") ===
+      "results flow-results transport-results | results  transport-results | results flow-results transport-results",
+    "results sections accordion",
+    sectionStates.join(" | "),
+  );
 
   // Flow without a mesh and transport without a flow: a new example has no output
   await page.click('[data-sidebar-tab="network"]');
@@ -141,8 +131,8 @@ try {
   // The domain mesh dropdown: a predefined mesh replaces the mesh of the example
   await page.click('[data-sidebar-tab="network"]');
   await page.select(".file-row select", "L-shape.vtu");
-  // The workflow gets the name when the mesh is loaded
-  await page.waitForFunction(() => document.querySelector("#toml-preview").textContent.includes('domain = "L-shape.vtu"'));
+  // The form shows the regions of the mesh when it is loaded
+  await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
   const meshLabel = await page.$eval(".file-row select", (node) => node.selectedOptions[0].textContent);
   check(meshLabel === "L-shape", "choose a predefined mesh", meshLabel);
 
@@ -151,7 +141,7 @@ try {
   await page.evaluate(() =>
     [...document.querySelectorAll("#form button")].find((node) => node.textContent === "Add fracture").click(),
   );
-  await page.waitForFunction(() => document.querySelector("#toml-preview").textContent.includes("[[network.user_fracture]]"));
+  await page.waitForFunction(() => [...document.querySelectorAll("#form h4")].some((node) => node.textContent === "Fracture 1"));
   const center = await page.evaluate(() => {
     const input = [...document.querySelectorAll("#form .field")]
       .find((field) => field.querySelector(".field-label")?.textContent === "Center x (m)")
@@ -177,7 +167,10 @@ try {
   // Bad input: the family regions of the L-shape example are not in the Box mesh: an error of the library
   await selectExample(page, "l_shape_north_east");
   await page.select(".file-row select", "Box.vtu");
-  await page.waitForFunction(() => document.querySelector("#toml-preview").textContent.includes('domain = "Box.vtu"'));
+  // The family regions of the example are not in the new mesh
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll("#form option")].some((node) => node.textContent.endsWith("(not in the mesh)")),
+  );
   await page.click("#check-button");
   await waitIdle(page);
   check(await isStatusError(page), "check of a bad input", await statusText(page));

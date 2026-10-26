@@ -1,7 +1,6 @@
 // The page: input forms (network, flow and transport), generation, flow and
 // transport in the worker, 3D view and output files.
 import "./style.css";
-import { strToU8, zipSync } from "fflate";
 import { listExamples, loadExample } from "./examples";
 import { renderFlowForm } from "./flow/form";
 import { addPointArray, triangleGridToPolyData } from "./flow/polyData";
@@ -30,10 +29,12 @@ import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
 import { userFracturesToVtp } from "./userFractures";
 import { NetworkViewer, PRESSURE_ARRAY, type ColorArray, type FractureLayer } from "./viewer";
-import { workflowToToml, type Workflow } from "./workflow";
+import type { Workflow } from "./workflow";
 
 const DEFAULT_COLOR_OPTION = "cell:fracture_id";
 const PRESSURE_FILE = "pressure.vtu";
+// The example of the page at the start
+const DEFAULT_EXAMPLE = "box_west_east";
 const PRESSURE_OPTION = colorOptionValue(PRESSURE_ARRAY);
 const TRAJECTORIES_FILE = "trajectories.vtp";
 
@@ -44,7 +45,6 @@ const RUN_BUTTON_TEXT: Record<SidebarTab, string> = {
   flow: "Solve flow",
   transport: "Track particles",
 };
-const DEFAULT_INPUT_FILE = "workflow.toml";
 
 function byId<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -76,23 +76,12 @@ const ui = {
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
   resultsEmpty: byId<HTMLParagraphElement>("results-empty"),
-  results: byId<HTMLDivElement>("results"),
+  results: byId<HTMLDetailsElement>("results"),
   resultsStats: byId<HTMLDListElement>("results-stats"),
-  downloadAll: byId<HTMLButtonElement>("download-all"),
-  downloadList: byId<HTMLUListElement>("download-list"),
-  flowResults: byId<HTMLDivElement>("flow-results"),
+  flowResults: byId<HTMLDetailsElement>("flow-results"),
   flowStats: byId<HTMLDListElement>("flow-stats"),
-  flowDownloadList: byId<HTMLUListElement>("flow-download-list"),
-  transportResults: byId<HTMLDivElement>("transport-results"),
+  transportResults: byId<HTMLDetailsElement>("transport-results"),
   transportStats: byId<HTMLDListElement>("transport-stats"),
-  transportDownloadList: byId<HTMLUListElement>("transport-download-list"),
-  log: byId<HTMLPreElement>("log"),
-  flowLogTitle: byId<HTMLHeadingElement>("flow-log-title"),
-  flowLog: byId<HTMLPreElement>("flow-log"),
-  transportLogTitle: byId<HTMLHeadingElement>("transport-log-title"),
-  transportLog: byId<HTMLPreElement>("transport-log"),
-  tomlPreview: byId<HTMLPreElement>("toml-preview"),
-  copyToml: byId<HTMLButtonElement>("copy-toml"),
 };
 
 let state: FormState = defaultFormState();
@@ -100,22 +89,15 @@ let files: InputFiles = { mesh: null };
 let regionNames: string[] = [];
 let regionBounds: RegionBounds[] = [];
 let meshNames: string[] = [];
-/** The description (comment) and the file name of the workflow file */
+/** The description (comment) of the workflow file */
 let description = "";
-let inputFileName = DEFAULT_INPUT_FILE;
 let output: GenerationOutput | null = null;
-/** The network input of `output` */
-let outputNetwork: FormState | null = null;
 let flowState: FlowState = defaultFlowState();
 let flowOutput: FlowOutput | null = null;
-/** The flow input of `flowOutput` */
-let outputFlow: FlowState | null = null;
 /** The flow TOML of `flowOutput`: the transport solves this flow again */
 let flowOutputToml: string | null = null;
 let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
-/** The transport input of `transportOutput` */
-let outputTransport: TransportState | null = null;
 let activeSidebarTab: SidebarTab = "network";
 let isBusy = false;
 let viewer: NetworkViewer | null = null;
@@ -161,10 +143,7 @@ const formContext: FormContext = {
   get regionBounds() {
     return regionBounds;
   },
-  changed: () => {
-    updateTomlPreview();
-    updateUserFracturesInViewer();
-  },
+  changed: () => updateUserFracturesInViewer(),
   rerender: () => render(),
 };
 
@@ -185,7 +164,7 @@ const flowContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
-  changed: () => updateTomlPreview(),
+  changed: () => {},
   rerender: () => renderFlow(),
 };
 
@@ -193,33 +172,21 @@ const transportContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
-  changed: () => updateTomlPreview(),
+  changed: () => {},
   rerender: () => renderTransport(),
 };
 
 function render(): void {
   renderForm(ui.form, state, formContext, fileHandlers);
-  updateTomlPreview();
   updateUserFracturesInViewer();
 }
 
 function renderFlow(): void {
   renderFlowForm(ui.flowForm, flowState, flowMesh() !== null, flowContext);
-  updateTomlPreview();
 }
 
 function renderTransport(): void {
   renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext);
-  updateTomlPreview();
-}
-
-/** The workflow file of the three forms */
-function workflowText(): string {
-  return workflowToToml({ description, network: state, flow: flowState, transport: transportState });
-}
-
-function updateTomlPreview(): void {
-  ui.tomlPreview.textContent = workflowText();
 }
 
 function selectSidebarTab(name: SidebarTab): void {
@@ -249,27 +216,17 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
 }
 
 /** Loads a new workflow into the three forms: the old output does not belong to it */
-async function loadInput(workflow: Workflow, newFiles: InputFiles, fileName: string): Promise<void> {
+async function loadInput(workflow: Workflow, newFiles: InputFiles): Promise<void> {
   state = workflow.network;
   flowState = workflow.flow;
   transportState = workflow.transport;
   description = workflow.description;
-  inputFileName = fileName;
   files = { mesh: null };
   await setMesh(newFiles.mesh);
   ui.exampleDescription.textContent = description;
   ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "network";
   showStatus("");
   render();
-}
-
-function downloadText(name: string, text: string | Uint8Array, type = "text/plain"): void {
-  const blob = new Blob([text as BlobPart], { type });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = name;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
 // ---------------------------------------------------------------- run
@@ -321,21 +278,18 @@ async function runGeneration(): Promise<void> {
   setBusy(true, true);
   ui.progress.value = 0;
   showStatus("Generating…");
-  const network = structuredClone(state);
   const startTime = performance.now();
   try {
     const result = await client.run(input, (acceptedCount, fraction) => {
       ui.progress.value = fraction;
       showStatus(`Generating… ${acceptedCount} fractures accepted`);
     });
-    ui.log.textContent = result.log;
     if (result.error !== null) {
       showStatus(result.error, true);
       return;
     }
     showStatus(`Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`);
     await showOutput(result);
-    outputNetwork = network;
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -382,12 +336,9 @@ async function runFlow(): Promise<void> {
   // fehm reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Solving the flow…");
-  const flow = structuredClone(flowState);
   const startTime = performance.now();
   try {
     const result = await client.runFlow(input);
-    ui.flowLog.textContent = result.log;
-    ui.flowLogTitle.hidden = false;
     if (result.error !== null) {
       showStatus(result.error, true);
       return;
@@ -396,7 +347,6 @@ async function runFlow(): Promise<void> {
       `Done in ${durationText(performance.now() - startTime)}: ${result.newtonIterations} Newton iterations.`,
     );
     await showFlowOutput(result, input.toml);
-    outputFlow = flow;
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -443,12 +393,9 @@ async function runTransport(): Promise<void> {
   // dfntrans reports no progress: an indeterminate bar
   ui.progress.removeAttribute("value");
   showStatus("Tracking the particles…");
-  const transport = structuredClone(transportState);
   const startTime = performance.now();
   try {
     const result = await client.runTransport(input);
-    ui.transportLog.textContent = result.log;
-    ui.transportLogTitle.hidden = false;
     if (result.error !== null) {
       showStatus(result.error, true);
       return;
@@ -457,7 +404,6 @@ async function runTransport(): Promise<void> {
       `Done in ${durationText(performance.now() - startTime)}: ${result.exitCount} of ${result.particleCount} particles exited.`,
     );
     await showTransportOutput(result);
-    outputTransport = transport;
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
@@ -469,11 +415,9 @@ async function runTransport(): Promise<void> {
 
 function clearOutput(): void {
   output = null;
-  outputNetwork = null;
   ui.results.hidden = true;
   ui.resultsEmpty.hidden = false;
   ui.colorSelect.disabled = true;
-  ui.log.textContent = "";
   if (viewer) {
     for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
       void viewer.setLayer(layer, null);
@@ -487,11 +431,8 @@ function clearOutput(): void {
 /** The flow output belongs to the mesh of one generation */
 function clearFlowOutput(): void {
   flowOutput = null;
-  outputFlow = null;
   flowOutputToml = null;
   ui.flowResults.hidden = true;
-  ui.flowLog.textContent = "";
-  ui.flowLogTitle.hidden = true;
   clearTransportOutput();
   renderTransport();
 }
@@ -499,10 +440,7 @@ function clearFlowOutput(): void {
 /** The transport output belongs to one flow output */
 function clearTransportOutput(): void {
   transportOutput = null;
-  outputTransport = null;
   ui.transportResults.hidden = true;
-  ui.transportLog.textContent = "";
-  ui.transportLogTitle.hidden = true;
   ui.showTrajectories.checked = false;
   ui.showTrajectories.disabled = true;
   if (viewer) {
@@ -540,48 +478,6 @@ function showStats(list: HTMLDListElement, stats: [string, string][]): void {
   );
 }
 
-function showDownloadLinks(list: HTMLUListElement, outputFiles: [string, string][]): void {
-  list.replaceChildren(
-    ...outputFiles.map(([name, text]) => {
-      const item = document.createElement("li");
-      const link = document.createElement("a");
-      link.href = "#";
-      link.textContent = name;
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        downloadText(name, text);
-      });
-      item.append(link);
-      return item;
-    }),
-  );
-}
-
-/**
- * One zip of the workflow: the workflow file with the input of each output
- * (the form for a step with no output), and the folders network/, flow/ and
- * transport/ with the output files.
- */
-function downloadAllOutput(): void {
-  const workflow = workflowToToml({
-    description,
-    network: outputNetwork ?? state,
-    flow: outputFlow ?? flowState,
-    transport: outputTransport ?? transportState,
-  });
-  const folders: [string, [string, string][]][] = [
-    ["network", output?.files ?? []],
-    ["flow", flowOutput?.files ?? []],
-    ["transport", transportOutput?.files ?? []],
-  ];
-  const entries: [string, Uint8Array][] = [[inputFileName, strToU8(workflow)]];
-  for (const [folder, outputFiles] of folders) {
-    entries.push(...outputFiles.map(([name, text]): [string, Uint8Array] => [`${folder}/${name}`, strToU8(text)]));
-  }
-  const archiveName = `${inputFileName.replace(/\.toml$/, "")}_output.zip`;
-  downloadText(archiveName, zipSync(Object.fromEntries(entries)), "application/zip");
-}
-
 async function showOutput(result: GenerationOutput): Promise<void> {
   clearFlowOutput();
   output = result;
@@ -599,7 +495,6 @@ async function showOutput(result: GenerationOutput): Promise<void> {
     ["Rejected fractures", String(result.rejectedCount)],
     ["Seed", result.seed],
   ]);
-  showDownloadLinks(ui.downloadList, result.files);
 
   ui.showRejected.disabled = outputFile("fractures_rejected.vtp") === null;
   await showOutputInViewer();
@@ -621,7 +516,6 @@ async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
     ["Net flow", massFlowText(netFlow)],
     ["Newton iterations", String(result.newtonIterations)],
   ]);
-  showDownloadLinks(ui.flowDownloadList, result.files);
 
   await showOutputInViewer(PRESSURE_OPTION);
 }
@@ -640,7 +534,6 @@ async function showTransportOutput(result: TransportOutput): Promise<void> {
     ["Out-flow volume flux", volumeFluxText(result.outflowVolumeFlux)],
     ["Seed", String(result.seed)],
   ]);
-  showDownloadLinks(ui.transportDownloadList, result.files);
 
   const hasTrajectories = transportOutputFile(TRAJECTORIES_FILE) !== null;
   ui.showTrajectories.disabled = !hasTrajectories;
@@ -766,30 +659,22 @@ async function updateViewer(action: (viewer: NetworkViewer) => void | Promise<vo
 
 // ---------------------------------------------------------------- events
 
-function selectTab(name: string): void {
-  for (const tab of document.querySelectorAll<HTMLButtonElement>(".panel .tab")) {
-    tab.classList.toggle("is-active", tab.dataset.tab === name);
+/** Loads an example into the forms; "" (no example) does nothing */
+async function openExample(name: string): Promise<void> {
+  if (name === "" || isBusy) {
+    return;
   }
-  for (const body of document.querySelectorAll<HTMLElement>(".tab-body")) {
-    body.hidden = body.dataset.tabBody !== name;
+  try {
+    const example = await loadExample(name);
+    await loadInput(example.workflow, example.files);
+    ui.form.dataset.example = name;
+  } catch (error) {
+    showStatus(errorText(error), true);
   }
 }
 
 function bindEvents(): void {
-  ui.exampleSelect.addEventListener("change", async () => {
-    const name = ui.exampleSelect.value;
-    if (name === "" || isBusy) {
-      return;
-    }
-    try {
-      const example = await loadExample(name);
-      await loadInput(example.workflow, example.files, `${name}.toml`);
-      ui.form.dataset.example = name;
-    } catch (error) {
-      showStatus(errorText(error), true);
-    }
-  });
-  ui.copyToml.addEventListener("click", () => void navigator.clipboard.writeText(workflowText()));
+  ui.exampleSelect.addEventListener("change", () => void openExample(ui.exampleSelect.value));
   const checkActions: Record<SidebarTab, () => Promise<void>> = {
     network: checkInput,
     flow: checkFlowInput,
@@ -803,7 +688,6 @@ function bindEvents(): void {
   ui.checkButton.addEventListener("click", () => void checkActions[activeSidebarTab]());
   ui.runButton.addEventListener("click", () => void runActions[activeSidebarTab]());
   ui.cancelButton.addEventListener("click", () => client.cancel());
-  ui.downloadAll.addEventListener("click", downloadAllOutput);
 
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
@@ -814,9 +698,6 @@ function bindEvents(): void {
   }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
 
-  for (const tab of document.querySelectorAll<HTMLButtonElement>(".panel .tab")) {
-    tab.addEventListener("click", () => selectTab(tab.dataset.tab ?? "results"));
-  }
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
     tab.addEventListener("click", () => {
       const name = tab.dataset.sidebarTab;
@@ -825,10 +706,16 @@ function bindEvents(): void {
   }
 }
 
+/** Fills the list of the examples, and opens the default example */
 async function fillExampleList(): Promise<void> {
   try {
-    for (const name of await listExamples()) {
+    const names = await listExamples();
+    for (const name of names) {
       ui.exampleSelect.append(new Option(name, name));
+    }
+    if (names.includes(DEFAULT_EXAMPLE)) {
+      ui.exampleSelect.value = DEFAULT_EXAMPLE;
+      await openExample(DEFAULT_EXAMPLE);
     }
   } catch (error) {
     showStatus(errorText(error), true);

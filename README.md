@@ -22,10 +22,10 @@ view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
 There is no server: `npm run build` gives a folder of static files.
 
 - The input of the three tabs is one workflow file (see "Workflow file").
-  The four workflow examples of `examples/` run the full workflow. The
-  TOML tab shows the workflow file of the three tabs, and "Download all"
-  has it. The app does not write the input files of the `dfngen`, `fehm`
-  and `dfntrans` binaries.
+  The four workflow examples of `examples/` run the full workflow; the
+  page opens `box_west_east` at the start. The app does not save the
+  workflow file or the output files, and it does not write the input files
+  of the `dfngen`, `fehm` and `dfntrans` binaries.
 - Network tab: a form with one field for each key of `[network]`: the domain mesh is
   one of the predefined meshes of `meshes/` (a dropdown), and each
   user-defined fracture is a card of the form (region, center, shape and
@@ -55,10 +55,8 @@ There is no server: `npm run build` gives a folder of static files.
   fractures of the form (layer "User fractures", blue; updated at each
   change of the form, also before "Generate"), the particle paths (layer "Trajectories": tubes, with cones in the direction
   of the velocity at every n-th point, about 20 for each path and at most
-  500); the logs; the mass flow of each
-  boundary; the particle counts and the volume fluxes of the transport; each
-  output file; and one `.zip` with the workflow file (the input of each
-  output) and the folders `network/`, `flow/` and `transport/`.
+  500); the mass flow of each boundary; the particle counts and the volume
+  fluxes of the transport.
 
 The output is that of the `dfngen` binary for the same input and seed.
 The math functions of WebAssembly (`libm`) and of the native platform can
@@ -275,8 +273,8 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the output files agree with the `dfntrans` binary (the integers exactly,
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
-- `scripts/e2e.mjs`: in Chrome (headless), the full workflow of each
-  example, the single zip, the flow without a mesh, the transport without
+- `scripts/e2e.mjs`: in Chrome (headless), the default example, the full
+  workflow of each example, the flow without a mesh, the transport without
   a flow, the choice of a predefined mesh, the limits of the center of a
   new user-defined fracture, a bad input and the cancel; it saves
   screenshots.

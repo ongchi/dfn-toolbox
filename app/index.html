@@ -61,58 +61,21 @@
           <div class="viewer-canvas">
             <canvas id="viewer-canvas"></canvas>
             <div id="viewer-message" class="viewer-message">Loading the 3D viewer…</div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="tabs" role="tablist">
-            <button class="tab is-active" type="button" data-tab="results">Results</button>
-            <button class="tab" type="button" data-tab="log">Log</button>
-            <button class="tab" type="button" data-tab="toml">TOML</button>
-          </div>
-          <div class="tab-body" data-tab-body="results">
-            <p id="results-empty" class="form-note">No network yet. Select an example, then click Generate.</p>
-            <div id="results" hidden>
-              <dl id="results-stats" class="stats"></dl>
-              <div class="downloads">
-                <button
-                  id="download-all"
-                  class="button-small"
-                  type="button"
-                  title="The workflow file and the output of the network, the flow and the transport"
-                >
-                  Download all (.zip)
-                </button>
-                <ul id="download-list"></ul>
-              </div>
+            <div class="results-bezel">
+              <p id="results-empty" class="form-note">No network yet. Click Generate.</p>
+              <details id="results" class="results-section" open hidden>
+                <summary>Fractures</summary>
+                <dl id="results-stats" class="stats"></dl>
+              </details>
+              <details id="flow-results" class="results-section" open hidden>
+                <summary>Flow</summary>
+                <dl id="flow-stats" class="stats"></dl>
+              </details>
+              <details id="transport-results" class="results-section" open hidden>
+                <summary>Transport</summary>
+                <dl id="transport-stats" class="stats"></dl>
+              </details>
             </div>
-            <div id="flow-results" hidden>
-              <h4>Flow</h4>
-              <dl id="flow-stats" class="stats"></dl>
-              <div class="downloads">
-                <ul id="flow-download-list"></ul>
-              </div>
-            </div>
-            <div id="transport-results" hidden>
-              <h4>Transport</h4>
-              <dl id="transport-stats" class="stats"></dl>
-              <div class="downloads">
-                <ul id="transport-download-list"></ul>
-              </div>
-            </div>
-          </div>
-          <div class="tab-body" data-tab-body="log" hidden>
-            <pre id="log" class="code"></pre>
-            <h4 id="flow-log-title" hidden>Flow</h4>
-            <pre id="flow-log" class="code"></pre>
-            <h4 id="transport-log-title" hidden>Transport</h4>
-            <pre id="transport-log" class="code"></pre>
-          </div>
-          <div class="tab-body" data-tab-body="toml" hidden>
-            <div class="toml-actions">
-              <button id="copy-toml" class="button-small" type="button">Copy</button>
-            </div>
-            <pre id="toml-preview" class="code"></pre>
           </div>
         </div>
       </section>

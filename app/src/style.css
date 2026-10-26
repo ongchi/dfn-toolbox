@@ -384,16 +384,56 @@ progress {
   pointer-events: none;
 }
 
-/* ---------------------------------------------------------------- panel */
-
-.panel {
-  height: 240px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
+/* The results over the bottom-left corner of the 3D view */
+.results-bezel {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  padding: 8px 12px;
+  background: rgb(255 255 255 / 90%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
 }
+
+/* Each section is an accordion: a click on its title shows or hides its values */
+.results-section ~ .results-section {
+  margin-top: 8px;
+}
+
+.results-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  user-select: none;
+}
+
+.results-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.results-section summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+
+.results-section[open] summary::before {
+  content: "▾ ";
+}
+
+.results-section[open] summary {
+  margin-bottom: 4px;
+}
+
+.results-bezel .form-note,
+.results-bezel .stats {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------- tabs */
 
 .tabs {
   display: flex;
@@ -416,21 +456,6 @@ progress {
   border-bottom-color: var(--accent);
 }
 
-.tab-body {
-  flex: 1;
-  overflow: auto;
-  padding: 8px 16px;
-}
-
-.code {
-  margin: 0;
-  white-space: pre;
-}
-
-.toml-actions {
-  float: right;
-}
-
 .stats {
   display: grid;
   grid-template-columns: max-content max-content;
@@ -448,13 +473,3 @@ progress {
   font-variant-numeric: tabular-nums;
 }
 
-.downloads ul {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0 0;
-  columns: 2;
-}
-
-.downloads li {
-  margin-bottom: 2px;
-}

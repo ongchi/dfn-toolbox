@@ -43,7 +43,6 @@ function handle(request: WorkerRequest): void {
     post({
       type: "flowResult",
       error: result.error ?? null,
-      log: result.log,
       files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
       boundaryFlows: result.boundary_names.map((name: string, index: number) => ({ name, massFlow: flows[index] })),
       newtonIterations: result.newton_iterations,
@@ -63,7 +62,6 @@ function handle(request: WorkerRequest): void {
     post({
       type: "transportResult",
       error: result.error ?? null,
-      log: result.log,
       seed: result.seed,
       files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
       particleCount: result.particle_count,
@@ -92,7 +90,6 @@ function handle(request: WorkerRequest): void {
   post({
     type: "result",
     error: result.error ?? null,
-    log: result.log,
     seed: result.seed.toString(),
     files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
     acceptedCount: result.accepted_count,

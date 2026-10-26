@@ -34,7 +34,6 @@ export type WorkerRequest =
 export interface GenerationOutput {
   /** Error message; then there are no files */
   error: string | null;
-  log: string;
   /** Seed which the generation used (decimal digits) */
   seed: string;
   /** (name, text) of each output file */
@@ -53,7 +52,6 @@ export interface BoundaryFlow {
 export interface FlowOutput {
   /** Error message; then there are no files */
   error: string | null;
-  log: string;
   /** (name, text) of each output file */
   files: [string, string][];
   boundaryFlows: BoundaryFlow[];
@@ -63,7 +61,6 @@ export interface FlowOutput {
 export interface TransportOutput {
   /** Error message; then there are no files */
   error: string | null;
-  log: string;
   /** Seed which the run used */
   seed: number;
   /** (name, text) of each output file */
