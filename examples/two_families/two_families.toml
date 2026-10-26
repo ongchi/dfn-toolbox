@@ -64,8 +64,3 @@ routing = "complete_mixing"
 method = "uniform_per_line"
 particles_per_line = 3
 weight_by_flux = false
-
-[transport.output]
-trajectories = true
-all_particles = false
-velocities = false

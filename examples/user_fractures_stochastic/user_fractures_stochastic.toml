@@ -72,8 +72,3 @@ weight_by_flux = false
 [transport.tdrw]
 matrix_porosity = 0.05
 matrix_diffusivity = 1e-11
-
-[transport.output]
-trajectories = true
-all_particles = false
-velocities = false

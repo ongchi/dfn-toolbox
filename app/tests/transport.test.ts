@@ -56,6 +56,12 @@ test("the TOML of the transport form is a valid input", () => {
   expect(check_transport_input(transportToLibraryToml(transportState(ROLES)), flowToml, mesh)).toBeUndefined();
 });
 
+test("the dfntrans input always has the trajectories and the velocities, and only the particles which exit", () => {
+  expect(transportToLibraryToml(transportState(ROLES))).toContain(
+    "[output]\ntrajectories = true\nall_particles = false\nvelocities = true\n",
+  );
+});
+
 test("a new mesh keeps the roles of the boundaries with the same name", () => {
   const state = transportState(ROLES);
   updateTransportBoundaries(state, ["north", "west"]);
@@ -77,9 +83,7 @@ test("a used boundary which is not in the new mesh stays at the end", () => {
 const TRANSPORT_TOLERANCE = "1e-5";
 
 test("the output files agree with the native binary of dfntrans", () => {
-  const state = transportState(ROLES);
-  state.hasTrajectories = true;
-  const toml = transportToLibraryToml(state);
+  const toml = transportToLibraryToml(transportState(ROLES));
   const result = run_transport(toml, flowToml, mesh, 1);
   expect(result.error).toBeUndefined();
 
@@ -103,9 +107,7 @@ test("some particles exit through the out-flow boundary", () => {
 });
 
 test("the trajectories have the velocity as the active vectors for the view", () => {
-  const state = transportState(ROLES);
-  state.hasTrajectories = true;
-  const result = run_transport(transportToLibraryToml(state), flowToml, mesh, 1);
+  const result = run_transport(transportToLibraryToml(transportState(ROLES)), flowToml, mesh, 1);
   const trajectories = markVelocityAsVectors(result.file("trajectories.vtp") ?? "");
   expect(trajectories).toMatch(/<PointData Vectors="velocity">[\s\S]*Name="velocity" NumberOfComponents="3"/);
 });
@@ -129,7 +131,6 @@ test("an unknown boundary is an error of the run", () => {
 
 test("the transport velocities give a speed at the points of the mesh", () => {
   const state = transportState(ROLES);
-  state.hasVelocities = true;
   const result = run_transport(transportToLibraryToml(state), flowToml, mesh, 1);
   expect(result.error).toBeUndefined();
   const speeds = nodeVelocityMagnitudes(result.file("velocities.vtp") ?? "", pointCount(mesh), state.timeUnit);

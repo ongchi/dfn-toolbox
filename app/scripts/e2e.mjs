@@ -220,16 +220,8 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow_velocity.png` });
 
-    // The velocities of the transport: the checkbox of the Transport tab
+    // The trajectories and the velocities of the transport are always on
     await page.click('[data-sidebar-tab="transport"]');
-    await page.evaluate(() => {
-      const checkbox = [...document.querySelectorAll("#transport-form input[type=checkbox]")].find(
-        (node) => node.closest(".field")?.querySelector(".field-label")?.textContent === "Velocities",
-      );
-      if (!checkbox.checked) {
-        checkbox.click();
-      }
-    });
     const transportStatus = await runStep(page, "transport");
     const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);

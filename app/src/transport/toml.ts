@@ -72,23 +72,25 @@ export function transportTables(state: TransportState): TomlTable[] {
       ],
     });
   }
-  tables.push({
-    name: "output",
-    isArray: false,
-    lines: [
-      `trajectories = ${state.hasTrajectories}`,
-      `all_particles = ${state.hasAllParticles}`,
-      `velocities = ${state.hasVelocities}`,
-    ],
-  });
   return tables;
 }
+
+/**
+ * The trajectories and the velocities are always on in dfn-web (the 3D view
+ * shows them), thus the workflow file has no section for the output; the
+ * dfntrans input needs it
+ */
+const OUTPUT_TABLE: TomlTable = {
+  name: "output",
+  isArray: false,
+  lines: ["trajectories = true", "all_particles = false", "velocities = true"],
+};
 
 /** The dfntrans input file of the transport, on the flow of the last "Solve flow" */
 export function transportToLibraryToml(state: TransportState): string {
   const [root, ...others] = transportTables(state);
   const flowRoot = { ...root, lines: [`flow = ${string(TRANSPORT_FLOW_FILE)}`, ...root.lines] };
-  return tablesToToml([flowRoot, ...others], "");
+  return tablesToToml([flowRoot, ...others, OUTPUT_TABLE], "");
 }
 
 function readSeeding(table: Table, problems: string[]): SeedingState {
@@ -134,7 +136,6 @@ export function readTransport(table: Table, problems: string[]): TransportState 
     tdrwReader.checkUnknownKeys();
   }
 
-  const outputReader = new TableReader(reader.subTable("output"), "[transport.output]", problems);
   const state: TransportState = {
     seed: reader.integer("seed", defaults.seed),
     timeUnit: reader.choice("time_unit", TIME_UNITS, defaults.timeUnit),
@@ -144,11 +145,7 @@ export function readTransport(table: Table, problems: string[]): TransportState 
     boundaries,
     seeding: readSeeding(reader.subTable("seeding"), problems),
     matrixDiffusion: diffusion,
-    hasTrajectories: outputReader.boolean("trajectories", defaults.hasTrajectories),
-    hasAllParticles: outputReader.boolean("all_particles", defaults.hasAllParticles),
-    hasVelocities: outputReader.boolean("velocities", defaults.hasVelocities),
   };
-  outputReader.checkUnknownKeys();
   reader.checkUnknownKeys();
   return state;
 }

@@ -55,10 +55,14 @@ There is no server: `npm run build` gives a folder of static files.
 - Transport tab: a form with one field for each key of `[transport]`. It
   uses the flow of the last "Solve flow": dfntrans solves the flow input of
   that run again. Each boundary array of the mesh is "not used", "in-flow"
-  or "out-flow". A new flow removes the transport output.
+  or "out-flow". A new flow removes the transport output. The form has no
+  output section: dfntrans always writes the trajectories and the
+  velocities (`trajectories = true`, `velocities = true`), and only the
+  particles which exit (`all_particles = false`).
   `trajectories.vtp` has a point for each time step: with many particles
   it is very large (about 1 MB for each particle in the examples), thus the
-  option is off by default; the examples have it on, with few particles.
+  default seeding has few particles (50, or 3 per line), and the help of
+  the particle fields tells the size.
 - "Generate", "Solve flow" and "Track particles" run in a Web Worker;
   "Cancel" stops them. An error of the library shows in the status line,
   as a text of the app with the words of the forms (`app/src/errors.ts`:
@@ -143,8 +147,7 @@ inflow = ["west"]
 outflow = ["east"]
 routing = "complete_mixing"
 [transport.seeding]
-[transport.tdrw]                   # optional; no [transport.control_planes]
-[transport.output]
+[transport.tdrw]                   # optional; no [transport.control_planes], no [transport.output]
 ```
 
 The reader is strict: an unknown key and a missing key are errors, so the

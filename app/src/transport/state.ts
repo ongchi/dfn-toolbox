@@ -49,9 +49,6 @@ export interface TransportState {
   boundaries: TransportBoundaryState[];
   seeding: SeedingState;
   matrixDiffusion: MatrixDiffusionState;
-  hasTrajectories: boolean;
-  hasAllParticles: boolean;
-  hasVelocities: boolean;
 }
 
 export function defaultTransportState(): TransportState {
@@ -64,15 +61,13 @@ export function defaultTransportState(): TransportState {
     boundaries: [],
     seeding: {
       method: "flux_weighted",
-      particlesPerLine: 10,
+      // Few particles: the trajectories have about 1 MB for each particle
+      particlesPerLine: 3,
       isWeightedByFlux: true,
-      particleCount: 1000,
+      particleCount: 50,
       particlesPerNode: 1,
     },
     matrixDiffusion: { isUsed: false, matrixPorosity: 0.02, matrixDiffusivity: 1e-13 },
-    hasTrajectories: false,
-    hasAllParticles: false,
-    hasVelocities: false,
   };
 }
 

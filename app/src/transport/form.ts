@@ -1,7 +1,11 @@
-// The transport form: one field for each key of the dfntrans input file.
+// The transport form: one field for each key of the dfntrans input file,
+// except the output (the trajectories and the velocities are always on).
 import type { FormContext } from "../form/context";
 import { checkboxField, element, numberField, row, section, selectField } from "../form/fields";
 import type { BoundaryRole, RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
+
+/** Help text of the particle numbers: the trajectories are always on */
+const TRAJECTORY_SIZE = "the trajectories have about 1 MB for each particle";
 
 function generalSection(state: TransportState, context: FormContext): HTMLElement {
   return section(
@@ -138,7 +142,7 @@ function seedingSection(state: TransportState, context: FormContext): HTMLElemen
           numberField({
             label: "Particles per line",
             key: "particles_per_line",
-            help: "1 or more",
+            help: `1 or more; ${TRAJECTORY_SIZE}`,
             value: seeding.particlesPerLine,
             isInteger: true,
             min: 1,
@@ -169,8 +173,8 @@ function seedingSection(state: TransportState, context: FormContext): HTMLElemen
             key: "particle_count",
             help:
               seeding.method === "flux_weighted"
-                ? "1 or more; at least one for each in-flow point"
-                : "1 or more",
+                ? `1 or more; at least one for each in-flow point; ${TRAJECTORY_SIZE}`
+                : `1 or more; ${TRAJECTORY_SIZE}`,
             value: seeding.particleCount,
             isInteger: true,
             min: 1,
@@ -188,7 +192,7 @@ function seedingSection(state: TransportState, context: FormContext): HTMLElemen
           numberField({
             label: "Particles per point",
             key: "particles_per_node",
-            help: "1 or more",
+            help: `1 or more; ${TRAJECTORY_SIZE}`,
             value: seeding.particlesPerNode,
             isInteger: true,
             min: 1,
@@ -249,42 +253,6 @@ function matrixDiffusionSection(state: TransportState, context: FormContext): HT
   );
 }
 
-function outputSection(state: TransportState, context: FormContext): HTMLElement {
-  return section(
-    "Output",
-    checkboxField({
-      label: "Trajectories",
-      key: "trajectories",
-      help: "shown in the 3D view; a point for each time step: the data can be very large (some 100 MB)",
-      value: state.hasTrajectories,
-      onInput: (value) => {
-        state.hasTrajectories = value;
-        context.changed();
-      },
-    }),
-    checkboxField({
-      label: "All particles",
-      key: "all_particles",
-      help: "also the particles which do not exit",
-      value: state.hasAllParticles,
-      onInput: (value) => {
-        state.hasAllParticles = value;
-        context.changed();
-      },
-    }),
-    checkboxField({
-      label: "Velocities",
-      key: "velocities",
-      help: "the velocity of the particle tracking at each point of the mesh: Color by → Transport velocity",
-      value: state.hasVelocities,
-      onInput: (value) => {
-        state.hasVelocities = value;
-        context.changed();
-      },
-    }),
-  );
-}
-
 /** Shows the transport form; `hasFlow` = there is a flow output */
 export function renderTransportForm(
   container: HTMLElement,
@@ -308,7 +276,6 @@ export function renderTransportForm(
     boundariesSection(state, context),
     seedingSection(state, context),
     matrixDiffusionSection(state, context),
-    outputSection(state, context),
   );
   container.scrollTop = scrollTop;
 }
