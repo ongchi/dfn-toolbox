@@ -38,7 +38,33 @@ async function waitIdle(page) {
   await page.waitForFunction(() => !document.querySelector("#run-button").disabled, { timeout: RUN_TIMEOUT });
 }
 
+/**
+ * Selects a radio button of the Domain tab ("example" or "shape"); the tab can be hidden.
+ * A switch resets the input: it waits until the example or the shape is loaded.
+ */
+async function selectDomainSource(page, source) {
+  const selector = `input[name="domain-source"][value="${source}"]`;
+  if (await page.$eval(selector, (node) => node.checked)) {
+    return;
+  }
+  await page.$eval("#form", (node) => {
+    delete node.dataset.example;
+    delete node.dataset.shape;
+  });
+  await page.$eval(selector, (node) => node.click());
+  const key = source === "example" ? "example" : "shape";
+  await page.waitForFunction((datasetKey) => document.querySelector("#form").dataset[datasetKey] !== undefined, {}, key);
+}
+
+/** The value of the n_poly field of the DFN tab */
+async function nPolyValue(page) {
+  return page.evaluate(
+    () => [...document.querySelectorAll("#form input[type=number]")].find((node) => node.closest(".field")?.textContent.includes("n_poly")).value,
+  );
+}
+
 async function selectExample(page, name) {
+  await selectDomainSource(page, "example");
   // A select of the same value sends no change event: select none first
   await page.select("#example-select", "");
   await page.$eval("#form", (node) => delete node.dataset.example);
@@ -75,6 +101,41 @@ try {
   const startTab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
+
+  // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
+  const domainRows = async () =>
+    page.evaluate(
+      () => `example ${document.querySelector("#example-row").hidden ? "hidden" : "shown"}, mesh ${document.querySelector("#domain-form").hidden ? "hidden" : "shown"}`,
+    );
+  const exampleRows = await domainRows();
+  const exampleNPoly = await nPolyValue(page);
+  await selectDomainSource(page, "shape");
+  const shapeRows = await domainRows();
+  check(
+    exampleRows === "example shown, mesh hidden" && shapeRows === "example hidden, mesh shown",
+    "domain source radio buttons",
+    `${exampleRows}; ${shapeRows}`,
+  );
+  // A switch resets the input: the default forms on the first shape, then the example again
+  const shapeReset = await page.evaluate(() => ({
+    shape: document.querySelector("#form").dataset.shape,
+    families: document.querySelectorAll("#form .family-card").length,
+  }));
+  const shapeNPoly = await nPolyValue(page);
+  check(
+    shapeReset.shape === "Box.vtu" && shapeReset.families === 1 && exampleNPoly === "50" && shapeNPoly === "100",
+    "shape resets the input",
+    `${shapeReset.shape}, ${shapeReset.families} family, n_poly ${exampleNPoly} → ${shapeNPoly}`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_domain_shape.png` });
+  await selectDomainSource(page, "example");
+  const exampleAgain = await page.$eval("#form", (node) => node.dataset.example);
+  const exampleAgainNPoly = await nPolyValue(page);
+  check(
+    exampleAgain === "box_west_east" && exampleAgainNPoly === "50",
+    "example loads again",
+    `${exampleAgain}, n_poly ${exampleAgainNPoly}`,
+  );
 
   // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
   const tabWalk = [];
@@ -155,8 +216,9 @@ try {
   const noFlowStatus = await runStep(page, "transport");
   check(await isStatusError(page), "transport without a flow", noFlowStatus);
 
-  // The domain mesh dropdown: a predefined mesh replaces the mesh of the example
-  await page.click('[data-sidebar-tab="network"]');
+  // The domain mesh dropdown: in the shape mode, a new shape replaces only the mesh
+  await page.click('[data-sidebar-tab="domain"]');
+  await selectDomainSource(page, "shape");
   await page.select(".file-row select", "L-shape.vtu");
   // The form shows the regions of the mesh when it is loaded
   await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
@@ -192,10 +254,19 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture.png` });
 
-  // Bad input: the family regions of the L-shape example are not in the Box mesh: an error of the library
-  await selectExample(page, "l_shape_north_east");
+  // Bad input: a family region of the L-shape mesh is not in the Box mesh: an error of the library
+  await selectDomainSource(page, "shape");
+  await page.select(".file-row select", "L-shape.vtu");
+  await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
+  await page.evaluate(() => {
+    const select = [...document.querySelectorAll("#form select")].find((node) =>
+      [...node.options].some((option) => option.value === "west_box"),
+    );
+    select.value = "west_box";
+    select.dispatchEvent(new Event("change"));
+  });
   await page.select(".file-row select", "Box.vtu");
-  // The family regions of the example are not in the new mesh
+  // The family region is not in the new mesh
   await page.waitForFunction(() =>
     [...document.querySelectorAll("#form option")].some((node) => node.textContent.endsWith("(not in the mesh)")),
   );

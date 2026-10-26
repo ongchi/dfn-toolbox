@@ -173,6 +173,15 @@ input[type="text"] {
 
 /* ---------------------------------------------------------------- form */
 
+/* The radio buttons of the Domain tab: an example or a predefined domain shape */
+.domain-source {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 16px 0;
+  border: none;
+}
+
 /* The example select of the Domain tab */
 .example-row {
   display: flex;
@@ -320,7 +329,9 @@ input[type="text"] {
 
 /* ---------------------------------------------------------------- run panel */
 
+/* At the bottom also when no form fills the sidebar (an example in the Domain tab) */
 .run-panel {
+  margin-top: auto;
   border-top: 1px solid var(--border);
   padding: 12px 16px;
   display: flex;

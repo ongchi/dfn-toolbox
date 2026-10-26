@@ -30,9 +30,14 @@ There is no server: `npm run build` gives a folder of static files.
   DFN; "Generate" is on the DFN tab. The page opens on the Domain tab.
   "Next" goes to the next tab (each tab but Transport); on the DFN tab it
   needs the fracture mesh of a generation, on the Flow tab a solved flow.
-  - Domain tab: the example (a dropdown of `examples/`), its description,
-    and the domain mesh: one of the predefined meshes of `meshes/` (a
-    dropdown).
+  - Domain tab: two radio buttons. "Example" shows the example (a dropdown
+    of `examples/`) and its description; an example loads the full
+    workflow. "Predefined domain shape" shows the domain mesh: one of the
+    predefined meshes of `meshes/` (a dropdown); a new shape replaces only
+    the mesh. A switch of the radio buttons resets all the input: "Example"
+    loads the example of its dropdown again (the default example if none),
+    and "Predefined domain shape" gives the default values of all the forms
+    on the last shape (the first mesh at the start).
   - User fractures tab: each user-defined fracture is a card (region,
     center, shape and orientation; see "User-defined fractures").
   - DFN tab: a form with one field for each other key of `[network]`.

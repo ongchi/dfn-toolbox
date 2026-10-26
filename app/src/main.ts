@@ -60,6 +60,7 @@ function byId<T extends HTMLElement>(id: string): T {
 }
 
 const ui = {
+  domainSource: byId<HTMLFieldSetElement>("domain-source"),
   exampleSelect: byId<HTMLSelectElement>("example-select"),
   exampleRow: byId<HTMLLabelElement>("example-row"),
   exampleDescription: byId<HTMLParagraphElement>("example-description"),
@@ -107,6 +108,8 @@ let flowOutputToml: string | null = null;
 let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
 let activeSidebarTab: SidebarTab = "domain";
+/** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
+let lastShape: string | null = null;
 let isBusy = false;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
@@ -135,6 +138,7 @@ function setBusy(busy: boolean): void {
   isBusy = busy;
   ui.runButton.disabled = busy;
   ui.exampleSelect.disabled = busy;
+  ui.domainSource.disabled = busy;
   ui.cancelButton.hidden = !busy;
   ui.progress.hidden = !busy;
   updateNextButton();
@@ -173,6 +177,7 @@ const fileHandlers: FileHandlers = {
     try {
       const mesh = await loadMesh(name);
       state.domain = name;
+      lastShape = name;
       await setMesh(mesh);
       render();
     } catch (error) {
@@ -215,18 +220,31 @@ function selectSidebarTab(name: SidebarTab): void {
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
     tab.classList.toggle("is-active", tab.dataset.sidebarTab === name);
   }
-  ui.exampleRow.hidden = name !== "domain";
-  ui.domainForm.hidden = name !== "domain";
+  updateDomainSource();
   ui.fracturesForm.hidden = name !== "fractures";
   ui.form.hidden = name !== "network";
   ui.flowForm.hidden = name !== "flow";
   ui.transportForm.hidden = name !== "transport";
-  ui.exampleDescription.hidden = name !== "domain" || ui.exampleDescription.textContent === "";
   const runText = RUN_BUTTON_TEXT[name];
   ui.runButton.hidden = runText === null;
   ui.runButton.textContent = runText ?? "";
   updateNextButton();
   showStatus("");
+}
+
+/** The radio button "Example" of the Domain tab is selected (else "Predefined domain shape") */
+function isExampleSource(): boolean {
+  return ui.domainSource.querySelector<HTMLInputElement>("input:checked")?.value === "example";
+}
+
+/** The radio buttons of the Domain tab: the example dropdown and its description, or the predefined meshes */
+function updateDomainSource(): void {
+  const isDomainTab = activeSidebarTab === "domain";
+  const isExample = isExampleSource();
+  ui.domainSource.hidden = !isDomainTab;
+  ui.exampleRow.hidden = !isDomainTab || !isExample;
+  ui.exampleDescription.hidden = !isDomainTab || !isExample || ui.exampleDescription.textContent === "";
+  ui.domainForm.hidden = !isDomainTab || isExample;
 }
 
 async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
@@ -251,7 +269,7 @@ async function loadInput(workflow: Workflow, newFiles: InputFiles): Promise<void
   files = { mesh: null };
   await setMesh(newFiles.mesh);
   ui.exampleDescription.textContent = description;
-  ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "domain";
+  updateDomainSource();
   showStatus("");
   render();
 }
@@ -653,8 +671,40 @@ async function openExample(name: string): Promise<void> {
   }
 }
 
+/** Default forms on a predefined mesh: the last selected shape, else the first one */
+async function startFromShape(): Promise<void> {
+  const name = lastShape ?? meshNames[0];
+  if (name === undefined || isBusy) {
+    return;
+  }
+  try {
+    const mesh = await loadMesh(name);
+    const network = defaultFormState();
+    network.domain = name;
+    await loadInput(
+      { description: "", network, flow: defaultFlowState(), transport: defaultTransportState() },
+      { mesh },
+    );
+    ui.form.dataset.shape = name;
+  } catch (error) {
+    showStatus(errorText(error), true);
+  }
+}
+
+/** A switch of the domain source resets the input: the example loads again, or the default forms on a shape */
+function switchDomainSource(): void {
+  updateDomainSource();
+  if (isExampleSource()) {
+    ui.exampleSelect.value ||= DEFAULT_EXAMPLE;
+    void openExample(ui.exampleSelect.value);
+  } else {
+    void startFromShape();
+  }
+}
+
 function bindEvents(): void {
   ui.exampleSelect.addEventListener("change", () => void openExample(ui.exampleSelect.value));
+  ui.domainSource.addEventListener("change", () => switchDomainSource());
   const runActions: Partial<Record<SidebarTab, () => Promise<void>>> = {
     network: runGeneration,
     flow: runFlow,
