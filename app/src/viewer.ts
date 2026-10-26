@@ -56,7 +56,7 @@ export class NetworkViewer {
   /** Tubes and cones */
   private trajectoryActors: vtkActor[] = [];
   private readonly pressureLookupTable: vtkLookupTable;
-  private meshActor: vtkActor | null = null;
+  private domainActor: vtkActor | null = null;
   private pressureLayer: PolyDataLayer | null = null;
   private isPressureVisible = false;
   private colorArrayName: string | null = null;
@@ -106,10 +106,10 @@ export class NetworkViewer {
   }
 
   /** Shows the domain mesh (text of an ASCII .vtu file) as a wireframe. */
-  async setMesh(vtuText: string): Promise<void> {
-    if (this.meshActor) {
-      this.renderer.removeActor(this.meshActor);
-      this.meshActor = null;
+  async setDomainMesh(vtuText: string): Promise<void> {
+    if (this.domainActor) {
+      this.renderer.removeActor(this.domainActor);
+      this.domainActor = null;
     }
     const reader = this.vtk.vtkXMLUnstructuredGridReader();
     reader.readFromInputStringOn();
@@ -124,7 +124,7 @@ export class NetworkViewer {
     const property = actor.getProperty();
     property.setColor(0.3, 0.3, 0.3);
     this.renderer.addActor(actor);
-    this.meshActor = actor;
+    this.domainActor = actor;
   }
 
   /**
@@ -341,7 +341,7 @@ export class NetworkViewer {
     }
   }
 
-  setVisible(layer: FractureLayer | "mesh" | "trajectories", isVisible: boolean): void {
+  setVisible(layer: FractureLayer | "domain" | "trajectories", isVisible: boolean): void {
     const visibility = isVisible ? 1 : 0;
     if (layer === "trajectories") {
       for (const actor of this.trajectoryActors) {
@@ -349,7 +349,7 @@ export class NetworkViewer {
       }
       return;
     }
-    const actor = layer === "mesh" ? this.meshActor : this.layers.get(layer)?.actor;
+    const actor = layer === "domain" ? this.domainActor : this.layers.get(layer)?.actor;
     if (actor) {
       actor.setVisibility(visibility);
     }

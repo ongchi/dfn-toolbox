@@ -47,8 +47,9 @@ There is no server: `npm run build` gives a folder of static files.
   tab. "Generate", "Solve flow" and "Track particles" run in a Web Worker;
   "Cancel" stops them.
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
-  fractures (with its edges; color by a cell array),
-  `fractures_removed.vtp`, `fractures_rejected.vtp`, the mesh, and the
+  fractures (layer "Mesh", with its edges; color by a cell array),
+  `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
+  (layer "Domain", a wireframe), and the
   pressure of the flow (layer "Pressure"; it hides the fracture layers), the
   particle paths (layer "Trajectories": tubes, with cones in the direction
   of the velocity at every n-th point, about 20 for each path and at most

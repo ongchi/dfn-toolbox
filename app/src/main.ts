@@ -65,6 +65,7 @@ const ui = {
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
   colorSelect: byId<HTMLSelectElement>("color-select"),
+  showDomain: byId<HTMLInputElement>("show-domain"),
   showMesh: byId<HTMLInputElement>("show-mesh"),
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
@@ -227,8 +228,8 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   clearOutput();
   if (viewer && mesh) {
-    await viewer.setMesh(mesh.text);
-    viewer.setVisible("mesh", ui.showMesh.checked);
+    await viewer.setDomainMesh(mesh.text);
+    viewer.setVisible("domain", ui.showDomain.checked);
     viewer.resetCamera();
     await viewer.render();
   }
@@ -695,7 +696,7 @@ async function showTransportInViewer(): Promise<void> {
 function applyLayerVisibility(view: NetworkViewer): void {
   const isPressureVisible = ui.showPressure.checked && flowOutput !== null;
   view.showPressure(isPressureVisible);
-  view.setVisible("final", !isPressureVisible);
+  view.setVisible("final", !isPressureVisible && ui.showMesh.checked);
   view.setVisible("removed", !isPressureVisible && ui.showRemoved.checked);
   view.setVisible("rejected", !isPressureVisible && ui.showRejected.checked);
   view.setVisible("trajectories", ui.showTrajectories.checked);
@@ -732,8 +733,8 @@ async function startViewer(): Promise<void> {
   }
   ui.viewerMessage.hidden = true;
   if (files.mesh) {
-    await viewer.setMesh(files.mesh.text);
-    viewer.setVisible("mesh", ui.showMesh.checked);
+    await viewer.setDomainMesh(files.mesh.text);
+    viewer.setVisible("domain", ui.showDomain.checked);
   }
   await showOutputInViewer();
   await showFlowInViewer();
@@ -802,8 +803,8 @@ function bindEvents(): void {
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(ui.colorSelect.value === "" ? null : ui.colorSelect.value)),
   );
-  ui.showMesh.addEventListener("change", () => updateViewer((view) => view.setVisible("mesh", ui.showMesh.checked)));
-  for (const checkbox of [ui.showRemoved, ui.showRejected, ui.showPressure, ui.showTrajectories]) {
+  ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
+  for (const checkbox of [ui.showMesh, ui.showRemoved, ui.showRejected, ui.showPressure, ui.showTrajectories]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
