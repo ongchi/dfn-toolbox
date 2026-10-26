@@ -37,7 +37,11 @@ There is no server: `npm run build` gives a folder of static files.
     the mesh. A switch of the radio buttons resets all the input: "Example"
     loads the example of its dropdown again (the default example if none),
     and "Predefined domain shape" gives the default values of all the forms
-    on the last shape (the first mesh at the start).
+    on the last shape (the first mesh at the start). In both modes, the
+    section "Boundary surfaces" has a color chooser for each boundary
+    surface of the domain mesh (cell array `boundary__<name>`), for the 3D
+    view only: the workflow file does not have the colors. A chosen color
+    stays with its surface name while the page is open.
   - User fractures tab: each user-defined fracture is a card (region,
     center, shape and orientation; see "User-defined fractures").
   - DFN tab: a form with one field for each other key of `[network]`.
@@ -68,7 +72,8 @@ There is no server: `npm run build` gives a folder of static files.
   triangle of `pressure.vtu`, m/s; "Transport velocity", with the output
   `velocities` of the transport: the mean speed of the sectors of each
   point in `velocities.vtp`, in m/s), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
-  (layer "Domain", a wireframe), the polygons of the user-defined
+  (layer "Domain", a wireframe, and each boundary surface in its color
+  with an opacity of 0.5), the polygons of the user-defined
   fractures of the form (layer "User fractures", blue; updated at each
   change of the form, also before "Generate"), the particle paths (layer "Trajectories": tubes, with cones in the direction
   of the velocity at every n-th point, about 20 for each path and at most
@@ -292,7 +297,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
-  the "Next" button, the full workflow of each example, the flow without a
+  the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example, the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh, the
   limits of the center of a new user-defined fracture, a bad input and the
   cancel; it saves screenshots.
@@ -300,7 +305,8 @@ npm run dev & npm run e2e -- http://localhost:5173/
 ## VTK.wasm notes
 
 - The bundle has no `vtkDataSetMapper` and no geometry filter: the domain
-  mesh is shown as its cell edges (`vtkExtractEdges`), and `dfn_mesh.vtu`
+  mesh is shown as its cell edges (`vtkExtractEdges`), each boundary
+  surface as PolyData text of its surface cells (`app/src/boundarySurfaces.ts`), and `dfn_mesh.vtu`
   (only triangles; with the pressure after the flow) is changed into
   PolyData text before it is read.
 - The XML readers read from a string (`readFromInputStringOn`,

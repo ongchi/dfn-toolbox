@@ -109,6 +109,24 @@ try {
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
 
+  // A color chooser for each boundary surface of the domain mesh; a new color changes the 3D view
+  const surfaceNames = await page.$$eval("#boundary-surfaces:not([hidden]) .field-label", (nodes) =>
+    nodes.map((node) => node.textContent).join(", "),
+  );
+  const canvasBefore = Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
+  await page.$eval("#boundary-surfaces input[type=color]", (node) => {
+    node.value = "#000000";
+    node.dispatchEvent(new Event("input"));
+  });
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const canvasAfter = Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
+  check(
+    surfaceNames === "west, east" && !canvasBefore.equals(canvasAfter),
+    "boundary surface colors",
+    `${surfaceNames}; view ${canvasBefore.equals(canvasAfter) ? "unchanged" : "changed"}`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surfaces.png` });
+
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
   const domainRows = async () =>
     page.evaluate(

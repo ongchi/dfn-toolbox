@@ -1,6 +1,7 @@
 // The page: input forms (network, flow and transport), generation, flow and
 // transport in the worker, 3D view and output files.
 import "./style.css";
+import { boundarySurfacePolyData, DEFAULT_SURFACE_COLORS, domainBoundarySurfaceNames } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm } from "./flow/form";
@@ -9,7 +10,7 @@ import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, 
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
-import type { FileHandlers } from "./form/files";
+import { boundarySurfaceSection, type FileHandlers } from "./form/files";
 import { defaultFormState, type FormState } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
 import {
@@ -77,6 +78,7 @@ const ui = {
   exampleRow: byId<HTMLLabelElement>("example-row"),
   exampleDescription: byId<HTMLParagraphElement>("example-description"),
   domainForm: byId<HTMLDivElement>("domain-form"),
+  boundarySurfaces: byId<HTMLDivElement>("boundary-surfaces"),
   fracturesForm: byId<HTMLDivElement>("fractures-form"),
   form: byId<HTMLDivElement>("form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
@@ -109,6 +111,9 @@ let state: FormState = defaultFormState();
 let files: InputFiles = { mesh: null };
 let regionNames: string[] = [];
 let regionBounds: RegionBounds[] = [];
+let boundarySurfaceNames: string[] = [];
+/** The colors which the user chose, by boundary surface name; they stay while the page is open */
+const boundarySurfaceColors = new Map<string, string>();
 let meshNames: string[] = [];
 /** The description (comment) of the workflow file */
 let description = "";
@@ -259,16 +264,47 @@ function updateDomainSource(): void {
   ui.exampleRow.hidden = !isDomainTab || !isExample;
   ui.exampleDescription.hidden = !isDomainTab || !isExample || ui.exampleDescription.textContent === "";
   ui.domainForm.hidden = !isDomainTab || isExample;
+  ui.boundarySurfaces.hidden = !isDomainTab || boundarySurfaceNames.length === 0;
+}
+
+/** The color of a boundary surface: the chosen one, else a default color from its position in the mesh */
+function boundarySurfaceColor(name: string): string {
+  const index = Math.max(0, boundarySurfaceNames.indexOf(name));
+  return boundarySurfaceColors.get(name) ?? DEFAULT_SURFACE_COLORS[index % DEFAULT_SURFACE_COLORS.length];
+}
+
+function renderBoundarySurfaces(): void {
+  ui.boundarySurfaces.replaceChildren(
+    boundarySurfaceSection(boundarySurfaceNames, boundarySurfaceColor, (name, color) => {
+      boundarySurfaceColors.set(name, color);
+      void updateViewer((view) => view.setBoundarySurfaceColor(name, color));
+    }),
+  );
+  updateDomainSource();
+}
+
+/** Shows the domain mesh and its boundary surfaces */
+async function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["mesh"]>): Promise<void> {
+  await view.setDomainMesh(mesh.text);
+  await view.setBoundarySurfaces(
+    boundarySurfaceNames.map((name) => ({
+      name,
+      vtpText: boundarySurfacePolyData(mesh.text, name),
+      color: boundarySurfaceColor(name),
+    })),
+  );
+  view.setVisible("domain", ui.showDomain.checked);
 }
 
 async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   files.mesh = mesh;
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
+  boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
+  renderBoundarySurfaces();
   clearOutput();
   if (viewer && mesh) {
-    await viewer.setDomainMesh(mesh.text);
-    viewer.setVisible("domain", ui.showDomain.checked);
+    await showDomainInViewer(viewer, mesh);
     viewer.resetCamera();
     await viewer.render();
   }
@@ -679,8 +715,7 @@ async function startViewer(): Promise<void> {
   }
   ui.viewerMessage.hidden = true;
   if (files.mesh) {
-    await viewer.setDomainMesh(files.mesh.text);
-    viewer.setVisible("domain", ui.showDomain.checked);
+    await showDomainInViewer(viewer, files.mesh);
   }
   await showOutputInViewer();
   await showTransportInViewer();
@@ -760,8 +795,7 @@ function bindEvents(): void {
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
   );
-  ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
-  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
+  ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));

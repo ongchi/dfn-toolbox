@@ -1,6 +1,6 @@
 import { meshDisplayName } from "../meshes";
 import type { FormContext } from "./context";
-import { element, section } from "./fields";
+import { element, helpText, section } from "./fields";
 import type { FormState } from "./state";
 
 export interface FileHandlers {
@@ -32,6 +32,25 @@ function meshRow(selected: string, meshNames: string[], onChoose: (name: string)
   header.append(element("span", "field-label", "Domain mesh"), meshSelect(selected, meshNames, onChoose));
   container.append(header);
   return container;
+}
+
+/** A color chooser of each boundary surface of the domain mesh, for the 3D view */
+export function boundarySurfaceSection(
+  names: string[],
+  colorOf: (name: string) => string,
+  onColor: (name: string, color: string) => void,
+): HTMLElement {
+  const rows = names.map((name) => {
+    const input = element("input");
+    input.type = "color";
+    input.value = colorOf(name);
+    input.addEventListener("input", () => onColor(name, input.value));
+    const label = element("label", "file-row-header");
+    label.append(element("span", "field-label", name), input);
+    return label;
+  });
+  const help = helpText(undefined, "The color of each boundary surface in the 3D view.");
+  return section("Boundary surfaces", ...rows, ...(help ? [help] : []));
 }
 
 export function domainSection(state: FormState, context: FormContext, handlers: FileHandlers): HTMLElement {

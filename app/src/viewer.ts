@@ -45,6 +45,8 @@ const CONE_HEIGHT_FACTOR = 4;
 const CONES_PER_PATH = 20;
 const MAX_CONE_COUNT = 500;
 const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
+// The boundary surfaces of the domain do not hide the fractures behind them
+const BOUNDARY_SURFACE_OPACITY = 0.5;
 
 /** "user": the polygons of the user-defined fractures of the form, before the generation */
 export type FractureLayer = "final" | "removed" | "rejected" | "user";
@@ -70,6 +72,18 @@ const SCALAR_BARS = new Map<string, { title: string; labelFormat: string }>([
   [TRANSPORT_VELOCITY_ARRAY.name, { title: "transport velocity (m/s)", labelFormat: VELOCITY_LABEL_FORMAT }],
 ]);
 
+/** A boundary surface of the domain mesh: its PolyData text, and its color as "#rrggbb" */
+export interface BoundarySurface {
+  name: string;
+  vtpText: string;
+  color: string;
+}
+
+/** The red, green and blue (0 to 1) of a color "#rrggbb" */
+function colorComponents(color: string): [number, number, number] {
+  return [1, 3, 5].map((start) => parseInt(color.slice(start, start + 2), 16) / 255) as [number, number, number];
+}
+
 interface PolyDataLayer {
   reader: vtkXMLPolyDataReader;
   mapper: vtkPolyDataMapper;
@@ -86,6 +100,8 @@ export class NetworkViewer {
   /** Tubes and cones */
   private trajectoryActors: vtkActor[] = [];
   private domainActor: vtkActor | null = null;
+  /** The boundary surfaces of the domain mesh, by name; part of the layer "domain" */
+  private boundarySurfaceActors = new Map<string, vtkActor>();
   private colorArray: ColorArray | null = null;
   private readonly canvas: HTMLCanvasElement;
 
@@ -159,6 +175,35 @@ export class NetworkViewer {
     property.setColor(0.3, 0.3, 0.3);
     this.renderer.addActor(actor);
     this.domainActor = actor;
+  }
+
+  /** Shows the boundary surfaces of the domain mesh, each with its color; replaces the old ones */
+  async setBoundarySurfaces(surfaces: BoundarySurface[]): Promise<void> {
+    for (const actor of this.boundarySurfaceActors.values()) {
+      this.renderer.removeActor(actor);
+    }
+    this.boundarySurfaceActors.clear();
+    for (const { name, vtpText, color } of surfaces) {
+      const reader = this.vtk.vtkXMLPolyDataReader();
+      reader.readFromInputStringOn();
+      reader.setInputString(vtpText);
+      await reader.update(0);
+      const mapper = this.vtk.vtkPolyDataMapper();
+      mapper.setInputConnection(0, reader.getOutputPort(0));
+      mapper.setScalarVisibility(0);
+      const actor = this.vtk.vtkActor({ mapper });
+      const property = actor.getProperty();
+      property.setRepresentationToSurface();
+      property.setColor(...colorComponents(color));
+      property.setOpacity(BOUNDARY_SURFACE_OPACITY);
+      this.renderer.addActor(actor);
+      this.boundarySurfaceActors.set(name, actor);
+    }
+  }
+
+  /** A new color ("#rrggbb") of a boundary surface of the domain mesh */
+  setBoundarySurfaceColor(name: string, color: string): void {
+    this.boundarySurfaceActors.get(name)?.getProperty().setColor(...colorComponents(color));
   }
 
   /**
@@ -340,6 +385,11 @@ export class NetworkViewer {
         actor.setVisibility(visibility);
       }
       return;
+    }
+    if (layer === "domain") {
+      for (const actor of this.boundarySurfaceActors.values()) {
+        actor.setVisibility(visibility);
+      }
     }
     const actor = layer === "domain" ? this.domainActor : this.layers.get(layer)?.actor;
     if (actor) {
