@@ -25,13 +25,11 @@ function meshSelect(selected: string, meshNames: string[], onChoose: (name: stri
   return select;
 }
 
-/** The domain mesh: the dropdown of the predefined meshes shows the selected one */
+/** The domain mesh: the dropdown of the predefined meshes shows the selected one; the style of the example row */
 function meshRow(selected: string, meshNames: string[], onChoose: (name: string) => void): HTMLElement {
-  const container = element("div", "file-row");
-  const header = element("div", "file-row-header");
-  header.append(element("span", "field-label", "Domain mesh"), meshSelect(selected, meshNames, onChoose));
-  container.append(header);
-  return container;
+  const row = element("label", "example-row");
+  row.append(element("span", "field-label", "Domain mesh"), meshSelect(selected, meshNames, onChoose));
+  return row;
 }
 
 /** A color chooser of each boundary surface of the domain mesh, for the 3D view */
@@ -54,5 +52,5 @@ export function boundarySurfaceSection(
 }
 
 export function domainSection(state: FormState, context: FormContext, handlers: FileHandlers): HTMLElement {
-  return section("Domain", meshRow(state.domain, context.meshNames, handlers.chooseMesh));
+  return meshRow(state.domain, context.meshNames, handlers.chooseMesh);
 }

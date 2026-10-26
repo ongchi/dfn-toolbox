@@ -280,10 +280,10 @@ try {
   const shapeDescription = () =>
     page.$eval("#shape-description", (node) => (node.hidden ? "(hidden)" : node.textContent));
   const boxDescription = await shapeDescription();
-  await page.select(".file-row select", "L-shape.vtu");
+  await page.select("#domain-form select", "L-shape.vtu");
   // The form shows the regions of the mesh when it is loaded
   await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
-  const meshLabel = await page.$eval(".file-row select", (node) => node.selectedOptions[0].textContent);
+  const meshLabel = await page.$eval("#domain-form select", (node) => node.selectedOptions[0].textContent);
   check(meshLabel === "L-shape", "choose a predefined mesh", meshLabel);
   const lShapeDescription = await shapeDescription();
   check(
@@ -324,7 +324,7 @@ try {
 
   // Bad input: a family region of the L-shape mesh is not in the Box mesh: an error of the library
   await selectDomainSource(page, "shape");
-  await page.select(".file-row select", "L-shape.vtu");
+  await page.select("#domain-form select", "L-shape.vtu");
   await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
   await page.evaluate(() => {
     const select = [...document.querySelectorAll("#form select")].find((node) =>
@@ -333,7 +333,7 @@ try {
     select.value = "west_box";
     select.dispatchEvent(new Event("change"));
   });
-  await page.select(".file-row select", "Box.vtu");
+  await page.select("#domain-form select", "Box.vtu");
   // The family region is not in the new mesh
   await page.waitForFunction(() =>
     [...document.querySelectorAll("#form option")].some((node) => node.textContent.endsWith("(not in the mesh)")),

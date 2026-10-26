@@ -213,6 +213,8 @@ input[type="text"] {
    directly below the mesh dropdown, which does not take the free height */
 #domain-form {
   flex: none;
+  /* The mesh row has the padding of the example row */
+  padding: 0;
 }
 
 .boundary-surfaces {
@@ -324,10 +326,6 @@ input[type="text"] {
 .family-actions {
   display: flex;
   gap: 6px;
-}
-
-.file-row {
-  margin-bottom: 10px;
 }
 
 .file-row-header {
