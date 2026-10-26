@@ -22,12 +22,13 @@ import {
   type TransportInput,
   type TransportOutput,
 } from "./generationClient";
-import { meshRegionNames, type InputFiles } from "./inputFiles";
+import { meshRegionBounds, meshRegionNames, type InputFiles, type RegionBounds } from "./inputFiles";
 import { listMeshes, loadMesh } from "./meshes";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
+import { userFracturesToVtp } from "./userFractures";
 import { NetworkViewer, PRESSURE_ARRAY, type ColorArray, type FractureLayer } from "./viewer";
 import { workflowToToml, type Workflow } from "./workflow";
 
@@ -67,6 +68,7 @@ const ui = {
   colorSelect: byId<HTMLSelectElement>("color-select"),
   showDomain: byId<HTMLInputElement>("show-domain"),
   showMesh: byId<HTMLInputElement>("show-mesh"),
+  showUserFractures: byId<HTMLInputElement>("show-user-fractures"),
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
@@ -94,8 +96,9 @@ const ui = {
 };
 
 let state: FormState = defaultFormState();
-let files: InputFiles = { mesh: null, userFractures: null };
+let files: InputFiles = { mesh: null };
 let regionNames: string[] = [];
+let regionBounds: RegionBounds[] = [];
 let meshNames: string[] = [];
 /** The description (comment) and the file name of the workflow file */
 let description = "";
@@ -155,7 +158,13 @@ const formContext: FormContext = {
   get meshNames() {
     return meshNames;
   },
-  changed: () => updateTomlPreview(),
+  get regionBounds() {
+    return regionBounds;
+  },
+  changed: () => {
+    updateTomlPreview();
+    updateUserFracturesInViewer();
+  },
   rerender: () => render(),
 };
 
@@ -170,21 +179,12 @@ const fileHandlers: FileHandlers = {
       showStatus(errorText(error), true);
     }
   },
-  chooseUserFractures: async (file) => {
-    state.userFractures = file.name;
-    files.userFractures = { name: file.name, text: await file.text() };
-    render();
-  },
-  removeUserFractures: () => {
-    state.userFractures = null;
-    files.userFractures = null;
-    render();
-  },
 };
 
 const flowContext: FormContext = {
   regionNames: [],
   meshNames: [],
+  regionBounds: [],
   changed: () => updateTomlPreview(),
   rerender: () => renderFlow(),
 };
@@ -192,13 +192,15 @@ const flowContext: FormContext = {
 const transportContext: FormContext = {
   regionNames: [],
   meshNames: [],
+  regionBounds: [],
   changed: () => updateTomlPreview(),
   rerender: () => renderTransport(),
 };
 
 function render(): void {
-  renderForm(ui.form, state, files, formContext, fileHandlers);
+  renderForm(ui.form, state, formContext, fileHandlers);
   updateTomlPreview();
+  updateUserFracturesInViewer();
 }
 
 function renderFlow(): void {
@@ -236,6 +238,7 @@ function selectSidebarTab(name: SidebarTab): void {
 async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   files.mesh = mesh;
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
+  regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
   clearOutput();
   if (viewer && mesh) {
     await viewer.setDomainMesh(mesh.text);
@@ -252,7 +255,7 @@ async function loadInput(workflow: Workflow, newFiles: InputFiles, fileName: str
   transportState = workflow.transport;
   description = workflow.description;
   inputFileName = fileName;
-  files = { mesh: null, userFractures: newFiles.userFractures };
+  files = { mesh: null };
   await setMesh(newFiles.mesh);
   ui.exampleDescription.textContent = description;
   ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "network";
@@ -281,13 +284,14 @@ function generationInput(): GenerationInput | string {
       ? "Choose a domain mesh."
       : `The domain mesh ${state.domain} is not a predefined mesh. Choose a domain mesh.`;
   }
-  if (state.userFractures !== null && files.userFractures === null) {
-    return `Choose the user-defined fracture file ${state.userFractures}, or remove it.`;
+  const unknownRegion = state.userFractures.find((fracture) => !regionNames.includes(fracture.region));
+  if (unknownRegion !== undefined) {
+    return `The region ${unknownRegion.region} of a user-defined fracture is not in the domain mesh. Choose another region.`;
   }
   return {
     toml: networkToLibraryToml(state),
     mesh: files.mesh.text,
-    userFractures: files.userFractures?.text,
+    userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, regionNames),
   };
 }
 
@@ -656,6 +660,7 @@ async function showTransportInViewer(): Promise<void> {
 
 function applyLayerVisibility(view: NetworkViewer): void {
   view.setVisible("final", ui.showMesh.checked);
+  view.setVisible("user", ui.showUserFractures.checked);
   view.setVisible("removed", ui.showRemoved.checked);
   view.setVisible("rejected", ui.showRejected.checked);
   view.setVisible("trajectories", ui.showTrajectories.checked);
@@ -713,6 +718,26 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
 
 // ---------------------------------------------------------------- viewer
 
+// The updates of the layer "user" run one after the other: two updates at the
+// same time could both add their polygons
+let userFracturesUpdate: Promise<void> = Promise.resolve();
+
+/** Shows the polygons of the user-defined fractures of the form (those with a region of the mesh) */
+function updateUserFracturesInViewer(): void {
+  userFracturesUpdate = userFracturesUpdate
+    .then(async () => {
+      if (!viewer) {
+        return;
+      }
+      const fractures = state.userFractures.filter((fracture) => regionNames.includes(fracture.region));
+      await viewer.setLayer("user", fractures.length === 0 ? null : userFracturesToVtp(fractures, regionNames));
+      applyLayerVisibility(viewer);
+      await viewer.render();
+    })
+    // A failed update does not stop the next ones
+    .catch((error: unknown) => showStatus(errorText(error), true));
+}
+
 async function startViewer(): Promise<void> {
   try {
     viewer = await NetworkViewer.create(ui.canvas);
@@ -727,6 +752,7 @@ async function startViewer(): Promise<void> {
   }
   await showOutputInViewer();
   await showTransportInViewer();
+  updateUserFracturesInViewer();
   viewer.resetCamera();
   await viewer.render();
 }
@@ -783,7 +809,7 @@ function bindEvents(): void {
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
   );
   ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
-  for (const checkbox of [ui.showMesh, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
+  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));

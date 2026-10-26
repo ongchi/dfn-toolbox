@@ -14,7 +14,6 @@ import puppeteer from "puppeteer-core";
 const url = process.argv[2] ?? "http://localhost:5173/";
 const screenshotDir = process.argv[3] ?? ".";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const meshesDir = new URL("../../meshes", import.meta.url).pathname.replace(/\/$/, "");
 const RUN_TIMEOUT = 300000;
 
 const browser = await puppeteer.launch({
@@ -147,12 +146,38 @@ try {
   const meshLabel = await page.$eval(".file-row select", (node) => node.selectedOptions[0].textContent);
   check(meshLabel === "L-shape", "choose a predefined mesh", meshLabel);
 
-  // Bad input: a mesh file as the user-defined fracture file gives an error of the library
-  await page.click('[data-sidebar-tab="network"]');
+  // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
   await selectExample(page, "box_west_east");
-  const [fractureInput] = await page.$$(".file-row input[type=file]");
-  await fractureInput.uploadFile(`${meshesDir}/Box.vtu`);
-  await page.waitForFunction(() => document.querySelector(".file-status").textContent.startsWith("Box.vtu"));
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#form button")].find((node) => node.textContent === "Add fracture").click(),
+  );
+  await page.waitForFunction(() => document.querySelector("#toml-preview").textContent.includes("[[network.user_fracture]]"));
+  const center = await page.evaluate(() => {
+    const input = [...document.querySelectorAll("#form .field")]
+      .find((field) => field.querySelector(".field-label")?.textContent === "Center x (m)")
+      .querySelector("input");
+    const limits = `${input.value} in ${input.min} to ${input.max}`;
+    input.value = "20";
+    input.dispatchEvent(new Event("input"));
+    return { limits, isOutsideInvalid: input.classList.contains("is-invalid") };
+  });
+  check(center.limits === "5 in 0 to 10" && center.isOutsideInvalid, "user fracture center in its region", center.limits);
+  // The 3D view shows the polygon at once: a larger radius for the screenshot
+  await page.evaluate(() => {
+    const input = [...document.querySelectorAll("#form .field")]
+      .find((field) => field.querySelector(".field-label")?.textContent === "Radius (m)")
+      .querySelector("input");
+    input.value = "4";
+    input.dispatchEvent(new Event("input"));
+    [...document.querySelectorAll("#form h3")].find((node) => node.textContent === "User-defined fractures").scrollIntoView();
+  });
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture.png` });
+
+  // Bad input: the family regions of the L-shape example are not in the Box mesh: an error of the library
+  await selectExample(page, "l_shape_north_east");
+  await page.select(".file-row select", "Box.vtu");
+  await page.waitForFunction(() => document.querySelector("#toml-preview").textContent.includes('domain = "Box.vtu"'));
   await page.click("#check-button");
   await waitIdle(page);
   check(await isStatusError(page), "check of a bad input", await statusText(page));

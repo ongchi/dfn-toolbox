@@ -38,7 +38,8 @@ const CONES_PER_PATH = 20;
 const MAX_CONE_COUNT = 500;
 const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
 
-export type FractureLayer = "final" | "removed" | "rejected";
+/** "user": the polygons of the user-defined fractures of the form, before the generation */
+export type FractureLayer = "final" | "removed" | "rejected" | "user";
 
 /** A data array of the triangle mesh of the final fractures, with one component */
 export interface ColorArray {
@@ -159,6 +160,11 @@ export class NetworkViewer {
     } else if (layer === "rejected") {
       property.setColor(0.85, 0.2, 0.2);
       property.setOpacity(0.25);
+    } else if (layer === "user") {
+      property.setColor(0.2, 0.4, 0.9);
+      property.setOpacity(0.5);
+      property.setEdgeVisibility(1);
+      property.setEdgeColor(0.1, 0.2, 0.6);
     } else {
       property.setEdgeVisibility(1);
       property.setEdgeColor(0.2, 0.2, 0.2);

@@ -15,7 +15,17 @@ import { FLOW_MESH_FILE } from "../src/flow/state";
 import { InputFormError, networkToLibraryToml } from "../src/form/toml";
 import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
 import { tomlToWorkflow } from "../src/workflow";
-import { compareOutputFolders, exampleNames, initWasm, meshPath, readExample, readMesh, runNativeDfngen } from "./cases";
+import {
+  compareOutputFolders,
+  exampleNames,
+  initWasm,
+  meshPath,
+  readExample,
+  readMesh,
+  runNativeDfngen,
+  userFracturesFile,
+} from "./cases";
+import { USER_FRACTURES_FILE } from "../src/userFractures";
 
 beforeAll(initWasm);
 
@@ -27,14 +37,13 @@ describe.each(exampleNames)("example %s", (exampleName) => {
   test("the dfngen input of the network is valid", () => {
     const example = readExample(exampleName);
     const network = tomlToWorkflow(example.toml).network;
-    const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
-    expect(check_input(networkToLibraryToml(network), readMesh(network.domain), userFractures)).toBeUndefined();
+    expect(check_input(networkToLibraryToml(network), readMesh(network.domain), userFracturesFile(network))).toBeUndefined();
   });
 
   test("the dfngen input of the network gives the output of the native binary", () => {
     const example = readExample(exampleName);
     const network = tomlToWorkflow(example.toml).network;
-    const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
+    const userFractures = userFracturesFile(network);
     const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFractures, 1n, () => {});
     expect(result.error).toBeUndefined();
     const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${exampleName}-`));
@@ -42,10 +51,12 @@ describe.each(exampleNames)("example %s", (exampleName) => {
       writeFileSync(join(wasmDir, name), result.file(name) ?? "");
     }
 
-    // The native binary reads the files at their full paths
+    // The native binary reads the mesh at its full path, and the fracture file next to its input
     network.domain = meshPath(network.domain);
-    network.userFractures = network.userFractures === null ? null : example.path(network.userFractures);
     const inputDir = mkdtempSync(join(tmpdir(), `dfngen-input-${exampleName}-`));
+    if (userFractures !== undefined) {
+      writeFileSync(join(inputDir, USER_FRACTURES_FILE), userFractures);
+    }
     writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network));
     const nativeDir = runNativeDfngen(join(inputDir, "input.toml"));
     for (const name of UNCOMPARED_FILES) {
@@ -109,6 +120,47 @@ test("an unknown aperture distribution is an error", () => {
   expect(problemsOf(toml)).toEqual([
     'network family 1: aperture: `distribution` must be "constant", "log_normal", "correlated" or "semi_correlated"',
   ]);
+});
+
+const USER_FRACTURES = readExample("user_fractures_stochastic").toml;
+
+test("the user fracture of the example is read with all its keys", () => {
+  expect(tomlToWorkflow(USER_FRACTURES).network.userFractures).toEqual([
+    {
+      region: "box",
+      center: [5, 5, 5],
+      numberOfPoints: 4,
+      radius: 7.78,
+      aspectRatio: 0.545,
+      beta: 0,
+      orientation: { convention: "theta_phi", firstAngle: 90, secondAngle: 90 },
+    },
+  ]);
+});
+
+test("a user fracture without region is an error", () => {
+  const toml = USER_FRACTURES.replace('region = "box"\n', "");
+  expect(problemsOf(toml)).toEqual(["network user fracture 1: `region` is missing"]);
+});
+
+test("a center which is not three numbers is an error", () => {
+  const toml = USER_FRACTURES.replace("center = [5.0, 5.0, 5.0]", "center = [5.0, 5.0]");
+  expect(problemsOf(toml)).toEqual(["network user fracture 1: `center` must be an array of three numbers"]);
+});
+
+test("kappa in the orientation of a user fracture is an error", () => {
+  const toml = USER_FRACTURES.replace("orientation = { theta = 90.0, phi = 90.0 }", "orientation = { theta = 90.0, phi = 90.0, kappa = 8.0 }");
+  expect(problemsOf(toml)).toEqual(["network user fracture 1: orientation: `kappa` is an unknown key"]);
+});
+
+test("the key user_fractures (a fracture file) is an error", () => {
+  const toml = USER_FRACTURES.replace('domain = "Box.vtu"', 'domain = "Box.vtu"\nuser_fractures = "fractures.vtp"');
+  expect(problemsOf(toml)).toEqual(["[network]: `user_fractures` is an unknown key"]);
+});
+
+test("the dfngen input names the fracture file only with user fractures", () => {
+  expect(networkToLibraryToml(tomlToWorkflow(USER_FRACTURES).network)).toMatch(/^user_fractures = "user_fractures\.vtp"$/m);
+  expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).not.toMatch(/^user_fractures =/m);
 });
 
 test("an unknown key in [flow] is an error", () => {

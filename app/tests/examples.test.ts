@@ -9,7 +9,7 @@ import { run_flow, run_generation, run_transport, type FlowResult, type Transpor
 import { updateTransportBoundaries } from "../src/transport/state";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "../src/workflow";
-import { exampleNames, initWasm, meshPath, readExample, readMesh } from "./cases";
+import { exampleNames, initWasm, meshPath, readExample, readMesh, userFracturesFile } from "./cases";
 
 // Milliseconds: the network, the flow and the transport of an example
 const WORKFLOW_TIMEOUT = 60000;
@@ -35,7 +35,7 @@ describe.each(exampleNames)("%s", (exampleName) => {
     const generation = run_generation(
       networkToLibraryToml(network),
       readMesh(network.domain),
-      network.userFractures === null ? undefined : example.readFile(network.userFractures),
+      userFracturesFile(network),
       1n,
       () => {},
     );

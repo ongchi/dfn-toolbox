@@ -1,14 +1,13 @@
 import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
 import { element, numberField, optionalNumberField, row, section, selectField } from "./fields";
+import { angleFields, conventionField } from "./orientation";
 import {
-  ORIENTATION_KEYS,
   defaultFamily,
   defaultRadius,
   type FamilyState,
   type FormState,
   type LogNormalSampling,
-  type OrientationConvention,
   type RadiusDistribution,
   type RadiusState,
 } from "./state";
@@ -96,32 +95,11 @@ function changeDistribution(old: RadiusState, distribution: RadiusDistribution):
   return radius;
 }
 
-const ANGLE_LABELS: Record<OrientationConvention, [string, string]> = {
-  theta_phi: ["Theta (°)", "Phi (°)"],
-  trend_plunge: ["Trend (°)", "Plunge (°)"],
-  dip_strike: ["Dip (°)", "Strike (°)"],
-};
-
 function orientationFields(family: FamilyState, context: FormContext): HTMLElement[] {
   const orientation = family.orientation;
-  const [firstKey, secondKey] = ORIENTATION_KEYS[orientation.convention];
-  const [firstLabel, secondLabel] = ANGLE_LABELS[orientation.convention];
   return [
     row(
-      selectField<OrientationConvention>({
-        label: "Orientation",
-        help: "mean normal of the Fisher distribution",
-        value: orientation.convention,
-        choices: [
-          ["theta_phi", "Theta and phi"],
-          ["trend_plunge", "Trend and plunge"],
-          ["dip_strike", "Dip and strike"],
-        ],
-        onInput: (value) => {
-          orientation.convention = value;
-          context.rerender();
-        },
-      }),
+      conventionField(orientation, "mean normal of the Fisher distribution", context),
       numberField({
         label: "Concentration",
         key: "kappa",
@@ -135,26 +113,7 @@ function orientationFields(family: FamilyState, context: FormContext): HTMLEleme
         },
       }),
     ),
-    row(
-      numberField({
-        label: firstLabel,
-        key: firstKey,
-        value: orientation.firstAngle,
-        onInput: (value) => {
-          orientation.firstAngle = value;
-          context.changed();
-        },
-      }),
-      numberField({
-        label: secondLabel,
-        key: secondKey,
-        value: orientation.secondAngle,
-        onInput: (value) => {
-          orientation.secondAngle = value;
-          context.changed();
-        },
-      }),
-    ),
+    row(...angleFields(orientation, context)),
   ];
 }
 

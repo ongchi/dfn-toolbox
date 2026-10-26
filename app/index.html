@@ -52,6 +52,7 @@
             </label>
             <label class="toolbar-check"><input id="show-domain" type="checkbox" checked /> Domain</label>
             <label class="toolbar-check"><input id="show-mesh" type="checkbox" checked /> Mesh</label>
+            <label class="toolbar-check"><input id="show-user-fractures" type="checkbox" checked /> User fractures</label>
             <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
             <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
             <label class="toolbar-check"><input id="show-trajectories" type="checkbox" disabled /> Trajectories</label>
@@ -70,7 +71,7 @@
             <button class="tab" type="button" data-tab="toml">TOML</button>
           </div>
           <div class="tab-body" data-tab-body="results">
-            <p id="results-empty" class="form-note">No network yet. Select an example or open files, then click Generate.</p>
+            <p id="results-empty" class="form-note">No network yet. Select an example, then click Generate.</p>
             <div id="results" hidden>
               <dl id="results-stats" class="stats"></dl>
               <div class="downloads">

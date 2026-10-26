@@ -26,10 +26,5 @@ export async function loadExample(name: string): Promise<{ workflow: Workflow; f
   const tomlUrl = new URL(`${name}/${name}.toml`, EXAMPLES_URL);
   const workflow = tomlToWorkflow(await fetchText(tomlUrl));
   const network = workflow.network;
-  const mesh = await loadMesh(network.domain);
-  const userFractures =
-    network.userFractures === null
-      ? null
-      : { name: network.userFractures, text: await fetchText(new URL(network.userFractures, tomlUrl)) };
-  return { workflow, files: { mesh, userFractures } };
+  return { workflow, files: { mesh: await loadMesh(network.domain) } };
 }

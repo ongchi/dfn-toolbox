@@ -15,6 +15,7 @@ export interface NumberFieldOptions extends FieldOptions {
   min?: number;
   /** The value must be above `min` (not equal) */
   isMinExclusive?: boolean;
+  max?: number;
   step?: number | "any";
   onInput: (value: number) => void;
 }
@@ -75,16 +76,22 @@ export function numberField(options: NumberFieldOptions): HTMLElement {
   if (options.min !== undefined && !options.isMinExclusive) {
     input.min = String(options.min);
   }
+  if (options.max !== undefined) {
+    input.max = String(options.max);
+  }
   input.disabled = options.isDisabled ?? false;
   input.required = true;
+  const isValid = (value: number) =>
+    Number.isFinite(value) &&
+    (!options.isInteger || Number.isInteger(value)) &&
+    (options.min === undefined || (options.isMinExclusive ? value > options.min : value >= options.min)) &&
+    (options.max === undefined || value <= options.max);
+  // A value of the state outside the limits (a new limit) is also invalid
+  input.classList.toggle("is-invalid", !isValid(options.value));
   input.addEventListener("input", () => {
     const value = input.valueAsNumber;
-    const isValid =
-      Number.isFinite(value) &&
-      (!options.isInteger || Number.isInteger(value)) &&
-      (options.min === undefined || (options.isMinExclusive ? value > options.min : value >= options.min));
-    input.classList.toggle("is-invalid", !isValid);
-    if (isValid) {
+    input.classList.toggle("is-invalid", !isValid(value));
+    if (isValid(value)) {
       options.onInput(value);
     }
   });

@@ -19,8 +19,11 @@ import {
   type FormState,
   type OrientationConvention,
   type OrientationState,
+  type PlaneOrientationState,
   type RadiusState,
+  type UserFractureState,
 } from "./state";
+import { USER_FRACTURES_FILE } from "../userFractures";
 
 /** A TOML text which the form cannot show, with one message for each problem */
 export class InputFormError extends Error {
@@ -116,13 +119,16 @@ function apertureEntries(aperture: ApertureState): [string, string][] {
   return entries;
 }
 
-function orientationEntries(orientation: OrientationState): [string, string][] {
+function planeOrientationEntries(orientation: PlaneOrientationState): [string, string][] {
   const [firstKey, secondKey] = ORIENTATION_KEYS[orientation.convention];
   return [
     [firstKey, float(orientation.firstAngle)],
     [secondKey, float(orientation.secondAngle)],
-    ["kappa", float(orientation.kappa)],
   ];
+}
+
+function orientationEntries(orientation: OrientationState): [string, string][] {
+  return [...planeOrientationEntries(orientation), ["kappa", float(orientation.kappa)]];
 }
 
 function familyLines(family: FamilyState, isP32: boolean): string[] {
@@ -146,6 +152,18 @@ function familyLines(family: FamilyState, isP32: boolean): string[] {
   return lines;
 }
 
+function userFractureLines(fracture: UserFractureState): string[] {
+  return [
+    `region = ${string(fracture.region)}`,
+    `center = [${fracture.center.map(float).join(", ")}]`,
+    `number_of_points = ${integer(fracture.numberOfPoints)}`,
+    `radius = ${float(fracture.radius)}`,
+    `aspect_ratio = ${float(fracture.aspectRatio)}`,
+    `beta = ${float(fracture.beta)}`,
+    `orientation = ${inlineTable(planeOrientationEntries(fracture.orientation))}`,
+  ];
+}
+
 /** The tables of `[network]` of the workflow file */
 export function networkTables(state: FormState): TomlTable[] {
   const isP32 = state.generation.stopCondition === "p32";
@@ -154,9 +172,6 @@ export function networkTables(state: FormState): TomlTable[] {
     `min_feature_size = ${float(state.minFeatureSize)}`,
     `domain = ${string(state.domain)}`,
   ];
-  if (state.userFractures !== null) {
-    rootLines.push(`user_fractures = ${string(state.userFractures)}`);
-  }
   const tables: TomlTable[] = [{ name: "", isArray: false, lines: rootLines }];
 
   const generationLines = isP32 ? [] : [`n_poly = ${integer(state.generation.nPoly)}`];
@@ -200,6 +215,9 @@ export function networkTables(state: FormState): TomlTable[] {
   for (const family of state.families) {
     tables.push({ name: "family", isArray: true, lines: familyLines(family, isP32) });
   }
+  for (const fracture of state.userFractures) {
+    tables.push({ name: "user_fracture", isArray: true, lines: userFractureLines(fracture) });
+  }
   return tables;
 }
 
@@ -209,11 +227,22 @@ export function networkTables(state: FormState): TomlTable[] {
  */
 const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray: false, lines: ["enable = true"] };
 
-/** The dfngen input file of the network; the mesh is always on in dfn-web */
+/**
+ * The dfngen input file of the network. The mesh is always on in dfn-web. The
+ * user-defined fractures are the polygons of `USER_FRACTURES_FILE` (made by
+ * `userFracturesToVtp`), not tables.
+ */
 export function networkToLibraryToml(state: FormState): string {
-  const tables = networkTables(state).flatMap((table) =>
-    table.name === "mesh" ? [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }] : [table],
-  );
+  const tables = networkTables(state).flatMap((table) => {
+    if (table.name === "") {
+      const fileLines = state.userFractures.length === 0 ? [] : [`user_fractures = ${string(USER_FRACTURES_FILE)}`];
+      return [{ ...table, lines: [...table.lines, ...fileLines] }];
+    }
+    if (table.name === "mesh") {
+      return [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }];
+    }
+    return table.name === "user_fracture" ? [] : [table];
+  });
   return tablesToToml(tables, "");
 }
 
@@ -336,6 +365,19 @@ export class TableReader {
     }
     this.problems.push(`${this.where(key)} must be ${choices.map((choice) => `"${choice}"`).join(", ")}`);
     return fallback;
+  }
+
+  /** Three numbers: x, y and z */
+  point(key: string): [number, number, number] {
+    const value = this.value(key, false);
+    if (value === undefined) {
+      return [0, 0, 0];
+    }
+    if (Array.isArray(value) && value.length === 3 && value.every((item) => typeof item === "number" || typeof item === "bigint")) {
+      return [Number(value[0]), Number(value[1]), Number(value[2])];
+    }
+    this.problems.push(`${this.where(key)} must be an array of three numbers`);
+    return [0, 0, 0];
   }
 
   stringArray(key: string): string[] {
@@ -465,8 +507,8 @@ function readOptionalAperture(reader: TableReader, key: string, path: string, pr
   return readAperture(reader.subTable(key), path, problems);
 }
 
-function readOrientation(table: Table, path: string, problems: string[]): OrientationState {
-  const reader = new TableReader(table, path, problems);
+/** The pair of angles of an orientation table; the reader checks the other keys */
+function readPlaneOrientation(reader: TableReader, path: string, problems: string[]): PlaneOrientationState {
   const conventions = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).filter((convention) =>
     ORIENTATION_KEYS[convention].some((key) => reader.has(key)),
   );
@@ -475,12 +517,12 @@ function readOrientation(table: Table, path: string, problems: string[]): Orient
   }
   const convention = conventions[0] ?? "theta_phi";
   const [firstKey, secondKey] = ORIENTATION_KEYS[convention];
-  const orientation = {
-    convention,
-    firstAngle: reader.float(firstKey, 0),
-    secondAngle: reader.float(secondKey, 0),
-    kappa: reader.float("kappa", 0),
-  };
+  return { convention, firstAngle: reader.float(firstKey, 0), secondAngle: reader.float(secondKey, 0) };
+}
+
+function readOrientation(table: Table, path: string, problems: string[]): OrientationState {
+  const reader = new TableReader(table, path, problems);
+  const orientation = { ...readPlaneOrientation(reader, path, problems), kappa: reader.float("kappa", 0) };
   reader.checkUnknownKeys();
   return orientation;
 }
@@ -511,6 +553,24 @@ function readFamily(table: Table, path: string, isP32: boolean, problems: string
   };
   reader.checkUnknownKeys();
   return family;
+}
+
+function readUserFracture(table: Table, path: string, problems: string[]): UserFractureState {
+  const reader = new TableReader(table, path, problems);
+  const orientationReader = new TableReader(reader.subTable("orientation"), `${path}: orientation`, problems);
+  const orientation = readPlaneOrientation(orientationReader, `${path}: orientation`, problems);
+  orientationReader.checkUnknownKeys();
+  const fracture: UserFractureState = {
+    region: reader.string("region", ""),
+    center: reader.point("center"),
+    numberOfPoints: reader.integer("number_of_points", 0),
+    radius: reader.float("radius", 0),
+    aspectRatio: reader.float("aspect_ratio", 0),
+    beta: reader.float("beta", 0),
+    orientation,
+  };
+  reader.checkUnknownKeys();
+  return fracture;
 }
 
 /** Parses a TOML text; integers which a number cannot hold exactly are bigints. Throws `InputFormError`. */
@@ -581,7 +641,9 @@ export function readNetwork(table: Table, problems: string[]): FormState {
     seed: reader.integerDigits("seed", "0"),
     minFeatureSize: reader.float("min_feature_size", 0),
     domain: reader.string("domain", ""),
-    userFractures: reader.optionalString("user_fractures"),
+    userFractures: reader
+      .tables("user_fracture")
+      .map((table, index) => readUserFracture(table, `network user fracture ${index + 1}`, problems)),
     generation,
     fram,
     mesh,

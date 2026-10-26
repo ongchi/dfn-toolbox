@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { networkToLibraryToml } from "../src/form/toml";
 import { initSync, input_file_names, run_generation } from "../src/pkg/dfn_wasm.js";
+import type { FormState } from "../src/form/state";
+import { meshRegionNames } from "../src/inputFiles";
+import { userFracturesToVtp } from "../src/userFractures";
 import { tomlToWorkflow, type Workflow } from "../src/workflow";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -66,6 +69,13 @@ export function readMesh(name: string): string {
   return readFileSync(meshPath(name), "utf8");
 }
 
+/** The polygon file of the user-defined fractures of a network; undefined without them */
+export function userFracturesFile(network: FormState): string | undefined {
+  return network.userFractures.length === 0
+    ? undefined
+    : userFracturesToVtp(network.userFractures, meshRegionNames(readMesh(network.domain)));
+}
+
 // The workflow examples of dfn-web (../examples)
 const examplesDir = resolve(appDir, "../examples");
 
@@ -77,19 +87,10 @@ export const exampleNames: string[] = readdirSync(examplesDir, { withFileTypes: 
 export interface ExampleFiles {
   /** The workflow file */
   toml: string;
-  /** The full path of a file which the workflow file names (relative to its folder) */
-  path(name: string): string;
-  readFile(name: string): string;
 }
 
 export function readExample(exampleName: string): ExampleFiles {
-  const exampleDir = join(examplesDir, exampleName);
-  const path = (name: string) => join(exampleDir, name);
-  return {
-    toml: readFileSync(path(`${exampleName}.toml`), "utf8"),
-    path,
-    readFile: (name) => readFileSync(path(name), "utf8"),
-  };
+  return { toml: readFileSync(join(examplesDir, exampleName, `${exampleName}.toml`), "utf8") };
 }
 
 /** The workflow of an example and the triangle mesh of its network, in WebAssembly (needs `initWasm`). */
@@ -97,8 +98,7 @@ export function generateExample(exampleName: string): { workflow: Workflow; mesh
   const example = readExample(exampleName);
   const workflow = tomlToWorkflow(example.toml);
   const network = workflow.network;
-  const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
-  const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFractures, 1n, () => {});
+  const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFracturesFile(network), 1n, () => {});
   if (result.error !== undefined) {
     throw new Error(`the generation of ${exampleName} failed: ${result.error}`);
   }

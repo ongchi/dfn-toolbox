@@ -3,11 +3,14 @@
      and its 6 faces as quads (cells 1 to 6). The face at x = 0 is on the
      boundary surface west, the face at x = 10 on the boundary surface east:
      they are the in-flow and the out-flow. The other faces are on no
-     boundary surface. -->
+     boundary surface. The hexahedron is the region box. -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
 <Piece NumberOfPoints="8" NumberOfCells="7">
-<CellData Scalars="boundary__west">
+<CellData Scalars="region__box">
+<DataArray type="Int32" Name="region__box" format="ascii">
+1 0 0 0 0 0 0
+</DataArray>
 <DataArray type="Int32" Name="boundary__west" format="ascii">
 0 1 0 0 0 0 0
 </DataArray>

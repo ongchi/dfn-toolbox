@@ -56,12 +56,17 @@ export type RadiusDistribution = RadiusState["distribution"];
 /** The pair of angles of the orientation, in the names of the input keys */
 export type OrientationConvention = "theta_phi" | "trend_plunge" | "dip_strike";
 
-export interface OrientationState {
+/** The orientation of a plane: the pair of angles of its normal */
+export interface PlaneOrientationState {
   convention: OrientationConvention;
   /** theta, trend or dip, in degrees */
   firstAngle: number;
   /** phi, plunge or strike, in degrees */
   secondAngle: number;
+}
+
+/** The orientation of a family: the mean normal and the Fisher concentration */
+export interface OrientationState extends PlaneOrientationState {
   kappa: number;
 }
 
@@ -81,14 +86,30 @@ export interface FamilyState {
   orientation: OrientationState;
 }
 
+/**
+ * One user-defined fracture (`[[network.user_fracture]]`): a polygon made as
+ * a stochastic fracture of dfngen-rs, with fixed values (see `userFractures.ts`)
+ */
+export interface UserFractureState {
+  /** Name of a region of the mesh; necessary */
+  region: string;
+  /** x, y, z in the coordinates of the mesh; in the bounding box of the region */
+  center: [number, number, number];
+  numberOfPoints: number;
+  radius: number;
+  aspectRatio: number;
+  /** Rotation in the plane of the fracture, in degrees */
+  beta: number;
+  orientation: PlaneOrientationState;
+}
+
 export interface FormState {
   /** Decimal digits of a u64; "0" = random seed */
   seed: string;
   minFeatureSize: number;
   /** Name of the domain mesh file, as in the `domain` key */
   domain: string;
-  /** Name of the user-defined fracture file; null = no key */
-  userFractures: string | null;
+  userFractures: UserFractureState[];
   generation: GenerationState;
   fram: FramState;
   mesh: MeshState;
@@ -159,12 +180,25 @@ export function defaultFamily(): FamilyState {
   };
 }
 
+/** A new user-defined fracture: a square of 1 m with the normal +z */
+export function defaultUserFracture(region: string, center: [number, number, number]): UserFractureState {
+  return {
+    region,
+    center,
+    numberOfPoints: 4,
+    radius: 1.0,
+    aspectRatio: 1.0,
+    beta: 0.0,
+    orientation: { convention: "theta_phi", firstAngle: 0.0, secondAngle: 0.0 },
+  };
+}
+
 export function defaultFormState(): FormState {
   return {
     seed: "12345",
     minFeatureSize: 0.1,
     domain: "",
-    userFractures: null,
+    userFractures: [],
     generation: { stopCondition: "n_poly", nPoly: 100, forceLargeFractures: false, removeFracturesLessThan: 0.0 },
     fram: { ...FRAM_DEFAULTS, enable: true },
     mesh: { ...MESH_DEFAULTS },

@@ -27,8 +27,9 @@ There is no server: `npm run build` gives a folder of static files.
   has it. The app does not write the input files of the `dfngen`, `fehm`
   and `dfntrans` binaries.
 - Network tab: a form with one field for each key of `[network]`: the domain mesh is
-  one of the predefined meshes of `meshes/` (a dropdown), and the
-  user-defined fracture file is a file of the user. The boundary lines of the
+  one of the predefined meshes of `meshes/` (a dropdown), and each
+  user-defined fracture is a card of the form (region, center, shape and
+  orientation; see "User-defined fractures"). The boundary lines of the
   regions and the triangle mesh are always on (the flow needs them), thus
   each family needs an aperture.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
@@ -50,7 +51,9 @@ There is no server: `npm run build` gives a folder of static files.
   fractures (layer "Mesh", with its edges; color by a cell array, or by
   the point pressure of the flow: "Pressure", selected when the flow is
   done), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
-  (layer "Domain", a wireframe), the particle paths (layer "Trajectories": tubes, with cones in the direction
+  (layer "Domain", a wireframe), the polygons of the user-defined
+  fractures of the form (layer "User fractures", blue; updated at each
+  change of the form, also before "Generate"), the particle paths (layer "Trajectories": tubes, with cones in the direction
   of the velocity at every n-th point, about 20 for each path and at most
   500); the logs; the mass flow of each
   boundary; the particle counts and the volume fluxes of the transport; each
@@ -86,16 +89,23 @@ the dfntrans input on that flow.
 [network]                          # the dfngen input (see "Input file" in ../dfngen-rs/README.md)
 seed = 12345
 min_feature_size = 0.4
-domain = "Box.vtu"       # the name of a predefined mesh (`meshes/`)
-user_fractures = "fractures.vtp"   # optional
+domain = "Box.vtu"                 # the name of a predefined mesh (`meshes/`); no `user_fractures`
 [network.generation]               # as [generation]
 [network.fram]                     # as [fram]; optional
 [network.mesh]                     # optional; no [network.region_boundaries]: the boundary lines are always on
 max_size_factor = 5.0              # no `enable`: always on
 slope = 0.5
-user_fracture_aperture = { distribution = "constant", value = 3e-4 }   # necessary with user_fractures
+user_fracture_aperture = { distribution = "constant", value = 3e-4 }   # necessary with user fractures
 [network.clusters]                 # as [clusters]
 [[network.family]]                 # as [[family]]; `aperture` is necessary
+[[network.user_fracture]]          # optional; one table for each user-defined fracture, all keys necessary
+region = "box"                     # one region of the mesh
+center = [5.0, 5.0, 5.0]           # m; in the bounding box of the cells of the region
+number_of_points = 4               # as a family: 3 or more, 4 = rectangle
+radius = 7.78                      # m; of the circle of the points
+aspect_ratio = 0.545               # y radius / x radius
+beta = 0.0                         # degrees; rotation in the plane of the fracture
+orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without kappa
 
 [flow]                             # the fehm input (see "Input file" in ../fehm-rs/README.md), without `mesh`
 temperature = 20.0
@@ -122,25 +132,42 @@ forms never lose a value. A boundary name of `[flow]` or `[transport]` is
 checked only by "Solve flow" and "Track particles": the names are those of
 the mesh of the generation.
 
+### User-defined fractures
+
+dfngen-rs reads user-defined fractures only as polygons (a `.vtp` file).
+dfn-web makes the polygon of each `[[network.user_fracture]]` in the same
+way as dfngen-rs makes a stochastic fracture (`app/src/userFractures.ts`):
+a regular polygon of `number_of_points` on the circle of `radius`, y scaled
+by `aspect_ratio`, turned by `beta` in its plane, rotated from the normal
++z to the normal of `orientation`, and moved to `center`. The polygon file
+`user_fractures.vtp` of the dfngen input has a cell array
+`region__<name>` for each region of the mesh, with 1 for the region of the
+fracture. The form limits the center to the bounding box of the cells of
+the region; a center in that box but outside the cells (possible in a
+region which is not a box) is not checked.
+
 ## Examples
 
 `examples/` has one folder for each example, with its workflow file
-`<name>.toml` and its fracture file (ASCII files, written by hand). Its
-domain mesh is a predefined mesh of `meshes/` (`Box.vtu`,
-`L-shape.vtu`; written by hand); a new `.vtu` file there is a new item of
-the dropdown, with its file name without `.vtu` ("Box", "L-shape"). The in-flow and out-flow boundaries are boundary surfaces of the
-domain mesh: surface cells (quads) with the cell data arrays
-`boundary__<name>` (see "Domain mesh" in ../dfngen-rs/README.md). Where a
-fracture crosses such a face, its boundary line gets the name, thus it is a
-boundary of the flow. Only the mesh of `l_shape_north_east` has regions,
-and only its families have a `region`.
+`<name>.toml` (written by hand). Its domain mesh is a predefined mesh of
+`meshes/` (`Box.vtu`, `L-shape.vtu`; ASCII files written by hand); a new
+`.vtu` file there is a new item of the dropdown, with its file name
+without `.vtu` ("Box", "L-shape"). The in-flow and out-flow boundaries are
+boundary surfaces of the domain mesh: surface cells (quads) with the cell
+data arrays `boundary__<name>` (see "Domain mesh" in
+../dfngen-rs/README.md). Where a fracture crosses such a face, its boundary
+line gets the name, thus it is a boundary of the flow. `Box.vtu` has the
+region `box` (its hexahedron) for the user-defined fracture of
+`user_fractures_stochastic`; `L-shape.vtu` has the regions `west_box`,
+`east_box` and `other_boxes`, and only the families of
+`l_shape_north_east` have a `region`.
 
 | Example | Content |
 |---|---|
 | `box_west_east` | A cube of 10 m (`Box.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
 | `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
 | `l_shape_north_east` | An L-shaped domain of 4 boxes (`L-shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
-| `user_fractures_stochastic` | The same cube, a large user-defined fracture from west to east with a larger aperture, a stochastic family, and matrix diffusion. |
+| `user_fractures_stochastic` | The same cube, a large user-defined fracture in the region `box` (a rectangle in the plane y = 5) from west to east with a larger aperture, a stochastic family, and matrix diffusion. |
 
 The seeds of the examples give a network which connects the in-flow and
 the out-flow boundaries. Many other seeds do not: then no fracture reaches
@@ -158,6 +185,7 @@ intersection outside the mesh), and "Solve flow" reports it.
 | `app` | Vite + TypeScript front end. |
 | `app/src/workflow.ts` | The workflow file: reading (strict) and writing of the three sections. |
 | `app/src/form` | The network form. `state.ts` has the form state, `toml.ts` the conversion between `[network]` and the state, the dfngen input, and the TOML helpers; one file for each section. |
+| `app/src/userFractures.ts` | The polygon file of the user-defined fractures (see "User-defined fractures"). |
 | `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: the pressure of `pressure.vtu` in the point data of `dfn_mesh.vtu`, and a triangle mesh as PolyData for the view. |
 | `app/src/transport` | The transport form (`state.ts`, `toml.ts`: `[transport]` and the dfntrans input, `form.ts`), and `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view. |
 | `app/src/viewer.ts` | The 3D view (VTK.wasm). |
@@ -231,7 +259,12 @@ npm run dev & npm run e2e -- http://localhost:5173/
   `rejections.dat` (a rounding difference changes the reason of some FRAM
   rejections; the final network is the same); the errors of the reader of
   the workflow file (an unknown key, a missing key or section, `enable` in
-  `[network.mesh]`, a family without aperture, and others).
+  `[network.mesh]`, a family without aperture, a user fracture without
+  region or with a bad center, and others).
+- `tests/userFractures.test.ts`: the polygons of the user-defined fractures
+  against the steps of dfngen-rs (the rectangle of `Poly::new`, `beta`, the
+  normals of the three conventions, the half turn for the normal -z), the
+  region arrays, and the region boxes of the predefined meshes.
 - `tests/flow.test.ts`: on the mesh of the example `l_shape_north_east`
   (generated in WebAssembly), the fehm input of the flow form is a valid
   input, the output files agree with the `fehm` binary (within 1e-9), the
@@ -244,7 +277,9 @@ npm run dev & npm run e2e -- http://localhost:5173/
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the full workflow of each
   example, the single zip, the flow without a mesh, the transport without
-  a flow, the choice of a predefined mesh, a bad input and the cancel; it saves screenshots.
+  a flow, the choice of a predefined mesh, the limits of the center of a
+  new user-defined fracture, a bad input and the cancel; it saves
+  screenshots.
 
 ## VTK.wasm notes
 
