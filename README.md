@@ -128,22 +128,25 @@ the mesh of the generation.
 
 `examples/` has one folder for each example, with its workflow file
 `<name>.toml`, its domain mesh and its fracture file (ASCII files, written
-by hand). The in-flow and out-flow boundaries are boundaries of the regions
-of the domain mesh: a region boundary in a fracture gives a boundary line,
-thus a boundary of the flow.
+by hand). The in-flow and out-flow boundaries are boundary surfaces of the
+domain mesh: surface cells (quads) with the cell data arrays
+`boundary__<name>` (see "Domain mesh" in ../dfngen-rs/README.md). Where a
+fracture crosses such a face, its boundary line gets the name, thus it is a
+boundary of the flow. The meshes have no regions, and the families no
+`region`.
 
 | Example | Content |
 |---|---|
-| `box_west_east` | A cube of 10 m with the regions west, center and east (`box_west_east.vtu`). One family in center; flow and particles from west to east. |
+| `box_west_east` | A cube of 10 m (`box_west_east.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
 | `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
-| `regions_north_surface` | The L-shaped domain of `mesh_domain` of dfngen-rs; the family in south; flow with gravity from the boundary to north to the mesh surface. |
+| `l_shape_north_east` | The L-shaped domain of `mesh_domain` of dfngen-rs (`l_shape.vtu`); the end face of the north arm is the boundary surface north, the end face of the east arm east. One family in the L; flow with gravity and particles from north to east. |
 | `user_fractures_stochastic` | The same cube, a large user-defined fracture from west to east with a larger aperture, a stochastic family, and matrix diffusion. |
 
 The seeds of the examples give a network which connects the in-flow and
 the out-flow boundaries. Many other seeds do not: then no fracture reaches
 a boundary, or a part of the network has no connection to a boundary (the
-mesh cuts each fracture at its region, thus two fractures can lose an
-intersection outside the region), and "Solve flow" reports it.
+mesh cuts each fracture at the mesh surface, thus two fractures can lose an
+intersection outside the mesh), and "Solve flow" reports it.
 
 ## Folders
 
@@ -228,13 +231,13 @@ npm run dev & npm run e2e -- http://localhost:5173/
   rejections; the final network is the same); the errors of the reader of
   the workflow file (an unknown key, a missing key or section, `enable` in
   `[network.mesh]`, a family without aperture, and others).
-- `tests/flow.test.ts`: on the mesh of the example `regions_north_surface`
+- `tests/flow.test.ts`: on the mesh of the example `l_shape_north_east`
   (generated in WebAssembly), the fehm input of the flow form is a valid
   input, the output files agree with the `fehm` binary (within 1e-9), the
   in-flow is equal to the out-flow, and a boundary array with no point and
   no boundary are errors.
-- `tests/transport.test.ts`: on the flow of that example (from north to the
-  mesh surface), the dfntrans input of the transport form is a valid input,
+- `tests/transport.test.ts`: on the flow of that example (from north to
+  east), the dfntrans input of the transport form is a valid input,
   the output files agree with the `dfntrans` binary (the integers exactly,
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.

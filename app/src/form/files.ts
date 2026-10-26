@@ -74,7 +74,7 @@ export function filesSection(state: FormState, files: InputFiles, handlers: File
       key: "domain",
       name: state.domain === "" ? null : state.domain,
       file: files.mesh,
-      help: "ASCII .vtu; cell types 10 to 14; `region__<name>` cell arrays are regions",
+      help: "ASCII .vtu; volume cell types 10 to 14, `region__<name>` cell arrays are regions; surface cell types 5 and 9, `boundary__<name>` cell arrays are boundary surfaces",
       buttons: [fileButton("Choose…", ".vtu", handlers.chooseMesh)],
     }),
     fileRow({

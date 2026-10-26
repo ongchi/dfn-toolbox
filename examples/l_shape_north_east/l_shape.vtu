@@ -1,16 +1,19 @@
 <?xml version="1.0"?>
 <!-- L shape in the x-y plane, 10 high in z. The bounding box is 10 x 10 x 10
      with its center at (15, 25, 35). No cell has x > 15 and y > 25.
-     Region 1: two hexahedra along x. Region 2: two wedges in +y. -->
+     Cells 0 and 1: two hexahedra along x (the east arm, y 20 to 25).
+     Cells 2 and 3: two wedges in +y (the north arm, x 10 to 15).
+     Cell 4: the end face of the north arm (y = 30), boundary surface north.
+     Cell 5: the end face of the east arm (x = 20), boundary surface east. -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
-<Piece NumberOfPoints="16" NumberOfCells="4">
-<CellData Scalars="region__south">
-<DataArray type="Int32" Name="region__south" format="ascii">
-1 1 0 0
+<Piece NumberOfPoints="16" NumberOfCells="6">
+<CellData Scalars="boundary__north">
+<DataArray type="Int32" Name="boundary__north" format="ascii">
+0 0 0 0 1 0
 </DataArray>
-<DataArray type="Int32" Name="region__north" format="ascii">
-0 0 1 1
+<DataArray type="Int32" Name="boundary__east" format="ascii">
+0 0 0 0 0 1
 </DataArray>
 </CellData>
 <Points>
@@ -39,12 +42,14 @@
 1 2 5 4 9 10 13 12
 3 4 7 11 12 15
 3 7 6 11 15 14
+6 7 15 14
+2 5 13 10
 </DataArray>
 <DataArray type="Int64" Name="offsets" format="ascii">
-8 16 22 28
+8 16 22 28 32 36
 </DataArray>
 <DataArray type="UInt8" Name="types" format="ascii">
-12 12 13 13
+12 12 13 13 9 9
 </DataArray>
 </Cells>
 </Piece>

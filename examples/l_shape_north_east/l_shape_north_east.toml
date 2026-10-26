@@ -1,16 +1,18 @@
-# Regions north -> surface: an L-shaped domain (l_shape.vtu) with the regions
-# south (y 20 to 25) and north (y 25 to 30, x 10 to 15). The family is in
-# south: its fractures are cut at the boundary to north and at the mesh
-# surface. The flow goes from the boundary to north (10.1 MPa) to the mesh
-# surface (10.0 MPa), with gravity; the particles leave at the mesh surface.
+# L shape north -> east: an L-shaped domain (l_shape.vtu) with an east arm
+# (y 20 to 25) and a north arm (x 10 to 15, y 25 to 30). The end face of the
+# north arm (y = 30) is the boundary surface north, the end face of the east
+# arm (x = 20) the boundary surface east. The family is in the whole L: its
+# fractures are cut at the mesh surface. The flow goes through the L from
+# north (10.1 MPa) to east (10.0 MPa), with gravity; the particles leave at
+# east.
 
 [network]
-seed = 6
+seed = 3
 min_feature_size = 0.3
 domain = "l_shape.vtu"
 
 [network.generation]
-n_poly = 80
+n_poly = 100
 force_large_fractures = false
 remove_fractures_less_than = 0.0
 
@@ -30,22 +32,21 @@ max_size_factor = 5.0
 slope = 0.5
 
 [network.clusters]
-keep_only_largest = false
+keep_only_largest = true
 keep_isolated_fractures = false
 
 [[network.family]]
 number_of_points = 8
 probability = 1.0
 aspect_ratio = 1.0
-region = "south"
 aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
-radius = { distribution = "truncated_power_law", alpha = 2.2, min = 1.0, max = 4.0 }
+radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5.0 }
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }
 
 [flow]
 temperature = 20.0
 gravity = true
-pressure = { north = 10.1, mesh_surface = 10.0 }
+pressure = { north = 10.1, east = 10.0 }
 
 [transport]
 seed = 12345
@@ -53,7 +54,7 @@ time_unit = "days"
 porosity = 1.0
 max_time_steps = 1000000
 inflow = ["north"]
-outflow = ["mesh_surface"]
+outflow = ["east"]
 routing = "complete_mixing"
 
 [transport.seeding]

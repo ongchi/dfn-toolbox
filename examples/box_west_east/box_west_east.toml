@@ -1,8 +1,9 @@
-# Box west -> east: the simplest workflow. One family of fractures in the
-# region center of a cube of 10 m. The flow goes from the boundary to the
-# region west (10.1 MPa) to the boundary to the region east (10.0 MPa); the
-# other boundary lines are on the mesh surface and have no flow. The
-# particles start on the in-flow lines (flux weighted) and leave at east.
+# Box west -> east: the simplest workflow. One family of fractures in a
+# cube of 10 m (box_west_east.vtu). The faces of the cube are surface cells
+# of the mesh: the face at x = 0 is the boundary surface west, the face at
+# x = 10 the boundary surface east. The flow goes from west (10.1 MPa) to
+# east (10.0 MPa); the lines on the other faces (mesh_surface) have no flow.
+# The particles start on the in-flow lines and leave at east.
 
 [network]
 seed = 1
@@ -37,7 +38,6 @@ keep_isolated_fractures = false
 number_of_points = 8
 probability = 1.0
 aspect_ratio = 1.0
-region = "center"
 aperture = { distribution = "constant", value = 1e-4 }
 radius = { distribution = "truncated_power_law", alpha = 1.6, min = 2.5, max = 6.0 }
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }

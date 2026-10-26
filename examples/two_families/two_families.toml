@@ -37,7 +37,6 @@ keep_isolated_fractures = false
 number_of_points = 8
 probability = 0.4
 aspect_ratio = 1.0
-region = "center"
 aperture = { distribution = "constant", value = 1e-4 }
 radius = { distribution = "truncated_power_law", alpha = 2.0, min = 2.0, max = 5.0 }
 orientation = { theta = 90.0, phi = 0.0, kappa = 15.0 }
@@ -46,7 +45,6 @@ orientation = { theta = 90.0, phi = 0.0, kappa = 15.0 }
 number_of_points = 8
 probability = 0.6
 aspect_ratio = 1.0
-region = "center"
 aperture = { distribution = "correlated", alpha = 5e-5, beta = 0.5 }
 radius = { distribution = "truncated_power_law", alpha = 1.4, min = 3.0, max = 8.0 }
 orientation = { theta = 90.0, phi = 90.0, kappa = 15.0 }

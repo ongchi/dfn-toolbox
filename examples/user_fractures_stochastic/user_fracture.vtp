@@ -1,17 +1,17 @@
 <?xml version="1.0"?>
 <!-- One large user-defined fracture in the cube of box_west_east: a
-     rectangle in the plane y = 5, from x = 0.5 to 9.5 and z = 2 to 8. Its
-     region is center: its mesh is cut at x = 1 (the boundary to west) and at
-     x = 9 (the boundary to east). -->
+     rectangle in the plane y = 5, from x = -0.5 to 10.5 and z = 2 to 8. It
+     has no region: it crosses the faces west (x = 0) and east (x = 10) of
+     the cube, and its mesh is cut there. -->
 <VTKFile type="PolyData" version="1.0" byte_order="LittleEndian">
 <PolyData>
 <Piece NumberOfPoints="4" NumberOfVerts="0" NumberOfLines="0" NumberOfStrips="0" NumberOfPolys="1">
 <Points>
 <DataArray type="Float64" Name="points" NumberOfComponents="3" format="ascii">
-0.5 5.0 2.0
-9.5 5.0 2.0
-9.5 5.0 8.0
-0.5 5.0 8.0
+-0.5 5.0 2.0
+10.5 5.0 2.0
+10.5 5.0 8.0
+-0.5 5.0 8.0
 </DataArray>
 </Points>
 <Polys>
@@ -22,11 +22,6 @@
 4
 </DataArray>
 </Polys>
-<CellData>
-<DataArray type="Int32" Name="region__center" format="ascii">
-1
-</DataArray>
-</CellData>
 </Piece>
 </PolyData>
 </VTKFile>

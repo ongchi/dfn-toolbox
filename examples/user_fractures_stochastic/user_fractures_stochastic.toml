@@ -1,6 +1,6 @@
 # User fractures + stochastic: the cube of box_west_east with one large
-# user-defined fracture (user_fracture.vtp, the plane y = 5, region center)
-# from west to east, and a stochastic family which crosses it. The user
+# user-defined fracture (user_fracture.vtp, the plane y = 5) across the
+# cube from west to east, and a stochastic family which crosses it. The user
 # fracture has a larger aperture: most of the flow goes through it. The
 # transport has matrix diffusion ([transport.tdrw]): the particles go into
 # the rock matrix and come back, thus their travel times are longer.
@@ -40,7 +40,6 @@ keep_isolated_fractures = false
 number_of_points = 8
 probability = 1.0
 aspect_ratio = 1.0
-region = "center"
 aperture = { distribution = "constant", value = 1e-4 }
 radius = { distribution = "truncated_power_law", alpha = 1.6, min = 2.0, max = 5.0 }
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }
