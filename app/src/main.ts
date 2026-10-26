@@ -22,13 +22,13 @@ import {
   type TransportInput,
   type TransportOutput,
 } from "./generationClient";
-import { baseName, meshRegionNames, type InputFiles } from "./inputFiles";
+import { meshRegionNames, type InputFiles } from "./inputFiles";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
 import { NetworkViewer, PRESSURE_ARRAY, type ColorArray, type FractureLayer } from "./viewer";
-import { tomlToWorkflow, workflowToToml, type Workflow } from "./workflow";
+import { workflowToToml, type Workflow } from "./workflow";
 
 const DEFAULT_COLOR_OPTION = "cell:fracture_id";
 const PRESSURE_FILE = "pressure.vtu";
@@ -55,8 +55,6 @@ function byId<T extends HTMLElement>(id: string): T {
 const ui = {
   exampleSelect: byId<HTMLSelectElement>("example-select"),
   exampleDescription: byId<HTMLParagraphElement>("example-description"),
-  openFiles: byId<HTMLInputElement>("open-files"),
-  saveInput: byId<HTMLButtonElement>("save-input"),
   form: byId<HTMLDivElement>("form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
@@ -248,37 +246,6 @@ async function loadInput(workflow: Workflow, newFiles: InputFiles, fileName: str
   ui.exampleDescription.hidden = description === "" || activeSidebarTab !== "network";
   showStatus("");
   render();
-}
-
-// ---------------------------------------------------------------- open and save
-
-async function openFiles(fileList: File[]): Promise<void> {
-  const tomlFile = fileList.find((file) => file.name.endsWith(".toml"));
-  const findFile = async (path: string | null) => {
-    const file = path === null ? undefined : fileList.find((candidate) => candidate.name === baseName(path));
-    return file && path !== null ? { name: path, text: await file.text() } : null;
-  };
-
-  if (tomlFile) {
-    const workflow = tomlToWorkflow(await tomlFile.text());
-    const network = workflow.network;
-    ui.exampleSelect.value = "";
-    delete ui.form.dataset.example;
-    await loadInput(
-      workflow,
-      { mesh: await findFile(network.domain), userFractures: await findFile(network.userFractures) },
-      tomlFile.name,
-    );
-    return;
-  }
-  // Only data files: they replace the files of the current input
-  for (const file of fileList) {
-    if (file.name.endsWith(".vtu")) {
-      await fileHandlers.chooseMesh(file);
-    } else if (file.name.endsWith(".vtp")) {
-      await fileHandlers.chooseUserFractures(file);
-    }
-  }
 }
 
 function downloadText(name: string, text: string | Uint8Array, type = "text/plain"): void {
@@ -782,15 +749,6 @@ function bindEvents(): void {
       showStatus(errorText(error), true);
     }
   });
-  ui.openFiles.addEventListener("change", async () => {
-    try {
-      await openFiles([...(ui.openFiles.files ?? [])]);
-    } catch (error) {
-      showStatus(errorText(error), true);
-    }
-    ui.openFiles.value = "";
-  });
-  ui.saveInput.addEventListener("click", () => downloadText(inputFileName, workflowText()));
   ui.copyToml.addEventListener("click", () => void navigator.clipboard.writeText(workflowText()));
   const checkActions: Record<SidebarTab, () => Promise<void>> = {
     network: checkInput,

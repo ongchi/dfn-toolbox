@@ -84,13 +84,6 @@ try {
   const cdp = await page.createCDPSession();
   await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: downloadDir });
 
-  // The input of the field "Seed" of the network form, in the page
-  await page.evaluateOnNewDocument(() => {
-    window.seedInput = () =>
-      [...document.querySelectorAll("#form .field")]
-        .find((field) => field.querySelector(".field-label")?.textContent === "Seed")
-        .querySelector("input");
-  });
   await page.goto(url);
   await page.waitForFunction(() => document.querySelector("#example-select").options.length > 1);
   await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
@@ -138,28 +131,9 @@ try {
     );
   check(hasAllParts, "download all", `${entries.length} files: ${entries.slice(0, 6).join(", ")}…`);
 
-  // Save the workflow file, and open it again with its mesh
+  // Flow without a mesh and transport without a flow: a new example has no output
   await page.click('[data-sidebar-tab="network"]');
   await selectExample(page, "box_west_east");
-  await page.evaluate(() => {
-    const input = seedInput();
-    input.value = "777";
-    input.dispatchEvent(new Event("input"));
-  });
-  await page.click("#save-input");
-  const savedPath = await waitDownload(downloadDir, "box_west_east.toml");
-  const saved = readFileSync(savedPath, "utf8");
-  const preview = await page.$eval("#toml-preview", (node) => node.textContent);
-  check(saved === preview && saved.includes("seed = 777"), "save input", `${saved.length} characters`);
-
-  await page.select("#example-select", "");
-  const [openInput] = await page.$$("#open-files");
-  await openInput.uploadFile(savedPath, `${examplesDir}/box_west_east/box_west_east.vtu`);
-  await page.waitForFunction(() => seedInput().value === "777");
-  const meshStatus = await page.$eval(".file-status", (node) => node.textContent);
-  check(meshStatus.startsWith("box_west_east.vtu"), "open the saved workflow file", meshStatus);
-
-  // Flow without a mesh and transport without a flow: the opened input has no output
   const noMeshStatus = await runStep(page, "flow");
   check(await isStatusError(page), "flow without a mesh", noMeshStatus);
   const noFlowStatus = await runStep(page, "transport");

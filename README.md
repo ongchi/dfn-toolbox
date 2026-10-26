@@ -22,11 +22,10 @@ view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
 There is no server: `npm run build` gives a folder of static files.
 
 - The input of the three tabs is one workflow file (see "Workflow file").
-  The four workflow examples of `examples/` run the full workflow.
-  "Open files…" reads a workflow file with its mesh and fracture files
-  (select all of them; the files are found by their names). "Save input"
-  writes the workflow file of the three tabs. The app does not write the
-  input files of the `dfngen`, `fehm` and `dfntrans` binaries.
+  The four workflow examples of `examples/` run the full workflow. The
+  TOML tab shows the workflow file of the three tabs, and "Download all"
+  has it. The app does not write the input files of the `dfngen`, `fehm`
+  and `dfntrans` binaries.
 - Network tab: a form with one field for each key of `[network]`, and the
   mesh file and the user-defined fracture file. The boundary lines of the
   regions and the triangle mesh are always on (the flow needs them), thus
@@ -240,8 +239,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the full workflow of each
-  example, the single zip, the save and the open of a workflow file, the
-  flow without a mesh, the transport without a flow, a bad input and the
+  example, the single zip, the flow without a mesh, the transport without a flow, a bad input and the
   cancel; it saves screenshots.
 
 ## VTK.wasm notes

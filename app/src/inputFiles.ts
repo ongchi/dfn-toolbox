@@ -12,11 +12,6 @@ export interface InputFiles {
   userFractures: InputFile | null;
 }
 
-/** Last part of a path ("../box.vtu" -> "box.vtu") */
-export function baseName(path: string): string {
-  return path.split(/[\\/]/).pop() ?? path;
-}
-
 /** Names of the regions of a mesh: the cell data arrays `region__<name>` */
 export function meshRegionNames(vtuText: string): string[] {
   const document = new DOMParser().parseFromString(vtuText, "application/xml");
