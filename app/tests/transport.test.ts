@@ -78,8 +78,6 @@ const TRANSPORT_TOLERANCE = "1e-5";
 
 test("the output files agree with the native binary of dfntrans", () => {
   const state = transportState(ROLES);
-  state.controlSurfaces.shape = "plane";
-  state.controlSurfaces.axis = "y";
   state.hasTrajectories = true;
   const toml = transportToLibraryToml(state);
   const result = run_transport(toml, flowToml, mesh, 1);

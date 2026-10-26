@@ -98,9 +98,6 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfntrans.ParticleCount": () => "The number of particles (Transport tab, Seeding) must be 1 or more.",
   "dfntrans.MatrixPorosity": () => "Matrix porosity (Transport tab) must be above 0 and at most 1.",
   "dfntrans.MatrixDiffusivity": () => "Matrix diffusivity (Transport tab) must be above 0.",
-  "dfntrans.ControlPlaneSpacing": () => "Spacing (Transport tab, Control planes) must be above 0.",
-  "dfntrans.WellControlSurface": () =>
-    "Spacing and Length to well (Transport tab, Control planes) must be above 0, and Well thickness 0 or more.",
   "dfntrans.EmptyInflowOutflow": () =>
     "The in-flow or the out-flow boundary (Transport tab) has no point in the network. Choose other boundaries.",
   "dfntrans.UnknownBoundary": (f) =>

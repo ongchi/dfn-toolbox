@@ -143,8 +143,7 @@ inflow = ["west"]
 outflow = ["east"]
 routing = "complete_mixing"
 [transport.seeding]
-[transport.tdrw]                   # optional
-[transport.control_planes]         # optional
+[transport.tdrw]                   # optional; no [transport.control_planes]
 [transport.output]
 ```
 

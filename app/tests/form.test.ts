@@ -105,6 +105,14 @@ test("[network.region_boundaries] is an error: the boundary lines are always on 
   expect(problemsOf(toml)).toEqual(["[network]: `region_boundaries` is an unknown key"]);
 });
 
+test("[transport.control_planes] is an error: the transport has no control planes", () => {
+  const toml = BOX.replace(
+    "[transport.output]",
+    '[transport.control_planes]\nshape = "plane"\ndirection = "x"\nspacing = 1.0\n\n[transport.output]',
+  );
+  expect(problemsOf(toml)).toEqual(["[transport]: `control_planes` is an unknown key"]);
+});
+
 test("a family without aperture is an error", () => {
   const toml = BOX.replace(/^aperture = .*$/m, "");
   expect(problemsOf(toml)).toEqual(["network family 1: `aperture` is missing"]);

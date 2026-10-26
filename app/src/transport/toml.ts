@@ -5,9 +5,7 @@ import { float, integer, string, TableReader, tablesToToml, type Table, type Tom
 import {
   defaultTransportState,
   TRANSPORT_FLOW_FILE,
-  type Axis,
   type BoundaryRole,
-  type ControlSurfacesState,
   type RoutingRule,
   type SeedingMethod,
   type SeedingState,
@@ -19,7 +17,6 @@ import {
 const TIME_UNITS: readonly TimeUnit[] = ["seconds", "minutes", "hours", "days", "years"];
 const ROUTING_RULES: readonly RoutingRule[] = ["complete_mixing", "streamline_routing"];
 const SEEDING_METHODS: readonly SeedingMethod[] = ["uniform_per_line", "equidistant", "random", "flux_weighted", "at_nodes"];
-const AXES: readonly Axis[] = ["x", "y", "z"];
 
 function boundaryNames(state: TransportState, role: BoundaryRole): string {
   const names = state.boundaries.filter((boundary) => boundary.role === role).map((boundary) => string(boundary.name));
@@ -43,19 +40,6 @@ function seedingLines(seeding: SeedingState): string[] {
       break;
   }
   return lines;
-}
-
-function controlSurfacesLines(control: ControlSurfacesState): string[] {
-  if (control.shape === "plane") {
-    return [`shape = "plane"`, `direction = ${string(control.axis)}`, `spacing = ${float(control.spacing)}`];
-  }
-  return [
-    `shape = "cylinder"`,
-    `axis = ${string(control.axis)}`,
-    `spacing = ${float(control.spacing)}`,
-    `length_to_well = ${float(control.lengthToWell)}`,
-    `well_thickness = ${float(control.wellThickness)}`,
-  ];
 }
 
 /** The tables of `[transport]` of the workflow file */
@@ -87,9 +71,6 @@ export function transportTables(state: TransportState): TomlTable[] {
         `matrix_diffusivity = ${float(diffusion.matrixDiffusivity)}`,
       ],
     });
-  }
-  if (state.controlSurfaces.shape !== "none") {
-    tables.push({ name: "control_planes", isArray: false, lines: controlSurfacesLines(state.controlSurfaces) });
   }
   tables.push({
     name: "output",
@@ -132,27 +113,6 @@ function readSeeding(table: Table, problems: string[]): SeedingState {
   return seeding;
 }
 
-function readControlSurfaces(reader: TableReader, problems: string[]): ControlSurfacesState {
-  const control = defaultTransportState().controlSurfaces;
-  if (!reader.has("control_planes")) {
-    return control;
-  }
-  const controlReader = new TableReader(reader.subTable("control_planes"), "[transport.control_planes]", problems);
-  const shape = controlReader.choice("shape", ["plane", "cylinder"] as const, "plane");
-  control.shape = shape;
-  if (shape === "plane") {
-    control.axis = controlReader.choice("direction", AXES, control.axis);
-    control.spacing = controlReader.float("spacing", control.spacing);
-  } else {
-    control.axis = controlReader.choice("axis", AXES, control.axis);
-    control.spacing = controlReader.float("spacing", control.spacing);
-    control.lengthToWell = controlReader.float("length_to_well", control.lengthToWell);
-    control.wellThickness = controlReader.float("well_thickness", control.wellThickness);
-  }
-  controlReader.checkUnknownKeys();
-  return control;
-}
-
 /**
  * Reads `[transport]` of the workflow file. The boundaries are the names of
  * `inflow` and `outflow`; the mesh of the generation adds its other boundaries.
@@ -184,7 +144,6 @@ export function readTransport(table: Table, problems: string[]): TransportState 
     boundaries,
     seeding: readSeeding(reader.subTable("seeding"), problems),
     matrixDiffusion: diffusion,
-    controlSurfaces: readControlSurfaces(reader, problems),
     hasTrajectories: outputReader.boolean("trajectories", defaults.hasTrajectories),
     hasAllParticles: outputReader.boolean("all_particles", defaults.hasAllParticles),
     hasVelocities: outputReader.boolean("velocities", defaults.hasVelocities),

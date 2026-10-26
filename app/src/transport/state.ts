@@ -9,8 +9,6 @@ export const TRANSPORT_FLOW_FILE = "flow.toml";
 export type TimeUnit = "seconds" | "minutes" | "hours" | "days" | "years";
 export type RoutingRule = "complete_mixing" | "streamline_routing";
 export type SeedingMethod = "uniform_per_line" | "equidistant" | "random" | "flux_weighted" | "at_nodes";
-export type Axis = "x" | "y" | "z";
-export type ControlShape = "none" | "plane" | "cylinder";
 export type BoundaryRole = "none" | "inflow" | "outflow";
 
 export interface TransportBoundaryState {
@@ -40,19 +38,6 @@ export interface MatrixDiffusionState {
   matrixDiffusivity: number;
 }
 
-/** The keys of both shapes; the TOML has only the keys of `shape` */
-export interface ControlSurfacesState {
-  shape: ControlShape;
-  /** plane: `direction`; cylinder: `axis` */
-  axis: Axis;
-  /** m */
-  spacing: number;
-  /** m, cylinder */
-  lengthToWell: number;
-  /** m, cylinder */
-  wellThickness: number;
-}
-
 export interface TransportState {
   /** 0 = a random seed for each run */
   seed: number;
@@ -64,7 +49,6 @@ export interface TransportState {
   boundaries: TransportBoundaryState[];
   seeding: SeedingState;
   matrixDiffusion: MatrixDiffusionState;
-  controlSurfaces: ControlSurfacesState;
   hasTrajectories: boolean;
   hasAllParticles: boolean;
   hasVelocities: boolean;
@@ -86,7 +70,6 @@ export function defaultTransportState(): TransportState {
       particlesPerNode: 1,
     },
     matrixDiffusion: { isUsed: false, matrixPorosity: 0.02, matrixDiffusivity: 1e-13 },
-    controlSurfaces: { shape: "none", axis: "x", spacing: 1.0, lengthToWell: 10.0, wellThickness: 0.5 },
     hasTrajectories: false,
     hasAllParticles: false,
     hasVelocities: false,

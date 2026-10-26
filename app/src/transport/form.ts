@@ -1,13 +1,7 @@
 // The transport form: one field for each key of the dfntrans input file.
 import type { FormContext } from "../form/context";
 import { checkboxField, element, numberField, row, section, selectField } from "../form/fields";
-import type { Axis, BoundaryRole, ControlShape, RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
-
-const AXIS_CHOICES: [Axis, string][] = [
-  ["x", "x"],
-  ["y", "y"],
-  ["z", "z"],
-];
+import type { BoundaryRole, RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
 
 function generalSection(state: TransportState, context: FormContext): HTMLElement {
   return section(
@@ -255,89 +249,6 @@ function matrixDiffusionSection(state: TransportState, context: FormContext): HT
   );
 }
 
-function controlSurfacesSection(state: TransportState, context: FormContext): HTMLElement {
-  const control = state.controlSurfaces;
-  const container = section(
-    "Control planes",
-    selectField<ControlShape>({
-      label: "Shape",
-      key: "shape",
-      help: "the particles are recorded where they cross a plane or a cylinder",
-      value: control.shape,
-      choices: [
-        ["none", "none"],
-        ["plane", "planes"],
-        ["cylinder", "cylinders"],
-      ],
-      onInput: (value) => {
-        control.shape = value;
-        context.rerender();
-      },
-    }),
-  );
-  if (control.shape === "none") {
-    return container;
-  }
-  const isPlane = control.shape === "plane";
-  container.append(
-    row(
-      selectField<Axis>({
-        label: isPlane ? "Direction" : "Axis",
-        key: isPlane ? "direction" : "axis",
-        help: isPlane ? "the planes are normal to this axis" : "the cylinders are about the line through the origin",
-        value: control.axis,
-        choices: AXIS_CHOICES,
-        onInput: (value) => {
-          control.axis = value;
-          context.changed();
-        },
-      }),
-      numberField({
-        label: "Spacing (m)",
-        key: "spacing",
-        help: "above 0",
-        value: control.spacing,
-        min: 0,
-        isMinExclusive: true,
-        onInput: (value) => {
-          control.spacing = value;
-          context.changed();
-        },
-      }),
-    ),
-  );
-  if (!isPlane) {
-    container.append(
-      row(
-        numberField({
-          label: "Length to well (m)",
-          key: "length_to_well",
-          help: "radius of the outer cylinder; above 0",
-          value: control.lengthToWell,
-          min: 0,
-          isMinExclusive: true,
-          onInput: (value) => {
-            control.lengthToWell = value;
-            context.changed();
-          },
-        }),
-        numberField({
-          label: "Well thickness (m)",
-          key: "well_thickness",
-          help: "the cylinders stop at the radius well_thickness / 2; 0 or more",
-          value: control.wellThickness,
-          min: 0,
-          onInput: (value) => {
-            control.wellThickness = value;
-            context.changed();
-          },
-        }),
-      ),
-    );
-  }
-  return container;
-}
-
 function outputSection(state: TransportState, context: FormContext): HTMLElement {
   return section(
     "Output",
@@ -397,7 +308,6 @@ export function renderTransportForm(
     boundariesSection(state, context),
     seedingSection(state, context),
     matrixDiffusionSection(state, context),
-    controlSurfacesSection(state, context),
     outputSection(state, context),
   );
   container.scrollTop = scrollTop;
