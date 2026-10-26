@@ -28,6 +28,12 @@ const ARRAY_ACCESS_BY_NAME = 1;
 // The default of vtkScalarBarActor, and 6 significant digits for the pressure
 const DEFAULT_LABEL_FORMAT = "%-#6.3g";
 const PRESSURE_LABEL_FORMAT = "%-#.6g";
+// The text of the scalar bar has the size of the text of the page (`:root` of style.css),
+// in CSS pixels; the bar is at most this wide
+const SCALAR_BAR_FONT_SIZE = 14;
+const SCALAR_BAR_WIDTH = 110;
+// CSS pixels between the title and the bar
+const SCALAR_BAR_TITLE_SPACE = 8;
 
 // The trajectories: tube radius relative to the diagonal of their bounds,
 // cone height relative to the tube radius, and the number of cones (for
@@ -67,25 +73,35 @@ export class NetworkViewer {
   private trajectoryActors: vtkActor[] = [];
   private domainActor: vtkActor | null = null;
   private colorArray: ColorArray | null = null;
+  private readonly canvas: HTMLCanvasElement;
 
   private constructor(
     session: StandaloneSession,
     renderer: vtkRenderer,
     window: vtkWebAssemblyOpenGLRenderWindow,
+    canvas: HTMLCanvasElement,
   ) {
+    this.canvas = canvas;
     this.vtk = session.vtk;
     this.renderer = renderer;
     this.window = window;
     this.lookupTable = this.vtk.vtkLookupTable();
     this.lookupTable.setHueRange(0.667, 0.0);
     this.lookupTable.build();
-    this.scalarBar =this.vtk.vtkScalarBarActor();
+    this.scalarBar = this.vtk.vtkScalarBarActor();
     this.scalarBar.setLookupTable(this.lookupTable);
     this.scalarBar.setNumberOfLabels(5);
-    this.scalarBar.setMaximumWidthInPixels(90);
-    // The default text is white, and the background is white
-    this.scalarBar.getTitleTextProperty().setColor(0.1, 0.1, 0.1);
-    this.scalarBar.getLabelTextProperty().setColor(0.1, 0.1, 0.1);
+    // A fixed font size, as the text of the page; the default scales the text with the bar
+    this.scalarBar.setUnconstrainedFontSize(true);
+    // The default text is white, bold, italic and with a shadow; the background is white
+    for (const text of [this.scalarBar.getTitleTextProperty(), this.scalarBar.getLabelTextProperty()]) {
+      text.setColor(0.1, 0.1, 0.1);
+      text.setFontFamilyToArial();
+      text.setItalic(0);
+      text.setShadow(0);
+      text.setBold(0);
+    }
+    this.scalarBar.getTitleTextProperty().setBold(1);
     this.scalarBar.setVisibility(0);
     this.renderer.addViewProp(this.scalarBar);
   }
@@ -106,7 +122,7 @@ export class NetworkViewer {
     await window.render();
     interactor.start();
 
-    return new NetworkViewer(session, renderer, window);
+    return new NetworkViewer(session, renderer, window, canvas);
   }
 
   /** Shows the domain mesh (text of an ASCII .vtu file) as a wireframe. */
@@ -196,6 +212,12 @@ export class NetworkViewer {
 
   /** The scalar bar of the color array; the pressure has its unit and more digits */
   private updateScalarBar(): void {
+    // The canvas can have more pixels than CSS pixels (a high-resolution screen)
+    const pixelRatio = this.canvas.clientWidth > 0 ? this.canvas.width / this.canvas.clientWidth : 1;
+    this.scalarBar.getTitleTextProperty().setFontSize(Math.round(SCALAR_BAR_FONT_SIZE * pixelRatio));
+    this.scalarBar.getLabelTextProperty().setFontSize(Math.round(SCALAR_BAR_FONT_SIZE * pixelRatio));
+    this.scalarBar.setMaximumWidthInPixels(Math.round(SCALAR_BAR_WIDTH * pixelRatio));
+    this.scalarBar.setVerticalTitleSeparation(Math.round(SCALAR_BAR_TITLE_SPACE * pixelRatio));
     const isColored = this.colorArray !== null && this.layers.has("final");
     const isPressure =
       isColored &&
