@@ -23,6 +23,7 @@ import {
   type TransportOutput,
 } from "./generationClient";
 import { meshRegionNames, type InputFiles } from "./inputFiles";
+import { listMeshes, loadMesh } from "./meshes";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
@@ -95,6 +96,7 @@ const ui = {
 let state: FormState = defaultFormState();
 let files: InputFiles = { mesh: null, userFractures: null };
 let regionNames: string[] = [];
+let meshNames: string[] = [];
 /** The description (comment) and the file name of the workflow file */
 let description = "";
 let inputFileName = DEFAULT_INPUT_FILE;
@@ -150,15 +152,23 @@ const formContext: FormContext = {
   get regionNames() {
     return regionNames;
   },
+  get meshNames() {
+    return meshNames;
+  },
   changed: () => updateTomlPreview(),
   rerender: () => render(),
 };
 
 const fileHandlers: FileHandlers = {
-  chooseMesh: async (file) => {
-    state.domain = file.name;
-    await setMesh({ name: file.name, text: await file.text() });
-    render();
+  chooseMesh: async (name) => {
+    try {
+      const mesh = await loadMesh(name);
+      state.domain = name;
+      await setMesh(mesh);
+      render();
+    } catch (error) {
+      showStatus(errorText(error), true);
+    }
   },
   chooseUserFractures: async (file) => {
     state.userFractures = file.name;
@@ -174,12 +184,14 @@ const fileHandlers: FileHandlers = {
 
 const flowContext: FormContext = {
   regionNames: [],
+  meshNames: [],
   changed: () => updateTomlPreview(),
   rerender: () => renderFlow(),
 };
 
 const transportContext: FormContext = {
   regionNames: [],
+  meshNames: [],
   changed: () => updateTomlPreview(),
   rerender: () => renderTransport(),
 };
@@ -265,7 +277,9 @@ function generationInput(): GenerationInput | string {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
   if (files.mesh === null) {
-    return state.domain === "" ? "Choose a domain mesh file (.vtu)." : `Choose the domain mesh file ${state.domain}.`;
+    return state.domain === ""
+      ? "Choose a domain mesh."
+      : `The domain mesh ${state.domain} is not a predefined mesh. Choose a domain mesh.`;
   }
   if (state.userFractures !== null && files.userFractures === null) {
     return `Choose the user-defined fracture file ${state.userFractures}, or remove it.`;
@@ -795,9 +809,19 @@ async function fillExampleList(): Promise<void> {
   }
 }
 
+async function fillMeshList(): Promise<void> {
+  try {
+    meshNames = await listMeshes();
+    render();
+  } catch (error) {
+    showStatus(errorText(error), true);
+  }
+}
+
 bindEvents();
 render();
 renderFlow();
 renderTransport();
 void fillExampleList();
+void fillMeshList();
 void startViewer();

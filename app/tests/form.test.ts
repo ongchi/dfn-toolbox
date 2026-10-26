@@ -15,7 +15,7 @@ import { FLOW_MESH_FILE } from "../src/flow/state";
 import { InputFormError, networkToLibraryToml } from "../src/form/toml";
 import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
 import { tomlToWorkflow } from "../src/workflow";
-import { compareOutputFolders, exampleNames, initWasm, readExample, runNativeDfngen } from "./cases";
+import { compareOutputFolders, exampleNames, initWasm, meshPath, readExample, readMesh, runNativeDfngen } from "./cases";
 
 beforeAll(initWasm);
 
@@ -28,14 +28,14 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     const example = readExample(exampleName);
     const network = tomlToWorkflow(example.toml).network;
     const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
-    expect(check_input(networkToLibraryToml(network), example.readFile(network.domain), userFractures)).toBeUndefined();
+    expect(check_input(networkToLibraryToml(network), readMesh(network.domain), userFractures)).toBeUndefined();
   });
 
   test("the dfngen input of the network gives the output of the native binary", () => {
     const example = readExample(exampleName);
     const network = tomlToWorkflow(example.toml).network;
     const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
-    const result = run_generation(networkToLibraryToml(network), example.readFile(network.domain), userFractures, 1n, () => {});
+    const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFractures, 1n, () => {});
     expect(result.error).toBeUndefined();
     const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${exampleName}-`));
     for (const name of result.file_names.filter((fileName: string) => !UNCOMPARED_FILES.includes(fileName))) {
@@ -43,7 +43,7 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     }
 
     // The native binary reads the files at their full paths
-    network.domain = example.path(network.domain);
+    network.domain = meshPath(network.domain);
     network.userFractures = network.userFractures === null ? null : example.path(network.userFractures);
     const inputDir = mkdtempSync(join(tmpdir(), `dfngen-input-${exampleName}-`));
     writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network));

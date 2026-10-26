@@ -14,7 +14,7 @@ import puppeteer from "puppeteer-core";
 const url = process.argv[2] ?? "http://localhost:5173/";
 const screenshotDir = process.argv[3] ?? ".";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const examplesDir = new URL("../../examples", import.meta.url).pathname.replace(/\/$/, "");
+const meshesDir = new URL("../../meshes", import.meta.url).pathname.replace(/\/$/, "");
 const RUN_TIMEOUT = 300000;
 
 const browser = await puppeteer.launch({
@@ -139,12 +139,20 @@ try {
   const noFlowStatus = await runStep(page, "transport");
   check(await isStatusError(page), "transport without a flow", noFlowStatus);
 
-  // Bad input: a fracture file as the domain mesh gives an error of the library
+  // The domain mesh dropdown: a predefined mesh replaces the mesh of the example
+  await page.click('[data-sidebar-tab="network"]');
+  await page.select(".file-row select", "L-shape.vtu");
+  // The workflow gets the name when the mesh is loaded
+  await page.waitForFunction(() => document.querySelector("#toml-preview").textContent.includes('domain = "L-shape.vtu"'));
+  const meshLabel = await page.$eval(".file-row select", (node) => node.selectedOptions[0].textContent);
+  check(meshLabel === "L-shape", "choose a predefined mesh", meshLabel);
+
+  // Bad input: a mesh file as the user-defined fracture file gives an error of the library
   await page.click('[data-sidebar-tab="network"]');
   await selectExample(page, "box_west_east");
-  const [meshInput] = await page.$$(".file-row input[type=file]");
-  await meshInput.uploadFile(`${examplesDir}/user_fractures_stochastic/user_fracture.vtp`);
-  await page.waitForFunction(() => document.querySelector(".file-status").textContent.startsWith("user_fracture.vtp"));
+  const [fractureInput] = await page.$$(".file-row input[type=file]");
+  await fractureInput.uploadFile(`${meshesDir}/Box.vtu`);
+  await page.waitForFunction(() => document.querySelector(".file-status").textContent.startsWith("Box.vtu"));
   await page.click("#check-button");
   await waitIdle(page);
   check(await isStatusError(page), "check of a bad input", await statusText(page));

@@ -7,7 +7,7 @@
 [network]
 seed = 3
 min_feature_size = 0.4
-domain = "../box_west_east/box_west_east.vtu"
+domain = "Box.vtu"
 
 [network.generation]
 n_poly = 60

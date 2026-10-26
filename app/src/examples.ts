@@ -1,5 +1,7 @@
-// The workflow examples of ../examples (copied by build-wasm.sh).
+// The workflow examples of ../examples (copied by build-wasm.sh). The domain
+// of an example is a predefined mesh.
 import type { InputFiles } from "./inputFiles";
+import { loadMesh } from "./meshes";
 import { tomlToWorkflow, type Workflow } from "./workflow";
 
 const EXAMPLES_URL = new URL(`${import.meta.env.BASE_URL}examples/`, window.location.href);
@@ -24,7 +26,7 @@ export async function loadExample(name: string): Promise<{ workflow: Workflow; f
   const tomlUrl = new URL(`${name}/${name}.toml`, EXAMPLES_URL);
   const workflow = tomlToWorkflow(await fetchText(tomlUrl));
   const network = workflow.network;
-  const mesh = { name: network.domain, text: await fetchText(new URL(network.domain, tomlUrl)) };
+  const mesh = await loadMesh(network.domain);
   const userFractures =
     network.userFractures === null
       ? null

@@ -19,7 +19,7 @@ export function renderForm(
 ): void {
   const scrollTop = container.scrollTop;
   container.replaceChildren(
-    filesSection(state, files, fileHandlers),
+    filesSection(state, files, context, fileHandlers),
     generalSection(state, context),
     generationSection(state, context),
     framSection(state, context),

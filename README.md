@@ -26,8 +26,9 @@ There is no server: `npm run build` gives a folder of static files.
   TOML tab shows the workflow file of the three tabs, and "Download all"
   has it. The app does not write the input files of the `dfngen`, `fehm`
   and `dfntrans` binaries.
-- Network tab: a form with one field for each key of `[network]`, and the
-  mesh file and the user-defined fracture file. The boundary lines of the
+- Network tab: a form with one field for each key of `[network]`: the domain mesh is
+  one of the predefined meshes of `meshes/` (a dropdown), and the
+  user-defined fracture file is a file of the user. The boundary lines of the
   regions and the triangle mesh are always on (the flow needs them), thus
   each family needs an aperture.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
@@ -85,7 +86,7 @@ the dfntrans input on that flow.
 [network]                          # the dfngen input (see "Input file" in ../dfngen-rs/README.md)
 seed = 12345
 min_feature_size = 0.4
-domain = "box_west_east.vtu"
+domain = "Box.vtu"       # the name of a predefined mesh (`meshes/`)
 user_fractures = "fractures.vtp"   # optional
 [network.generation]               # as [generation]
 [network.fram]                     # as [fram]; optional
@@ -124,8 +125,10 @@ the mesh of the generation.
 ## Examples
 
 `examples/` has one folder for each example, with its workflow file
-`<name>.toml`, its domain mesh and its fracture file (ASCII files, written
-by hand). The in-flow and out-flow boundaries are boundary surfaces of the
+`<name>.toml` and its fracture file (ASCII files, written by hand). Its
+domain mesh is a predefined mesh of `meshes/` (`Box.vtu`,
+`L-shape.vtu`; written by hand); a new `.vtu` file there is a new item of
+the dropdown, with its file name without `.vtu` ("Box", "L-shape"). The in-flow and out-flow boundaries are boundary surfaces of the
 domain mesh: surface cells (quads) with the cell data arrays
 `boundary__<name>` (see "Domain mesh" in ../dfngen-rs/README.md). Where a
 fracture crosses such a face, its boundary line gets the name, thus it is a
@@ -134,9 +137,9 @@ and only its families have a `region`.
 
 | Example | Content |
 |---|---|
-| `box_west_east` | A cube of 10 m (`box_west_east.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
+| `box_west_east` | A cube of 10 m (`Box.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
 | `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
-| `l_shape_north_east` | An L-shaped domain of 4 boxes (`l_shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
+| `l_shape_north_east` | An L-shaped domain of 4 boxes (`L-shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
 | `user_fractures_stochastic` | The same cube, a large user-defined fracture from west to east with a larger aperture, a stochastic family, and matrix diffusion. |
 
 The seeds of the examples give a network which connects the in-flow and
@@ -151,6 +154,7 @@ intersection outside the mesh), and "Solve flow" reports it.
 |---|---|
 | `dfn-wasm` | Rust crate: `wasm-bindgen` functions of the libraries: `generation.rs` (`input_file_names`, `check_input`, `run_generation`), `flow.rs` (`check_flow_input`, `run_flow`) and `transport.rs` (`check_transport_input`, `run_transport`). Not a member of a workspace. |
 | `examples` | The workflow examples (see "Examples"); `build-wasm.sh` copies them into `app/public/examples`. |
+| `meshes` | The predefined domain meshes (see "Examples"); `build-wasm.sh` copies them into `app/public/meshes`, with `index.json`. |
 | `app` | Vite + TypeScript front end. |
 | `app/src/workflow.ts` | The workflow file: reading (strict) and writing of the three sections. |
 | `app/src/form` | The network form. `state.ts` has the form state, `toml.ts` the conversion between `[network]` and the state, the dfngen input, and the TOML helpers; one file for each section. |
@@ -239,8 +243,8 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the full workflow of each
-  example, the single zip, the flow without a mesh, the transport without a flow, a bad input and the
-  cancel; it saves screenshots.
+  example, the single zip, the flow without a mesh, the transport without
+  a flow, the choice of a predefined mesh, a bad input and the cancel; it saves screenshots.
 
 ## VTK.wasm notes
 

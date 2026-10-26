@@ -3,6 +3,7 @@ dist/
 # Made by ../build-wasm.sh
 src/pkg/
 public/examples/
+public/meshes/
 # Made by ../fetch-vtk.sh
 public/vtk/
 src/vtk-wasm.gen.d.ts

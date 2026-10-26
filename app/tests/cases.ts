@@ -55,6 +55,17 @@ export function readCase(caseName: string, toml?: string): CaseFiles {
   };
 }
 
+// The predefined domain meshes of dfn-web (../meshes): the `domain` of a workflow names one
+const meshesDir = resolve(appDir, "../meshes");
+
+export function meshPath(name: string): string {
+  return join(meshesDir, name);
+}
+
+export function readMesh(name: string): string {
+  return readFileSync(meshPath(name), "utf8");
+}
+
 // The workflow examples of dfn-web (../examples)
 const examplesDir = resolve(appDir, "../examples");
 
@@ -87,7 +98,7 @@ export function generateExample(exampleName: string): { workflow: Workflow; mesh
   const workflow = tomlToWorkflow(example.toml);
   const network = workflow.network;
   const userFractures = network.userFractures === null ? undefined : example.readFile(network.userFractures);
-  const result = run_generation(networkToLibraryToml(network), example.readFile(network.domain), userFractures, 1n, () => {});
+  const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFractures, 1n, () => {});
   if (result.error !== undefined) {
     throw new Error(`the generation of ${exampleName} failed: ${result.error}`);
   }

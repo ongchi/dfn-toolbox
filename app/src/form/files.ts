@@ -1,9 +1,11 @@
 import type { InputFile, InputFiles } from "../inputFiles";
+import type { FormContext } from "./context";
 import { element, helpText, section } from "./fields";
 import type { FormState } from "./state";
 
 export interface FileHandlers {
-  chooseMesh(file: File): void;
+  /** The name of a predefined domain mesh */
+  chooseMesh(name: string): void;
   chooseUserFractures(file: File): void;
   removeUserFractures(): void;
 }
@@ -21,6 +23,28 @@ function fileButton(label: string, accept: string, onChoose: (file: File) => voi
   });
   button.append(input);
   return button;
+}
+
+/** The name of a predefined mesh in the form: its file name without `.vtu` */
+function meshLabel(fileName: string): string {
+  return fileName.replace(/\.vtu$/, "");
+}
+
+/** The predefined domain meshes; a name which is not one of them is shown as not available */
+function meshSelect(selected: string, meshNames: string[], onChoose: (name: string) => void): HTMLElement {
+  const select = element("select");
+  const names = selected === "" || meshNames.includes(selected) ? meshNames : [...meshNames, selected];
+  select.append(new Option("Choose…", ""));
+  for (const name of names) {
+    select.append(new Option(meshNames.includes(name) ? meshLabel(name) : `${meshLabel(name)} (not available)`, name));
+  }
+  select.value = selected;
+  select.addEventListener("change", () => {
+    if (select.value !== "") {
+      onChoose(select.value);
+    }
+  });
+  return select;
 }
 
 function sizeText(file: InputFile): string {
@@ -59,7 +83,21 @@ function fileRow(options: {
   return container;
 }
 
-export function filesSection(state: FormState, files: InputFiles, handlers: FileHandlers): HTMLElement {
+/** The domain mesh: the dropdown of the predefined meshes shows the selected one */
+function meshRow(selected: string, meshNames: string[], onChoose: (name: string) => void): HTMLElement {
+  const container = element("div", "file-row");
+  const header = element("div", "file-row-header");
+  header.append(element("span", "field-label", "Domain mesh"), meshSelect(selected, meshNames, onChoose));
+  container.append(header);
+  return container;
+}
+
+export function filesSection(
+  state: FormState,
+  files: InputFiles,
+  context: FormContext,
+  handlers: FileHandlers,
+): HTMLElement {
   const fractureButtons = [fileButton("Choose…", ".vtp", handlers.chooseUserFractures)];
   if (state.userFractures !== null) {
     const removeButton = element("button", "button-small", "Remove");
@@ -69,14 +107,7 @@ export function filesSection(state: FormState, files: InputFiles, handlers: File
   }
   return section(
     "Input files",
-    fileRow({
-      label: "Domain mesh",
-      key: "domain",
-      name: state.domain === "" ? null : state.domain,
-      file: files.mesh,
-      help: "ASCII .vtu; volume cell types 10 to 14, `region__<name>` cell arrays are regions; surface cell types 5 and 9, `boundary__<name>` cell arrays are boundary surfaces",
-      buttons: [fileButton("Choose…", ".vtu", handlers.chooseMesh)],
-    }),
+    meshRow(state.domain, context.meshNames, handlers.chooseMesh),
     fileRow({
       label: "User-defined fractures",
       key: "user_fractures",

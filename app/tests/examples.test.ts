@@ -1,5 +1,6 @@
 // The workflow examples of ../examples in WebAssembly: each one is a valid
 // workflow file and runs the full workflow (network, flow and transport).
+import { existsSync } from "node:fs";
 import { beforeAll, describe, expect, test } from "vitest";
 import { FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
@@ -8,7 +9,7 @@ import { run_flow, run_generation, run_transport, type FlowResult, type Transpor
 import { updateTransportBoundaries } from "../src/transport/state";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "../src/workflow";
-import { exampleNames, initWasm, readExample } from "./cases";
+import { exampleNames, initWasm, meshPath, readExample, readMesh } from "./cases";
 
 // Milliseconds: the network, the flow and the transport of an example
 const WORKFLOW_TIMEOUT = 60000;
@@ -33,7 +34,7 @@ describe.each(exampleNames)("%s", (exampleName) => {
     const network = workflow.network;
     const generation = run_generation(
       networkToLibraryToml(network),
-      example.readFile(network.domain),
+      readMesh(network.domain),
       network.userFractures === null ? undefined : example.readFile(network.userFractures),
       1n,
       () => {},
@@ -49,6 +50,10 @@ describe.each(exampleNames)("%s", (exampleName) => {
     updateTransportBoundaries(workflow.transport, boundaryNames);
     transport = run_transport(transportToLibraryToml(workflow.transport), flowToml, mesh, 1);
   }, WORKFLOW_TIMEOUT);
+
+  test("the domain is a predefined mesh", () => {
+    expect(existsSync(meshPath(workflow.network.domain))).toBe(true);
+  });
 
   test("the workflow file is read again into the same state", () => {
     const original = tomlToWorkflow(readExample(exampleName).toml);
