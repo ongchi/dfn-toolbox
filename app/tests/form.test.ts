@@ -89,9 +89,9 @@ test("enable in [network.mesh] is an error: the mesh is always on", () => {
   expect(problemsOf(toml)).toEqual(["[network.mesh]: `enable` is an unknown key"]);
 });
 
-test("enable in [network.region_boundaries] is an error: the boundary lines are always on", () => {
-  const toml = BOX.replace("[network.region_boundaries]", "[network.region_boundaries]\nenable = true");
-  expect(problemsOf(toml)).toEqual(["[network.region_boundaries]: `enable` is an unknown key"]);
+test("[network.region_boundaries] is an error: the boundary lines are always on and have no key", () => {
+  const toml = BOX.replace("[network.mesh]", "[network.region_boundaries]\nenable = true\n\n[network.mesh]");
+  expect(problemsOf(toml)).toEqual(["[network]: `region_boundaries` is an unknown key"]);
 });
 
 test("a family without aperture is an error", () => {

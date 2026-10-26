@@ -90,9 +90,7 @@ domain = "box_west_east.vtu"
 user_fractures = "fractures.vtp"   # optional
 [network.generation]               # as [generation]
 [network.fram]                     # as [fram]; optional
-[network.region_boundaries]        # optional
-use_family_region = true           # no `enable`: always on
-[network.mesh]                     # optional
+[network.mesh]                     # optional; no [network.region_boundaries]: the boundary lines are always on
 max_size_factor = 5.0              # no `enable`: always on
 slope = 0.5
 user_fracture_aperture = { distribution = "constant", value = 3e-4 }   # necessary with user_fractures
@@ -139,7 +137,7 @@ and only its families have a `region`.
 |---|---|
 | `box_west_east` | A cube of 10 m (`box_west_east.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
 | `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
-| `l_shape_north_east` | An L-shaped domain of 4 boxes (`l_shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region, with `use_family_region = false` (the fractures connect the regions); flow with gravity and particles from north to east. |
+| `l_shape_north_east` | An L-shaped domain of 4 boxes (`l_shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
 | `user_fractures_stochastic` | The same cube, a large user-defined fracture from west to east with a larger aperture, a stochastic family, and matrix diffusion. |
 
 The seeds of the examples give a network which connects the in-flow and

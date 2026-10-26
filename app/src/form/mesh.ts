@@ -1,6 +1,6 @@
 import { optionalApertureFields } from "./aperture";
 import type { FormContext } from "./context";
-import { checkboxField, element, numberField, row, section } from "./fields";
+import { element, numberField, row, section } from "./fields";
 import type { FormState } from "./state";
 
 /** The boundary lines and the mesh are always on: the flow needs them */
@@ -13,16 +13,6 @@ export function meshSection(state: FormState, context: FormContext): HTMLElement
       "form-note",
       "The generation always writes the boundary lines of the regions (fracture_boundaries.vtp) and the triangle mesh of the final fractures (dfn_mesh.vtu). The boundary lines give the boundaries of the flow.",
     ),
-    checkboxField({
-      label: "Use the family region",
-      key: "use_family_region",
-      help: "off = the lines of each stochastic fracture are at the mesh surface, also if its family has a region",
-      value: state.regionBoundaries.useFamilyRegion,
-      onInput: (value) => {
-        state.regionBoundaries.useFamilyRegion = value;
-        context.changed();
-      },
-    }),
     row(
       numberField({
         label: "Maximum size factor",

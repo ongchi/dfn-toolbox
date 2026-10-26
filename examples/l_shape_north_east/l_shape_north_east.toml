@@ -4,10 +4,10 @@
 # east_box and other_boxes (the middle and the north box). The end face of
 # the north box (y = 30) is the boundary surface north, the end face of the
 # east box (x = 25) the boundary surface east. One family in each region:
-# the region gives the fracture centers, and with use_family_region = false
-# the fractures are cut only at the mesh surface, thus they connect the
-# regions. The flow goes through the L from north (10.1 MPa) to east
-# (10.0 MPa), with gravity; the particles leave at east.
+# the region gives only the fracture centers. The fractures are cut only at
+# the mesh surface, thus they connect the regions. The flow goes through
+# the L from north (10.1 MPa) to east (10.0 MPa), with gravity; the
+# particles leave at east.
 
 [network]
 seed = 376
@@ -26,9 +26,6 @@ triple_intersections = true
 check_user_fractures = false
 write_rejected_fractures = false
 rejects_per_fracture = 10
-
-[network.region_boundaries]
-use_family_region = false
 
 [network.mesh]
 max_size_factor = 5.0

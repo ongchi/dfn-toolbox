@@ -24,9 +24,6 @@ check_user_fractures = false
 write_rejected_fractures = false
 rejects_per_fracture = 10
 
-[network.region_boundaries]
-use_family_region = true
-
 [network.mesh]
 max_size_factor = 5.0
 slope = 0.5

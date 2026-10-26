@@ -22,11 +22,6 @@ export interface FramState {
   rejectsPerFracture: number;
 }
 
-/** Always on: the boundary lines give the boundaries of the flow */
-export interface RegionBoundariesState {
-  useFamilyRegion: boolean;
-}
-
 export type ApertureState =
   | { distribution: "constant"; value: number }
   | { distribution: "log_normal"; logMean: number; sd: number }
@@ -96,7 +91,6 @@ export interface FormState {
   userFractures: string | null;
   generation: GenerationState;
   fram: FramState;
-  regionBoundaries: RegionBoundariesState;
   mesh: MeshState;
   clusters: ClustersState;
   families: FamilyState[];
@@ -116,11 +110,6 @@ export const FRAM_DEFAULTS: FramState = {
   checkUserFractures: false,
   writeRejectedFractures: false,
   rejectsPerFracture: 10,
-};
-
-/** Default values of `[region_boundaries]`, as in `RegionBoundariesSection::default` */
-export const REGION_BOUNDARIES_DEFAULTS: RegionBoundariesState = {
-  useFamilyRegion: true,
 };
 
 /** Default values of `[mesh]`, as in `MeshSection::default` */
@@ -178,7 +167,6 @@ export function defaultFormState(): FormState {
     userFractures: null,
     generation: { stopCondition: "n_poly", nPoly: 100, forceLargeFractures: false, removeFracturesLessThan: 0.0 },
     fram: { ...FRAM_DEFAULTS, enable: true },
-    regionBoundaries: { ...REGION_BOUNDARIES_DEFAULTS },
     mesh: { ...MESH_DEFAULTS },
     clusters: { keepOnlyLargest: false, keepIsolatedFractures: false },
     families: [defaultFamily()],

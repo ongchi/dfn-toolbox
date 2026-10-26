@@ -12,7 +12,6 @@ import {
   FRAM_DEFAULTS,
   MESH_DEFAULTS,
   ORIENTATION_KEYS,
-  REGION_BOUNDARIES_DEFAULTS,
   defaultAperture,
   defaultFamily,
   type ApertureState,
@@ -182,12 +181,6 @@ export function networkTables(state: FormState): TomlTable[] {
     });
   }
 
-  tables.push({
-    name: "region_boundaries",
-    isArray: false,
-    lines: [`use_family_region = ${state.regionBoundaries.useFamilyRegion}`],
-  });
-
   const mesh = state.mesh;
   const meshLines = [`max_size_factor = ${float(mesh.maxSizeFactor)}`, `slope = ${float(mesh.slope)}`];
   if (mesh.userFractureAperture !== null) {
@@ -210,13 +203,16 @@ export function networkTables(state: FormState): TomlTable[] {
   return tables;
 }
 
-/** Sections which are always on in dfn-web; the dfngen input needs `enable = true` */
-const ALWAYS_ON_SECTIONS = new Set(["region_boundaries", "mesh"]);
+/**
+ * The boundary lines are always on in dfn-web and have no other key, thus
+ * the workflow file has no section for them; the dfngen input needs it
+ */
+const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray: false, lines: ["enable = true"] };
 
-/** The dfngen input file of the network */
+/** The dfngen input file of the network; the mesh is always on in dfn-web */
 export function networkToLibraryToml(state: FormState): string {
-  const tables = networkTables(state).map((table) =>
-    ALWAYS_ON_SECTIONS.has(table.name) ? { ...table, lines: ["enable = true", ...table.lines] } : table,
+  const tables = networkTables(state).flatMap((table) =>
+    table.name === "mesh" ? [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }] : [table],
   );
   return tablesToToml(tables, "");
 }
@@ -555,20 +551,6 @@ export function readNetwork(table: Table, problems: string[]): FormState {
   };
   framReader.checkUnknownKeys();
 
-  const regionBoundariesReader = new TableReader(
-    reader.subTable("region_boundaries", true),
-    "[network.region_boundaries]",
-    problems,
-  );
-  const regionBoundaries = {
-    useFamilyRegion: regionBoundariesReader.boolean(
-      "use_family_region",
-      REGION_BOUNDARIES_DEFAULTS.useFamilyRegion,
-      true,
-    ),
-  };
-  regionBoundariesReader.checkUnknownKeys();
-
   const meshReader = new TableReader(reader.subTable("mesh", true), "[network.mesh]", problems);
   const mesh = {
     maxSizeFactor: meshReader.optionalFloat("max_size_factor") ?? MESH_DEFAULTS.maxSizeFactor,
@@ -602,7 +584,6 @@ export function readNetwork(table: Table, problems: string[]): FormState {
     userFractures: reader.optionalString("user_fractures"),
     generation,
     fram,
-    regionBoundaries,
     mesh,
     clusters,
     families,
