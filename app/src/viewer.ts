@@ -40,6 +40,15 @@ const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
 
 export type FractureLayer = "final" | "removed" | "rejected";
 
+/** A data array of the triangle mesh of the final fractures, with one component */
+export interface ColorArray {
+  name: string;
+  association: "cell" | "point";
+}
+
+/** The pressure of the flow, which `addPointArray` adds to the mesh */
+export const PRESSURE_ARRAY: ColorArray = { name: "pressure", association: "point" };
+
 interface PolyDataLayer {
   reader: vtkXMLPolyDataReader;
   mapper: vtkPolyDataMapper;
@@ -55,11 +64,8 @@ export class NetworkViewer {
   private readonly layers = new Map<FractureLayer, PolyDataLayer>();
   /** Tubes and cones */
   private trajectoryActors: vtkActor[] = [];
-  private readonly pressureLookupTable: vtkLookupTable;
   private domainActor: vtkActor | null = null;
-  private pressureLayer: PolyDataLayer | null = null;
-  private isPressureVisible = false;
-  private colorArrayName: string | null = null;
+  private colorArray: ColorArray | null = null;
 
   private constructor(
     session: StandaloneSession,
@@ -72,9 +78,6 @@ export class NetworkViewer {
     this.lookupTable = this.vtk.vtkLookupTable();
     this.lookupTable.setHueRange(0.667, 0.0);
     this.lookupTable.build();
-    this.pressureLookupTable = this.vtk.vtkLookupTable();
-    this.pressureLookupTable.setHueRange(0.667, 0.0);
-    this.pressureLookupTable.build();
     this.scalarBar =this.vtk.vtkScalarBarActor();
     this.scalarBar.setLookupTable(this.lookupTable);
     this.scalarBar.setNumberOfLabels(5);
@@ -163,7 +166,7 @@ export class NetworkViewer {
     this.renderer.addActor(actor);
     this.layers.set(layer, { reader, mapper, actor });
     if (layer === "final") {
-      await this.colorBy(this.colorArrayName);
+      await this.colorBy(this.colorArray);
     }
   }
 
@@ -185,99 +188,50 @@ export class NetworkViewer {
     return names;
   }
 
-  /**
-   * Shows the pressure of the flow (text of a .vtp file with the point array
-   * `pressure`), or removes the layer (null). The layer is hidden until
-   * `showPressure(true)`.
-   */
-  async setPressure(vtpText: string | null): Promise<void> {
-    if (this.pressureLayer) {
-      this.renderer.removeActor(this.pressureLayer.actor);
-      this.pressureLayer = null;
-    }
-    if (vtpText === null) {
-      this.showPressure(false);
-      return;
-    }
-    const reader = this.vtk.vtkXMLPolyDataReader();
-    reader.readFromInputStringOn();
-    reader.setInputString(vtpText);
-    await reader.update(0);
-    const pointData = reader.getOutput().getPointData();
-    const arrayIndex = [...Array(pointData.getNumberOfArrays()).keys()].find(
-      (index) => pointData.getArrayName(index) === "pressure",
-    );
-    if (arrayIndex === undefined) {
-      throw new Error("pressure.vtu has no point array pressure");
-    }
-    this.pressureLookupTable.setTableRange(pointData.getArray(arrayIndex).getRange(0));
-    const mapper = this.vtk.vtkPolyDataMapper();
-    mapper.setInputConnection(0, reader.getOutputPort(0));
-    mapper.setScalarModeToUsePointFieldData();
-    mapper.setArrayAccessMode(ARRAY_ACCESS_BY_NAME);
-    mapper.setArrayName("pressure");
-    mapper.setArrayComponent(0);
-    mapper.setLookupTable(this.pressureLookupTable);
-    mapper.setUseLookupTableScalarRange(1);
-    mapper.setScalarVisibility(1);
-    const actor = this.vtk.vtkActor({ mapper });
-    actor.getProperty().setRepresentationToSurface();
-    this.renderer.addActor(actor);
-    this.pressureLayer = { reader, mapper, actor };
-    this.showPressure(this.isPressureVisible);
-  }
-
-  /** Shows or hides the pressure layer; the scalar bar follows the visible layer */
-  showPressure(isVisible: boolean): void {
-    this.isPressureVisible = isVisible;
-    this.pressureLayer?.actor.setVisibility(isVisible ? 1 : 0);
-    this.updateScalarBar();
-  }
-
-  /** The scalar bar of the pressure when it is visible, else of the fracture color */
+  /** The scalar bar of the color array; the pressure has its unit and more digits */
   private updateScalarBar(): void {
-    if (this.isPressureVisible && this.pressureLayer) {
-      this.scalarBar.setLookupTable(this.pressureLookupTable);
-      this.scalarBar.setTitle("pressure (MPa)");
-      // The pressure differences are small against the pressure
-      this.scalarBar.setLabelFormat(PRESSURE_LABEL_FORMAT);
-      this.scalarBar.setVisibility(1);
-      return;
-    }
-    const isColored = this.colorArrayName !== null && this.layers.has("final");
-    this.scalarBar.setLookupTable(this.lookupTable);
-    this.scalarBar.setLabelFormat(DEFAULT_LABEL_FORMAT);
-    this.scalarBar.setTitle(this.colorArrayName ?? "");
+    const isColored = this.colorArray !== null && this.layers.has("final");
+    const isPressure =
+      isColored &&
+      this.colorArray?.name === PRESSURE_ARRAY.name &&
+      this.colorArray.association === PRESSURE_ARRAY.association;
+    this.scalarBar.setTitle(isPressure ? "pressure (MPa)" : (this.colorArray?.name ?? ""));
+    // The pressure differences are small against the pressure
+    this.scalarBar.setLabelFormat(isPressure ? PRESSURE_LABEL_FORMAT : DEFAULT_LABEL_FORMAT);
     this.scalarBar.setVisibility(isColored ? 1 : 0);
   }
 
-  /** Colors the triangle mesh of the final fractures by a cell data array, or with one color (null). */
-  async colorBy(arrayName: string | null): Promise<void> {
-    this.colorArrayName = arrayName;
+  /** Colors the triangle mesh of the final fractures by a data array, or with one color (null). */
+  async colorBy(colorArray: ColorArray | null): Promise<void> {
+    this.colorArray = colorArray;
     const final = this.layers.get("final");
     if (!final) {
       this.updateScalarBar();
       return;
     }
-    if (arrayName === null) {
+    if (colorArray === null) {
       final.mapper.setScalarVisibility(0);
       final.actor.getProperty().setColor(0.95, 0.75, 0.3);
       this.updateScalarBar();
       return;
     }
-    const cellData = final.reader.getOutput().getCellData();
-    const arrayIndex = [...Array(cellData.getNumberOfArrays()).keys()].find(
-      (index) => cellData.getArrayName(index) === arrayName,
-    );
+    const { name, association } = colorArray;
+    const output = final.reader.getOutput();
+    const data = association === "cell" ? output.getCellData() : output.getPointData();
+    const arrayIndex = [...Array(data.getNumberOfArrays()).keys()].find((index) => data.getArrayName(index) === name);
     if (arrayIndex === undefined) {
-      throw new Error(`dfn_mesh.vtu has no cell array ${arrayName}`);
+      throw new Error(`dfn_mesh.vtu has no ${association} array ${name}`);
     }
-    const range = cellData.getArray(arrayIndex).getRange(0);
+    const range = data.getArray(arrayIndex).getRange(0);
     // The mapper selects the array by its name; it does not set the range of
     // the lookup table, thus the range is set there
-    final.mapper.setScalarModeToUseCellFieldData();
+    if (association === "cell") {
+      final.mapper.setScalarModeToUseCellFieldData();
+    } else {
+      final.mapper.setScalarModeToUsePointFieldData();
+    }
     final.mapper.setArrayAccessMode(ARRAY_ACCESS_BY_NAME);
-    final.mapper.setArrayName(arrayName);
+    final.mapper.setArrayName(name);
     final.mapper.setArrayComponent(0);
     this.lookupTable.setTableRange(range);
     final.mapper.setLookupTable(this.lookupTable);

@@ -107,7 +107,7 @@ try {
 
     const flowStatus = await runStep(page, "flow");
     const hasFlowResults = await page.$eval("#flow-results", (node) => !node.hidden);
-    const isPressureShown = await page.$eval("#show-pressure", (node) => node.checked && !node.disabled);
+    const isPressureShown = await page.$eval("#color-select", (node) => node.value === "point:pressure");
     check(flowStatus.startsWith("Done") && hasFlowResults && isPressureShown, `${name}: flow`, flowStatus);
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow.png` });
@@ -120,8 +120,8 @@ try {
       `${name}: transport`,
       transportStatus,
     );
-    // The trajectories in the fractures: without the pressure
-    await page.click("#show-pressure");
+    // The trajectories in the fractures: colored by fracture, not by the pressure
+    await page.select("#color-select", "cell:fracture_id");
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_transport.png` });
   }

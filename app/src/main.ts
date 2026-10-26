@@ -4,7 +4,7 @@ import "./style.css";
 import { strToU8, zipSync } from "fflate";
 import { listExamples, loadExample } from "./examples";
 import { renderFlowForm } from "./flow/form";
-import { triangleGridToPolyData } from "./flow/polyData";
+import { addPointArray, triangleGridToPolyData } from "./flow/polyData";
 import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
@@ -27,11 +27,12 @@ import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
-import { NetworkViewer, type FractureLayer } from "./viewer";
+import { NetworkViewer, PRESSURE_ARRAY, type ColorArray, type FractureLayer } from "./viewer";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "./workflow";
 
-const DEFAULT_COLOR_ARRAY = "fracture_id";
+const DEFAULT_COLOR_OPTION = "cell:fracture_id";
 const PRESSURE_FILE = "pressure.vtu";
+const PRESSURE_OPTION = colorOptionValue(PRESSURE_ARRAY);
 const TRAJECTORIES_FILE = "trajectories.vtp";
 
 type SidebarTab = "network" | "flow" | "transport";
@@ -69,7 +70,6 @@ const ui = {
   showMesh: byId<HTMLInputElement>("show-mesh"),
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
-  showPressure: byId<HTMLInputElement>("show-pressure"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
@@ -507,13 +507,6 @@ function clearFlowOutput(): void {
   ui.flowResults.hidden = true;
   ui.flowLog.textContent = "";
   ui.flowLogTitle.hidden = true;
-  ui.showPressure.checked = false;
-  ui.showPressure.disabled = true;
-  if (viewer) {
-    void viewer.setPressure(null);
-    applyLayerVisibility(viewer);
-    void viewer.render();
-  }
   clearTransportOutput();
   renderTransport();
 }
@@ -645,19 +638,7 @@ async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
   ]);
   showDownloadLinks(ui.flowDownloadList, result.files);
 
-  ui.showPressure.disabled = false;
-  ui.showPressure.checked = true;
-  await showFlowInViewer();
-}
-
-async function showFlowInViewer(): Promise<void> {
-  const pressure = flowOutputFile(PRESSURE_FILE);
-  if (!viewer || pressure === null) {
-    return;
-  }
-  await viewer.setPressure(triangleGridToPolyData(pressure));
-  applyLayerVisibility(viewer);
-  await viewer.render();
+  await showOutputInViewer(PRESSURE_OPTION);
 }
 
 function volumeFluxText(volumeFlux: number): string {
@@ -692,33 +673,60 @@ async function showTransportInViewer(): Promise<void> {
   await viewer.render();
 }
 
-/** The pressure layer hides the fracture layers: they have the same surfaces */
 function applyLayerVisibility(view: NetworkViewer): void {
-  const isPressureVisible = ui.showPressure.checked && flowOutput !== null;
-  view.showPressure(isPressureVisible);
-  view.setVisible("final", !isPressureVisible && ui.showMesh.checked);
-  view.setVisible("removed", !isPressureVisible && ui.showRemoved.checked);
-  view.setVisible("rejected", !isPressureVisible && ui.showRejected.checked);
+  view.setVisible("final", ui.showMesh.checked);
+  view.setVisible("removed", ui.showRemoved.checked);
+  view.setVisible("rejected", ui.showRejected.checked);
   view.setVisible("trajectories", ui.showTrajectories.checked);
 }
 
-async function showOutputInViewer(): Promise<void> {
+/** The value of a "Color by" option: `<association>:<name>`, "" = one color */
+function colorOptionValue(colorArray: ColorArray): string {
+  return `${colorArray.association}:${colorArray.name}`;
+}
+
+/** The array of a "Color by" option value; null = one color */
+function colorArrayOf(optionValue: string): ColorArray | null {
+  const separator = optionValue.indexOf(":");
+  if (separator < 0) {
+    return null;
+  }
+  const association = optionValue.slice(0, separator) === "point" ? "point" : "cell";
+  return { name: optionValue.slice(separator + 1), association };
+}
+
+/** The triangle mesh of the final fractures, with the pressure of the flow if there is one */
+function meshWithPressure(mesh: string): string {
+  const pressure = flowOutputFile(PRESSURE_FILE);
+  return pressure === null ? mesh : addPointArray(mesh, pressure, PRESSURE_ARRAY.name);
+}
+
+/**
+ * Shows the output of the generation and the pressure of the flow. "Color
+ * by" selects `selected`; else it keeps its array if the new mesh has it;
+ * else `fracture_id`.
+ */
+async function showOutputInViewer(selected: string | null = null): Promise<void> {
   if (!viewer || !output) {
     return;
   }
   const mesh = flowMesh();
-  await viewer.setLayer("final", mesh === null ? null : triangleGridToPolyData(mesh));
+  await viewer.setLayer("final", mesh === null ? null : triangleGridToPolyData(meshWithPressure(mesh)));
   await viewer.setLayer("removed", outputFile("fractures_removed.vtp"));
   await viewer.setLayer("rejected", outputFile("fractures_rejected.vtp"));
   applyLayerVisibility(viewer);
 
   const previous = ui.colorSelect.value;
-  const names = await viewer.cellArrayNames();
-  const oneColor = new Option("One color", "");
-  ui.colorSelect.replaceChildren(oneColor, ...names.map((name) => new Option(name, name)));
-  ui.colorSelect.value = names.includes(previous) ? previous : names.includes(DEFAULT_COLOR_ARRAY) ? DEFAULT_COLOR_ARRAY : "";
+  const options = (await viewer.cellArrayNames()).map((name) => new Option(name, colorOptionValue({ name, association: "cell" })));
+  if (flowOutputFile(PRESSURE_FILE) !== null) {
+    options.push(new Option("Pressure", PRESSURE_OPTION));
+  }
+  ui.colorSelect.replaceChildren(new Option("One color", ""), ...options);
+  const values = options.map((option) => option.value);
+  ui.colorSelect.value =
+    [selected, previous, DEFAULT_COLOR_OPTION].find((value) => value !== null && values.includes(value)) ?? "";
   ui.colorSelect.disabled = false;
-  await viewer.colorBy(ui.colorSelect.value === "" ? null : ui.colorSelect.value);
+  await viewer.colorBy(colorArrayOf(ui.colorSelect.value));
   await viewer.render();
 }
 
@@ -737,7 +745,6 @@ async function startViewer(): Promise<void> {
     viewer.setVisible("domain", ui.showDomain.checked);
   }
   await showOutputInViewer();
-  await showFlowInViewer();
   await showTransportInViewer();
   viewer.resetCamera();
   await viewer.render();
@@ -801,10 +808,10 @@ function bindEvents(): void {
   ui.downloadAll.addEventListener("click", downloadAllOutput);
 
   ui.colorSelect.addEventListener("change", () =>
-    updateViewer((view) => view.colorBy(ui.colorSelect.value === "" ? null : ui.colorSelect.value)),
+    updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
   );
   ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
-  for (const checkbox of [ui.showMesh, ui.showRemoved, ui.showRejected, ui.showPressure, ui.showTrajectories]) {
+  for (const checkbox of [ui.showMesh, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));

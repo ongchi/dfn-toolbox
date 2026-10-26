@@ -47,11 +47,10 @@ There is no server: `npm run build` gives a folder of static files.
   tab. "Generate", "Solve flow" and "Track particles" run in a Web Worker;
   "Cancel" stops them.
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
-  fractures (layer "Mesh", with its edges; color by a cell array),
-  `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
-  (layer "Domain", a wireframe), and the
-  pressure of the flow (layer "Pressure"; it hides the fracture layers), the
-  particle paths (layer "Trajectories": tubes, with cones in the direction
+  fractures (layer "Mesh", with its edges; color by a cell array, or by
+  the point pressure of the flow: "Pressure", selected when the flow is
+  done), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
+  (layer "Domain", a wireframe), the particle paths (layer "Trajectories": tubes, with cones in the direction
   of the velocity at every n-th point, about 20 for each path and at most
   500); the logs; the mass flow of each
   boundary; the particle counts and the volume fluxes of the transport; each
@@ -156,7 +155,7 @@ intersection outside the mesh), and "Solve flow" reports it.
 | `app` | Vite + TypeScript front end. |
 | `app/src/workflow.ts` | The workflow file: reading (strict) and writing of the three sections. |
 | `app/src/form` | The network form. `state.ts` has the form state, `toml.ts` the conversion between `[network]` and the state, the dfngen input, and the TOML helpers; one file for each section. |
-| `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: `pressure.vtu` as PolyData for the view. |
+| `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: the pressure of `pressure.vtu` in the point data of `dfn_mesh.vtu`, and a triangle mesh as PolyData for the view. |
 | `app/src/transport` | The transport form (`state.ts`, `toml.ts`: `[transport]` and the dfntrans input, `form.ts`), and `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view. |
 | `app/src/viewer.ts` | The 3D view (VTK.wasm). |
 | `app/src/worker.ts`, `app/src/generationClient.ts` | The Web Worker of the generation, the flow and the transport, and its interface for the page. |
@@ -248,8 +247,9 @@ npm run dev & npm run e2e -- http://localhost:5173/
 ## VTK.wasm notes
 
 - The bundle has no `vtkDataSetMapper` and no geometry filter: the domain
-  mesh is shown as its cell edges (`vtkExtractEdges`), and `pressure.vtu`
-  (only triangles) is changed into PolyData text before it is read.
+  mesh is shown as its cell edges (`vtkExtractEdges`), and `dfn_mesh.vtu`
+  (only triangles; with the pressure after the flow) is changed into
+  PolyData text before it is read.
 - The XML readers read from a string (`readFromInputStringOn`,
   `setInputString`), thus the app has no VTK file parser.
 - Change VTK objects with their setter methods. An assignment to a property
