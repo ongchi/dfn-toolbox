@@ -1,13 +1,16 @@
-# L shape north -> east: an L-shaped domain (l_shape.vtu) with an east arm
-# (y 20 to 25) and a north arm (x 10 to 15, y 25 to 30). The end face of the
-# north arm (y = 30) is the boundary surface north, the end face of the east
-# arm (x = 20) the boundary surface east. The family is in the whole L: its
-# fractures are cut at the mesh surface. The flow goes through the L from
-# north (10.1 MPa) to east (10.0 MPa), with gravity; the particles leave at
-# east.
+# L shape north -> east: an L-shaped domain (l_shape.vtu) of 4 boxes: the
+# west, middle and east boxes along x (y 20 to 25), and the north box at
+# +y of the west box (x 10 to 15, y 25 to 30). The regions are west_box,
+# east_box and other_boxes (the middle and the north box). The end face of
+# the north box (y = 30) is the boundary surface north, the end face of the
+# east box (x = 25) the boundary surface east. One family in each region:
+# the region gives the fracture centers, and with use_family_region = false
+# the fractures are cut only at the mesh surface, thus they connect the
+# regions. The flow goes through the L from north (10.1 MPa) to east
+# (10.0 MPa), with gravity; the particles leave at east.
 
 [network]
-seed = 3
+seed = 376
 min_feature_size = 0.3
 domain = "l_shape.vtu"
 
@@ -25,7 +28,7 @@ write_rejected_fractures = false
 rejects_per_fracture = 10
 
 [network.region_boundaries]
-use_family_region = true
+use_family_region = false
 
 [network.mesh]
 max_size_factor = 5.0
@@ -37,8 +40,27 @@ keep_isolated_fractures = false
 
 [[network.family]]
 number_of_points = 8
-probability = 1.0
+probability = 0.3333333333333333
 aspect_ratio = 1.0
+region = "west_box"
+aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
+radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5.0 }
+orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }
+
+[[network.family]]
+number_of_points = 8
+probability = 0.3333333333333333
+aspect_ratio = 1.0
+region = "east_box"
+aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
+radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5.0 }
+orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }
+
+[[network.family]]
+number_of_points = 8
+probability = 0.3333333333333333
+aspect_ratio = 1.0
+region = "other_boxes"
 aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
 radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5.0 }
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }

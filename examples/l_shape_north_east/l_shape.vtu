@@ -1,14 +1,25 @@
 <?xml version="1.0"?>
-<!-- L shape in the x-y plane, 10 high in z. The bounding box is 10 x 10 x 10
-     with its center at (15, 25, 35). No cell has x > 15 and y > 25.
-     Cells 0 and 1: two hexahedra along x (the east arm, y 20 to 25).
-     Cells 2 and 3: two wedges in +y (the north arm, x 10 to 15).
-     Cell 4: the end face of the north arm (y = 30), boundary surface north.
-     Cell 5: the end face of the east arm (x = 20), boundary surface east. -->
+<!-- L shape in the x-y plane, 5 high in z, of 4 boxes of 5 x 5 x 5. The
+     bounding box is 15 x 10 x 5 with its center at (17.5, 25, 32.5).
+     Cells 0 to 2: three hexahedra along x (y 20 to 25): the west box
+     (x 10 to 15), the middle box (x 15 to 20) and the east box (x 20 to 25).
+     Cell 3: a hexahedron in +y of the west box (the north box, y 25 to 30).
+     Regions: west_box = cell 0, east_box = cell 2, other_boxes = cells 1, 3.
+     Cell 4: the end face of the north box (y = 30), boundary surface north.
+     Cell 5: the end face of the east box (x = 25), boundary surface east. -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
-<Piece NumberOfPoints="16" NumberOfCells="6">
-<CellData Scalars="boundary__north">
+<Piece NumberOfPoints="20" NumberOfCells="6">
+<CellData Scalars="region__west_box">
+<DataArray type="Int32" Name="region__west_box" format="ascii">
+1 0 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="region__east_box" format="ascii">
+0 0 1 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="region__other_boxes" format="ascii">
+0 1 0 1 0 0
+</DataArray>
 <DataArray type="Int32" Name="boundary__north" format="ascii">
 0 0 0 0 1 0
 </DataArray>
@@ -21,35 +32,39 @@
 10 20 30
 15 20 30
 20 20 30
+25 20 30
 10 25 30
 15 25 30
 20 25 30
+25 25 30
 10 30 30
 15 30 30
-10 20 40
-15 20 40
-20 20 40
-10 25 40
-15 25 40
-20 25 40
-10 30 40
-15 30 40
+10 20 35
+15 20 35
+20 20 35
+25 20 35
+10 25 35
+15 25 35
+20 25 35
+25 25 35
+10 30 35
+15 30 35
 </DataArray>
 </Points>
 <Cells>
 <DataArray type="Int64" Name="connectivity" format="ascii">
-0 1 4 3 8 9 12 11
-1 2 5 4 9 10 13 12
-3 4 7 11 12 15
-3 7 6 11 15 14
-6 7 15 14
-2 5 13 10
+0 1 5 4 10 11 15 14
+1 2 6 5 11 12 16 15
+2 3 7 6 12 13 17 16
+4 5 9 8 14 15 19 18
+8 9 19 18
+3 7 17 13
 </DataArray>
 <DataArray type="Int64" Name="offsets" format="ascii">
-8 16 22 28 32 36
+8 16 24 32 36 40
 </DataArray>
 <DataArray type="UInt8" Name="types" format="ascii">
-12 12 13 13 9 9
+12 12 12 12 9 9
 </DataArray>
 </Cells>
 </Piece>

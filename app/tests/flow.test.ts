@@ -11,7 +11,8 @@ import { flowToLibraryToml } from "../src/flow/toml";
 import { check_flow_input, run_flow } from "../src/pkg/dfn_wasm.js";
 import { compareOutputFolders, generateExample, initWasm, runNativeFehm } from "./cases";
 
-// The example with the boundary arrays of the mesh surface, and of the boundary surfaces north and east
+// The example with the boundary arrays of the mesh surface, of the regions
+// west_box, east_box and other_boxes, and of the boundary surfaces north and east
 const EXAMPLE_NAME = "l_shape_north_east";
 
 let mesh = "";
@@ -35,7 +36,7 @@ function flowState(pressures: Record<string, number>, boundaryMesh = mesh): Flow
 const PRESSURES = { north: 10.1, east: 10.0 };
 
 test("the boundaries of the mesh are its boundary arrays", () => {
-  expect(meshBoundaryNames(mesh)).toEqual(["mesh_surface", "north", "east"]);
+  expect(meshBoundaryNames(mesh)).toEqual(["mesh_surface", "west_box", "east_box", "other_boxes", "north", "east"]);
 });
 
 test("the TOML of the flow form is a valid input", () => {
