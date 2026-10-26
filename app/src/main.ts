@@ -30,7 +30,7 @@ import { markVelocityAsVectors } from "./transport/trajectories";
 import { NetworkViewer, type FractureLayer } from "./viewer";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "./workflow";
 
-const DEFAULT_COLOR_ARRAY = "family";
+const DEFAULT_COLOR_ARRAY = "fracture_id";
 const PRESSURE_FILE = "pressure.vtu";
 const TRAJECTORIES_FILE = "trajectories.vtp";
 
@@ -705,7 +705,8 @@ async function showOutputInViewer(): Promise<void> {
   if (!viewer || !output) {
     return;
   }
-  await viewer.setLayer("final", outputFile("fractures.vtp"));
+  const mesh = flowMesh();
+  await viewer.setLayer("final", mesh === null ? null : triangleGridToPolyData(mesh));
   await viewer.setLayer("removed", outputFile("fractures_removed.vtp"));
   await viewer.setLayer("rejected", outputFile("fractures_rejected.vtp"));
   applyLayerVisibility(viewer);

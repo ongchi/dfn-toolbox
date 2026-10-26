@@ -46,7 +46,8 @@ There is no server: `npm run build` gives a folder of static files.
 - "Check input" shows the error of the library for the input of the active
   tab. "Generate", "Solve flow" and "Track particles" run in a Web Worker;
   "Cancel" stops them.
-- Output: the 3D view of `fractures.vtp` (color by a cell array),
+- Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
+  fractures (with its edges; color by a cell array),
   `fractures_removed.vtp`, `fractures_rejected.vtp`, the mesh, and the
   pressure of the flow (layer "Pressure"; it hides the fracture layers), the
   particle paths (layer "Trajectories": tubes, with cones in the direction

@@ -127,7 +127,10 @@ export class NetworkViewer {
     this.meshActor = actor;
   }
 
-  /** Shows a fracture file (text of a .vtp file), or removes the layer (null). */
+  /**
+   * Shows a fracture file (text of a .vtp file), or removes the layer (null).
+   * The layer "final" is the triangle mesh, shown with its edges.
+   */
   async setLayer(layer: FractureLayer, vtpText: string | null): Promise<void> {
     const old = this.layers.get(layer);
     if (old) {
@@ -153,6 +156,9 @@ export class NetworkViewer {
     } else if (layer === "rejected") {
       property.setColor(0.85, 0.2, 0.2);
       property.setOpacity(0.25);
+    } else {
+      property.setEdgeVisibility(1);
+      property.setEdgeColor(0.2, 0.2, 0.2);
     }
     this.renderer.addActor(actor);
     this.layers.set(layer, { reader, mapper, actor });
@@ -161,7 +167,7 @@ export class NetworkViewer {
     }
   }
 
-  /** Names of the cell data arrays with one component of the final fractures. */
+  /** Names of the cell data arrays with one component of the triangle mesh of the final fractures. */
   async cellArrayNames(): Promise<string[]> {
     const final = this.layers.get("final");
     if (!final) {
@@ -245,7 +251,7 @@ export class NetworkViewer {
     this.scalarBar.setVisibility(isColored ? 1 : 0);
   }
 
-  /** Colors the final fractures by a cell data array, or with one color (null). */
+  /** Colors the triangle mesh of the final fractures by a cell data array, or with one color (null). */
   async colorBy(arrayName: string | null): Promise<void> {
     this.colorArrayName = arrayName;
     const final = this.layers.get("final");
@@ -264,7 +270,7 @@ export class NetworkViewer {
       (index) => cellData.getArrayName(index) === arrayName,
     );
     if (arrayIndex === undefined) {
-      throw new Error(`fractures.vtp has no cell array ${arrayName}`);
+      throw new Error(`dfn_mesh.vtu has no cell array ${arrayName}`);
     }
     const range = cellData.getArray(arrayIndex).getRange(0);
     // The mapper selects the array by its name; it does not set the range of
