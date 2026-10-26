@@ -1,4 +1,4 @@
-# L shape north -> east: an L-shaped domain (L-shape.vtu) of 4 boxes: the
+# L shape north -> east: an L-shaped domain (the L-shape) of 4 boxes: the
 # west, middle and east boxes along x (y 20 to 25), and the north box at
 # +y of the west box (x 10 to 15, y 25 to 30). The regions are west_box,
 # east_box and other_boxes (the middle and the north box). The end face of

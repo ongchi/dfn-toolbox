@@ -1,3 +1,4 @@
+import { meshDisplayName } from "../meshes";
 import type { FormContext } from "./context";
 import { element, section } from "./fields";
 import type { FormState } from "./state";
@@ -7,18 +8,13 @@ export interface FileHandlers {
   chooseMesh(name: string): void;
 }
 
-/** The name of a predefined mesh in the form: its file name without `.vtu` */
-function meshLabel(fileName: string): string {
-  return fileName.replace(/\.vtu$/, "");
-}
-
 /** The predefined domain meshes; a name which is not one of them is shown as not available */
 function meshSelect(selected: string, meshNames: string[], onChoose: (name: string) => void): HTMLElement {
   const select = element("select");
   const names = selected === "" || meshNames.includes(selected) ? meshNames : [...meshNames, selected];
   select.append(new Option("Choose…", ""));
   for (const name of names) {
-    select.append(new Option(meshNames.includes(name) ? meshLabel(name) : `${meshLabel(name)} (not available)`, name));
+    select.append(new Option(meshNames.includes(name) ? meshDisplayName(name) : `${meshDisplayName(name)} (not available)`, name));
   }
   select.value = selected;
   select.addEventListener("change", () => {

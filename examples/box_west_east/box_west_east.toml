@@ -1,5 +1,5 @@
 # Box west -> east: the simplest workflow. One family of fractures in a
-# cube of 10 m (Box.vtu). The faces of the cube are surface cells
+# cube of 10 m (the Box shape). The faces of the cube are surface cells
 # of the mesh: the face at x = 0 is the boundary surface west, the face at
 # x = 10 the boundary surface east. The flow goes from west (10.1 MPa) to
 # east (10.0 MPa); the lines on the other faces (mesh_surface) have no flow.

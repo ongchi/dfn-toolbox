@@ -2,7 +2,7 @@
 // of an example is a predefined mesh.
 import type { InputFiles } from "./inputFiles";
 import { loadMesh } from "./meshes";
-import { tomlToWorkflow, type Workflow } from "./workflow";
+import { readDescription, tomlToWorkflow, type Workflow } from "./workflow";
 
 const EXAMPLES_URL = new URL(`${import.meta.env.BASE_URL}examples/`, window.location.href);
 
@@ -22,9 +22,19 @@ async function fetchText(url: URL): Promise<string> {
   return response.text();
 }
 
+function exampleUrl(name: string): URL {
+  return new URL(`${name}/${name}.toml`, EXAMPLES_URL);
+}
+
+/** The title of an example: the start of its description up to the first ":", else its name */
+export async function loadExampleTitle(name: string): Promise<string> {
+  const description = readDescription(await fetchText(exampleUrl(name)));
+  const colon = description.indexOf(":");
+  return colon > 0 ? description.slice(0, colon) : name;
+}
+
 export async function loadExample(name: string): Promise<{ workflow: Workflow; files: InputFiles }> {
-  const tomlUrl = new URL(`${name}/${name}.toml`, EXAMPLES_URL);
-  const workflow = tomlToWorkflow(await fetchText(tomlUrl));
+  const workflow = tomlToWorkflow(await fetchText(exampleUrl(name)));
   const network = workflow.network;
   return { workflow, files: { mesh: await loadMesh(network.domain) } };
 }

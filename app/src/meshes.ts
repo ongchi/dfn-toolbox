@@ -11,11 +11,16 @@ export async function listMeshes(): Promise<string[]> {
   return response.json();
 }
 
+/** The name of a predefined mesh for the user: its file name without `.vtu` */
+export function meshDisplayName(fileName: string): string {
+  return fileName.replace(/\.vtu$/, "");
+}
+
 export async function loadMesh(name: string): Promise<InputFile> {
   const url = new URL(name, MESHES_URL);
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`cannot load the domain mesh ${name} (HTTP ${response.status})`);
+    throw new Error(`cannot load the domain shape ${meshDisplayName(name)} (HTTP ${response.status})`);
   }
   return { name, text: await response.text() };
 }

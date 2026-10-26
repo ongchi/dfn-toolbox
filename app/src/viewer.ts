@@ -248,7 +248,7 @@ export class NetworkViewer {
     const data = association === "cell" ? output.getCellData() : output.getPointData();
     const arrayIndex = [...Array(data.getNumberOfArrays()).keys()].find((index) => data.getArrayName(index) === name);
     if (arrayIndex === undefined) {
-      throw new Error(`dfn_mesh.vtu has no ${association} array ${name}`);
+      throw new Error(`the fracture mesh has no ${association} array ${name}`);
     }
     const range = data.getArray(arrayIndex).getRange(0);
     // The mapper selects the array by its name; it does not set the range of

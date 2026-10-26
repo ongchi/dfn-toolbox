@@ -5,7 +5,7 @@
 /** The text of `trajectories.vtp` with `velocity` as the active point vectors */
 export function markVelocityAsVectors(vtpText: string): string {
   if (!vtpText.includes("<PointData>")) {
-    throw new Error("trajectories.vtp has no <PointData>");
+    throw new Error("the trajectories have no point data");
   }
   return vtpText.replace("<PointData>", '<PointData Vectors="velocity">');
 }

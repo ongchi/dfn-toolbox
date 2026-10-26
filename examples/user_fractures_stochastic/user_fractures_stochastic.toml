@@ -1,4 +1,4 @@
-# User fractures + stochastic: the cube of box_west_east with one large
+# User fractures + stochastic: the cube of "Box west -> east" with one large
 # user-defined fracture in the region box (a rectangle of 11 x 6 m in the
 # plane y = 5: the normal +y) across the cube from west to east, and a
 # stochastic family which crosses it. The user fracture has a larger

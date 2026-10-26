@@ -1,4 +1,4 @@
-# Two families: the cube of box_west_east with two families of other
+# Two families: the cube of "Box west -> east" with two families of other
 # orientations. Family 1 is perpendicular to the flow direction (normal along
 # x), family 2 is parallel to it (normal along y) with larger fractures and an
 # aperture which grows with the radius. Color the network by "family" and

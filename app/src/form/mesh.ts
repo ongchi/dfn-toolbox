@@ -11,7 +11,7 @@ export function meshSection(state: FormState, context: FormContext): HTMLElement
     element(
       "p",
       "form-note",
-      "The generation always writes the boundary lines of the regions (fracture_boundaries.vtp) and the triangle mesh of the final fractures (dfn_mesh.vtu). The boundary lines give the boundaries of the flow.",
+      "The generation always makes the boundary lines of the regions and the triangle mesh of the final fractures. The boundary lines give the boundaries of the flow.",
     ),
     row(
       numberField({

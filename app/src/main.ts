@@ -1,7 +1,7 @@
 // The page: input forms (network, flow and transport), generation, flow and
 // transport in the worker, 3D view and output files.
 import "./style.css";
-import { listExamples, loadExample } from "./examples";
+import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm } from "./flow/form";
 import { addPointArray, triangleGridToPolyData } from "./flow/polyData";
 import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
@@ -22,7 +22,7 @@ import {
   type TransportOutput,
 } from "./generationClient";
 import { meshRegionBounds, meshRegionNames, type InputFiles, type RegionBounds } from "./inputFiles";
-import { listMeshes, loadMesh } from "./meshes";
+import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, updateTransportBoundaries, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
@@ -283,8 +283,8 @@ function generationInput(): GenerationInput | string {
   }
   if (files.mesh === null) {
     return state.domain === ""
-      ? "Choose a domain mesh."
-      : `The domain mesh ${state.domain} is not a predefined mesh. Choose a domain mesh.`;
+      ? "Choose a domain shape."
+      : `The domain shape ${meshDisplayName(state.domain)} is not available. Choose a domain shape.`;
   }
   const unknownRegion = state.userFractures.find((fracture) => !regionNames.includes(fracture.region));
   if (unknownRegion !== undefined) {
@@ -329,7 +329,7 @@ async function runGeneration(): Promise<void> {
 function flowInput(): FlowInput | string {
   const mesh = flowMesh();
   if (mesh === null) {
-    return `Generate a network first: the flow needs ${FLOW_MESH_FILE}.`;
+    return "Generate a network first: the flow needs its triangle mesh.";
   }
   if (ui.flowForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
@@ -737,9 +737,8 @@ function bindEvents(): void {
 async function fillExampleList(): Promise<void> {
   try {
     const names = await listExamples();
-    for (const name of names) {
-      ui.exampleSelect.append(new Option(name, name));
-    }
+    const titles = await Promise.all(names.map(loadExampleTitle));
+    names.forEach((name, index) => ui.exampleSelect.append(new Option(titles[index], name)));
     if (names.includes(DEFAULT_EXAMPLE)) {
       ui.exampleSelect.value = DEFAULT_EXAMPLE;
       await openExample(DEFAULT_EXAMPLE);

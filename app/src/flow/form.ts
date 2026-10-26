@@ -107,7 +107,7 @@ export function renderFlowForm(container: HTMLElement, state: FlowState, hasMesh
       element(
         "p",
         "form-note",
-        "Generate a network (DFN tab) first. The flow uses the mesh dfn_mesh.vtu of the last generation.",
+        "Generate a network (DFN tab) first. The flow uses the triangle mesh of the last generation.",
       ),
     );
     return;

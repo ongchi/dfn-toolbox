@@ -98,6 +98,8 @@ try {
   await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined);
   const startExample = await page.$eval("#example-select", (node) => node.value);
   check(startExample === "box_west_east", "default example", startExample);
+  const startExampleTitle = await page.$eval("#example-select", (node) => node.selectedOptions[0].textContent);
+  check(startExampleTitle === "Box west -> east", "example title", startExampleTitle);
   const startTab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });

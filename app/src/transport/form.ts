@@ -344,7 +344,7 @@ function outputSection(state: TransportState, context: FormContext): HTMLElement
     checkboxField({
       label: "Trajectories",
       key: "trajectories",
-      help: "trajectories.vtp, shown in the view; a point for each time step: the file can be very large (some 100 MB)",
+      help: "shown in the 3D view; a point for each time step: the data can be very large (some 100 MB)",
       value: state.hasTrajectories,
       onInput: (value) => {
         state.hasTrajectories = value;
