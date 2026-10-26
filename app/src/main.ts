@@ -84,7 +84,7 @@ const ui = {
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
-  resultsEmpty: byId<HTMLParagraphElement>("results-empty"),
+  resultsBezel: byId<HTMLDivElement>("results-bezel"),
   results: byId<HTMLDetailsElement>("results"),
   resultsStats: byId<HTMLDListElement>("results-stats"),
   flowResults: byId<HTMLDetailsElement>("flow-results"),
@@ -411,7 +411,7 @@ function clearOutput(): void {
   output = null;
   updateNextButton();
   ui.results.hidden = true;
-  ui.resultsEmpty.hidden = false;
+  ui.resultsBezel.hidden = true;
   ui.colorSelect.disabled = true;
   if (viewer) {
     for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
@@ -478,7 +478,7 @@ async function showOutput(result: GenerationOutput): Promise<void> {
   clearFlowOutput();
   output = result;
   updateNextButton();
-  ui.resultsEmpty.hidden = true;
+  ui.resultsBezel.hidden = false;
   ui.results.hidden = false;
   const mesh = flowMesh();
   const boundaryNames = mesh === null ? [] : meshBoundaryNames(mesh);

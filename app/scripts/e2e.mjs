@@ -157,12 +157,17 @@ try {
     // "Next" of the DFN tab needs the fracture mesh, "Next" of the Flow tab a solved flow
     const isNextDisabled = () => page.$eval("#next-button", (node) => node.disabled);
     const isNetworkNextDisabled = await isNextDisabled();
+    // The results bezel of the 3D view shows only with a result
+    const isBezelShown = () => page.$eval("#results-bezel", (node) => !node.hidden);
+    const isBezelShownBefore = await isBezelShown();
     const networkStatus = await runStep(page, "network");
     check(
       networkStatus.startsWith("Done") && isNetworkNextDisabled && !(await isNextDisabled()),
       `${name}: network`,
       networkStatus,
     );
+    const isBezelShownAfter = await isBezelShown();
+    check(!isBezelShownBefore && isBezelShownAfter, `${name}: results bezel`, `${isBezelShownBefore} → ${isBezelShownAfter}`);
 
     await page.click('[data-sidebar-tab="flow"]');
     const isFlowNextDisabled = await isNextDisabled();
