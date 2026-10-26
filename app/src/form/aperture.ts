@@ -1,15 +1,14 @@
-// Fields of an aperture distribution: a family `aperture` (necessary), and
-// `mesh.user_fracture_aperture` ("None" = no key).
+// Fields of an aperture distribution: a family `aperture` (necessary).
 import type { FormContext } from "./context";
 import { numberField, row, selectField } from "./fields";
 import { defaultAperture, type ApertureDistribution, type ApertureState } from "./state";
 
-interface ApertureFieldOptions<Aperture extends ApertureState | null> {
+interface ApertureFieldOptions {
   label: string;
   key: string;
   help: string;
-  aperture: Aperture;
-  onSelect: (aperture: Aperture) => void;
+  aperture: ApertureState;
+  onSelect: (aperture: ApertureState) => void;
 }
 
 const DISTRIBUTION_CHOICES: [ApertureDistribution, string][] = [
@@ -46,7 +45,7 @@ function parameterFields(aperture: ApertureState, context: FormContext): HTMLEle
   }
 }
 
-export function apertureFields(options: ApertureFieldOptions<ApertureState>, context: FormContext): HTMLElement[] {
+export function apertureFields(options: ApertureFieldOptions, context: FormContext): HTMLElement[] {
   const distribution = selectField<ApertureDistribution>({
     label: options.label,
     key: options.key,
@@ -59,26 +58,4 @@ export function apertureFields(options: ApertureFieldOptions<ApertureState>, con
     },
   });
   return [row(distribution), row(...parameterFields(options.aperture, context))];
-}
-
-export function optionalApertureFields(
-  options: ApertureFieldOptions<ApertureState | null>,
-  context: FormContext,
-): HTMLElement[] {
-  const aperture = options.aperture;
-  const distribution = selectField<ApertureDistribution | "">({
-    label: options.label,
-    key: options.key,
-    help: options.help,
-    value: aperture?.distribution ?? "",
-    choices: [["", "None"], ...DISTRIBUTION_CHOICES],
-    onInput: (value) => {
-      options.onSelect(value === "" ? null : defaultAperture(value));
-      context.rerender();
-    },
-  });
-  if (aperture === null) {
-    return [row(distribution)];
-  }
-  return [row(distribution), row(...parameterFields(aperture, context))];
 }

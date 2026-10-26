@@ -160,6 +160,7 @@ function userFractureLines(fracture: UserFractureState): string[] {
     `radius = ${float(fracture.radius)}`,
     `aspect_ratio = ${float(fracture.aspectRatio)}`,
     `beta = ${float(fracture.beta)}`,
+    `aperture = ${float(fracture.aperture)}`,
     `orientation = ${inlineTable(planeOrientationEntries(fracture.orientation))}`,
   ];
 }
@@ -198,9 +199,6 @@ export function networkTables(state: FormState): TomlTable[] {
 
   const mesh = state.mesh;
   const meshLines = [`max_size_factor = ${float(mesh.maxSizeFactor)}`, `slope = ${float(mesh.slope)}`];
-  if (mesh.userFractureAperture !== null) {
-    meshLines.push(`user_fracture_aperture = ${inlineTable(apertureEntries(mesh.userFractureAperture))}`);
-  }
   tables.push({ name: "mesh", isArray: false, lines: meshLines });
 
   tables.push({
@@ -567,6 +565,7 @@ function readUserFracture(table: Table, path: string, problems: string[]): UserF
     radius: reader.float("radius", 0),
     aspectRatio: reader.float("aspect_ratio", 0),
     beta: reader.float("beta", 0),
+    aperture: reader.float("aperture", 0),
     orientation,
   };
   reader.checkUnknownKeys();
@@ -615,12 +614,6 @@ export function readNetwork(table: Table, problems: string[]): FormState {
   const mesh = {
     maxSizeFactor: meshReader.optionalFloat("max_size_factor") ?? MESH_DEFAULTS.maxSizeFactor,
     slope: meshReader.optionalFloat("slope") ?? MESH_DEFAULTS.slope,
-    userFractureAperture: readOptionalAperture(
-      meshReader,
-      "user_fracture_aperture",
-      "[network.mesh]: user_fracture_aperture",
-      problems,
-    ),
   };
   meshReader.checkUnknownKeys();
 

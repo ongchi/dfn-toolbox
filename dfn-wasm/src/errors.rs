@@ -4,7 +4,7 @@
 //! each kind (`app/src/errors.ts`).
 
 use dfngen::distribution::{exp, log_norm};
-use dfngen::{DfngenError, FamilyError, RegionError};
+use dfngen::{DfngenError, FamilyError, RegionError, UserFractureError};
 use dfntrans::DfntransError;
 use fehm::{eos, FehmError};
 use wasm_bindgen::prelude::*;
@@ -88,18 +88,29 @@ pub fn dfngen_report(error: &DfngenError) -> ErrorReport {
             report("dfngen.UserFractureFileMissing").with("file", file)
         }
         DfngenError::MinFeatureSize => report("dfngen.MinFeatureSize"),
-        DfngenError::UserFracture { fracture, source } => {
-            let (reason, region) = region_reason(source);
-            report(&format!("dfngen.UserFracture.{reason}"))
+        DfngenError::UserFracture { fracture, source } => match source {
+            UserFractureError::Region(region_error) => {
+                let (reason, region) = region_reason(region_error);
+                report(&format!("dfngen.UserFracture.{reason}"))
+                    .with("fracture", fracture)
+                    .with("region", region)
+            }
+            UserFractureError::Aperture { aperture } => report("dfngen.UserFracture.Aperture")
                 .with("fracture", fracture)
-                .with("region", region)
-        }
+                .with("aperture", aperture),
+        },
+        DfngenError::UserFracturePieceApertures {
+            fracture_id,
+            first,
+            other,
+        } => report("dfngen.UserFracturePieceApertures")
+            .with("fracture_id", fracture_id)
+            .with("first", first)
+            .with("other", other),
         DfngenError::Family { family, source } => family_report(error, *family, source),
         DfngenError::MeshNeedsRegionBoundaries => report("dfngen.MeshNeedsRegionBoundaries"),
         DfngenError::MeshMaxSizeFactor => report("dfngen.MeshMaxSizeFactor"),
         DfngenError::MeshSlope => report("dfngen.MeshSlope"),
-        DfngenError::UserFractureApertureMissing => report("dfngen.UserFractureApertureMissing"),
-        DfngenError::UserFractureAperture(_) => report("dfngen.UserFractureAperture"),
         DfngenError::NoFractureDefined => report("dfngen.NoFractureDefined"),
         DfngenError::Mesh(_) => report("dfngen.Mesh"),
         DfngenError::NoIntersectingFractures => report("dfngen.NoIntersectingFractures"),
@@ -120,7 +131,6 @@ fn family_report(error: &DfngenError, family: usize, source: &FamilyError) -> Er
         FamilyError::OrientationPair => report("OrientationPair"),
         FamilyError::P32TargetMissing => report("P32TargetMissing"),
         FamilyError::P32TargetNotAllowed => report("P32TargetNotAllowed"),
-        FamilyError::ApertureMissing => report("ApertureMissing"),
         FamilyError::Aperture(_) => report("Aperture"),
         FamilyError::MissingValue(_) => report("MissingValue"),
     }

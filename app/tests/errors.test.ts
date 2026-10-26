@@ -78,6 +78,13 @@ test("a minimum feature size of 0 names the field of the form", () => {
   expect(text).toBe("Minimum feature size (DFN tab, General) must be greater than 0.");
 });
 
+test("a user fracture aperture of 0 names the fracture and the field of the form", () => {
+  const files = readCase("user_fractures");
+  const userFractures = files.userFractures?.replace(/(Name="aperture" format="ascii">\n)2e-4/, "$10.0");
+  const text = userText(check_input(files.toml, files.mesh, userFractures));
+  expect(text).toBe("Fracture 1 (User fractures tab): Aperture must be greater than 0.");
+});
+
 test("a family with 2 points names the family", () => {
   const text = networkErrorText((toml) => toml.replace(/number_of_points = \d+/, "number_of_points = 2"));
   expect(text).toBe("Family 1 (DFN tab): Number of points must be 3 or more.");

@@ -46,7 +46,6 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     `${FAMILY(f)}: set a P32 target. The stop condition "P32 target of each family" needs one for each family.`,
   "dfngen.Family.P32TargetNotAllowed": (f) =>
     `${FAMILY(f)}: the stop condition "Number of fractures" uses no P32 target. Remove the target.`,
-  "dfngen.Family.ApertureMissing": (f) => `${FAMILY(f)}: set an aperture. The triangle mesh for the flow needs one.`,
   "dfngen.Family.Aperture": (f) => `${FAMILY(f)}: ${APERTURE_VALUES}`,
   "dfngen.FamilyRadius.LogNormalSigma": (f) =>
     `${FAMILY(f)}: the standard deviation of the radius must be greater than 0.`,
@@ -65,10 +64,9 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     `${USER_FRACTURE(f)}: the domain has no region ${f.region}. Choose another region.`,
   "dfngen.UserFracture.EmptyRegion": (f) =>
     `${USER_FRACTURE(f)}: the region ${f.region} has no cell in the domain. Choose another region.`,
+  "dfngen.UserFracture.Aperture": (f) => `${USER_FRACTURE(f)}: Aperture must be greater than 0.`,
   "dfngen.MeshMaxSizeFactor": () => `Maximum size factor (${MESH_SECTION}) must be 1 or more.`,
   "dfngen.MeshSlope": () => `Slope (${MESH_SECTION}) must be greater than 0.`,
-  "dfngen.UserFractureApertureMissing": () => `Set the user-defined fracture aperture (${MESH_SECTION}).`,
-  "dfngen.UserFractureAperture": () => `User-defined fracture aperture (${MESH_SECTION}): ${APERTURE_VALUES}`,
   "dfngen.NoFractureDefined": () =>
     "There is no fracture. Add a fracture family (DFN tab) or a user-defined fracture (User fractures tab).",
   "dfngen.NoIntersectingFractures": () =>

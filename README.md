@@ -43,7 +43,7 @@ There is no server: `npm run build` gives a folder of static files.
     view only: the workflow file does not have the colors. A chosen color
     stays with its surface name while the page is open.
   - User fractures tab: each user-defined fracture is a card (region,
-    center, shape and orientation; see "User-defined fractures").
+    center, shape, aperture and orientation; see "User-defined fractures").
   - DFN tab: a form with one field for each other key of `[network]`.
     The boundary lines of the regions and the triangle mesh are always on
     (the flow needs them), thus each family needs an aperture.
@@ -116,7 +116,6 @@ domain = "Box.vtu"                 # the name of a predefined mesh (`meshes/`); 
 [network.mesh]                     # optional; no [network.region_boundaries]: the boundary lines are always on
 max_size_factor = 5.0              # no `enable`: always on
 slope = 0.5
-user_fracture_aperture = { distribution = "constant", value = 3e-4 }   # necessary with user fractures
 [network.clusters]                 # as [clusters]
 [[network.family]]                 # as [[family]]; `aperture` is necessary
 [[network.user_fracture]]          # optional; one table for each user-defined fracture, all keys necessary
@@ -126,6 +125,7 @@ number_of_points = 4               # as a family: 3 or more, 4 = rectangle
 radius = 7.78                      # m; of the circle of the points
 aspect_ratio = 0.545               # y radius / x radius
 beta = 0.0                         # degrees; rotation in the plane of the fracture
+aperture = 3e-4                    # m; above 0; the cell array `aperture` of the dfngen fracture file
 orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without kappa
 
 [flow]                             # the fehm input (see "Input file" in ../fehm-rs/README.md), without `mesh`
@@ -161,7 +161,8 @@ way as dfngen-rs makes a stochastic fracture (`app/src/userFractures.ts`):
 a regular polygon of `number_of_points` on the circle of `radius`, y scaled
 by `aspect_ratio`, turned by `beta` in its plane, rotated from the normal
 +z to the normal of `orientation`, and moved to `center`. The polygon file
-`user_fractures.vtp` of the dfngen input has a cell array
+`user_fractures.vtp` of the dfngen input has the cell array `aperture` (the
+`aperture` of each fracture) and a cell array
 `region__<name>` for each region of the mesh, with 1 for the region of the
 fracture. The form limits the center to the bounding box of the cells of
 the region; a center in that box but outside the cells (possible in a

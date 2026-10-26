@@ -27,7 +27,6 @@ rejects_per_fracture = 10
 [network.mesh]
 max_size_factor = 5.0
 slope = 0.5
-user_fracture_aperture = { distribution = "constant", value = 3e-4 }
 
 [network.clusters]
 keep_only_largest = true
@@ -48,6 +47,7 @@ number_of_points = 4
 radius = 7.78
 aspect_ratio = 0.545
 beta = 0.0
+aperture = 3e-4
 orientation = { theta = 90.0, phi = 90.0 }
 
 [flow]

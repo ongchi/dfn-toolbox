@@ -87,6 +87,11 @@ test("the polygon file has one region array for each region of the mesh", () => 
   expect(text).toMatch(/NumberOfPoints="8" .*NumberOfPolys="2"/);
 });
 
+test("the polygon file has the aperture of each fracture", () => {
+  const text = userFracturesToVtp([fracture({ aperture: 2e-4 }), fracture({ aperture: 3e-4 })], ["box"]);
+  expect(text).toMatch(/Name="aperture" NumberOfComponents="1" format="ascii">\n0.0002 0.0003\n/);
+});
+
 test("a region which is not in the mesh is an error", () => {
   expect(() => userFracturesToVtp([fracture({ region: "north" })], ["west"])).toThrow(/north/);
 });

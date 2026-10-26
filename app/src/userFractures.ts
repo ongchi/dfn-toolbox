@@ -112,9 +112,9 @@ function dataArray(name: string, type: string, components: number, values: (numb
 
 /**
  * The polygon file of the fractures (ASCII VTK PolyData, as dfngen-rs reads
- * it): one polygon cell for each fracture, and one cell array
- * `region__<name>` for each region of the mesh (1 for the region of the
- * fracture). The region of each fracture must be one of `regionNames`.
+ * it): one polygon cell for each fracture, the cell array `aperture`, and one
+ * cell array `region__<name>` for each region of the mesh (1 for the region
+ * of the fracture). The region of each fracture must be one of `regionNames`.
  */
 export function userFracturesToVtp(fractures: UserFractureState[], regionNames: string[]): string {
   const unknown = fractures.find((fracture) => !regionNames.includes(fracture.region));
@@ -130,6 +130,7 @@ export function userFracturesToVtp(fractures: UserFractureState[], regionNames: 
     "<PolyData>",
     `<Piece NumberOfPoints="${points.length}" NumberOfVerts="0" NumberOfLines="0" NumberOfStrips="0" NumberOfPolys="${fractures.length}">`,
     "<CellData>",
+    dataArray("aperture", "Float64", 1, fractures.map((fracture) => fracture.aperture)),
     ...regionNames.map((name) =>
       dataArray(
         `region__${name}`,

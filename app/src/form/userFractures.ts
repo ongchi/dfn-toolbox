@@ -123,6 +123,20 @@ function fractureCard(state: FormState, index: number, context: FormContext): HT
         },
       }),
     ),
+    row(
+      numberField({
+        label: "Aperture (m)",
+        key: "aperture",
+        help: "for the flow; above 0",
+        value: fracture.aperture,
+        min: 0,
+        isMinExclusive: true,
+        onInput: (value) => {
+          fracture.aperture = value;
+          context.changed();
+        },
+      }),
+    ),
     row(conventionField(fracture.orientation, "normal of the fracture", context)),
     row(...angleFields(fracture.orientation, context)),
   );

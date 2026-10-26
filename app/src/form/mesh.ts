@@ -1,4 +1,3 @@
-import { optionalApertureFields } from "./aperture";
 import type { FormContext } from "./context";
 import { element, numberField, row, section } from "./fields";
 import type { FormState } from "./state";
@@ -37,18 +36,6 @@ export function meshSection(state: FormState, context: FormContext): HTMLElement
           context.changed();
         },
       }),
-    ),
-    ...optionalApertureFields(
-      {
-        label: "User-defined fracture aperture",
-        key: "user_fracture_aperture",
-        help: "necessary with a user-defined fracture file",
-        aperture: mesh.userFractureAperture,
-        onSelect: (aperture) => {
-          mesh.userFractureAperture = aperture;
-        },
-      },
-      context,
     ),
   );
 }

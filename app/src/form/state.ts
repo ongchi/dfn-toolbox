@@ -34,8 +34,6 @@ export type ApertureDistribution = ApertureState["distribution"];
 export interface MeshState {
   maxSizeFactor: number;
   slope: number;
-  /** null = no key */
-  userFractureAperture: ApertureState | null;
 }
 
 export interface ClustersState {
@@ -100,6 +98,8 @@ export interface UserFractureState {
   aspectRatio: number;
   /** Rotation in the plane of the fracture, in degrees */
   beta: number;
+  /** Aperture (m), above 0; necessary: the mesh is always on */
+  aperture: number;
   orientation: PlaneOrientationState;
 }
 
@@ -133,11 +133,10 @@ export const FRAM_DEFAULTS: FramState = {
   rejectsPerFracture: 10,
 };
 
-/** Default values of `[mesh]`, as in `MeshSection::default` */
+/** Default values of `[network.mesh]` (necessary keys in the dfngen input) */
 export const MESH_DEFAULTS: MeshState = {
   maxSizeFactor: 10.0,
   slope: 0.5,
-  userFractureAperture: null,
 };
 
 export function defaultAperture(distribution: ApertureDistribution): ApertureState {
@@ -189,6 +188,7 @@ export function defaultUserFracture(region: string, center: [number, number, num
     radius: 1.0,
     aspectRatio: 1.0,
     beta: 0.0,
+    aperture: 1e-4,
     orientation: { convention: "theta_phi", firstAngle: 0.0, secondAngle: 0.0 },
   };
 }

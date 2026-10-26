@@ -133,9 +133,23 @@ test("the user fracture of the example is read with all its keys", () => {
       radius: 7.78,
       aspectRatio: 0.545,
       beta: 0,
+      aperture: 3e-4,
       orientation: { convention: "theta_phi", firstAngle: 90, secondAngle: 90 },
     },
   ]);
+});
+
+test("a user fracture without aperture is an error", () => {
+  const toml = USER_FRACTURES.replace("aperture = 3e-4\n", "");
+  expect(problemsOf(toml)).toEqual(["network user fracture 1: `aperture` is missing"]);
+});
+
+test("user_fracture_aperture in [network.mesh] is an error: each user fracture has its aperture", () => {
+  const toml = USER_FRACTURES.replace(
+    "[network.mesh]",
+    '[network.mesh]\nuser_fracture_aperture = { distribution = "constant", value = 3e-4 }',
+  );
+  expect(problemsOf(toml)).toEqual(["[network.mesh]: `user_fracture_aperture` is an unknown key"]);
 });
 
 test("a user fracture without region is an error", () => {
