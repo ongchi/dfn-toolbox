@@ -6,7 +6,7 @@ import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm } from "./flow/form";
 import { addArray, addPointArray, pointCount, triangleGridToPolyData, vectorMagnitudes } from "./flow/polyData";
-import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
+import { defaultFlowState, FLOW_MESH_FILE, flowBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
@@ -195,6 +195,7 @@ const formContext: FormContext = {
   get regionBounds() {
     return regionBounds;
   },
+  boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
   changed: () => updateUserFracturesInViewer(),
   rerender: () => render(),
 };
@@ -217,6 +218,7 @@ const flowContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
+  boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
   changed: () => {},
   rerender: () => renderFlow(),
 };
@@ -225,6 +227,7 @@ const transportContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
+  boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
   changed: () => {},
   rerender: () => renderTransport(),
 };
@@ -282,10 +285,18 @@ function boundarySurfaceColor(name: string): string {
   return boundarySurfaceColors.get(name) ?? DEFAULT_SURFACE_COLORS[index % DEFAULT_SURFACE_COLORS.length];
 }
 
+/** The color of a boundary surface of the domain mesh; null for another name */
+function knownBoundarySurfaceColor(name: string): string | null {
+  return boundarySurfaceNames.includes(name) ? boundarySurfaceColor(name) : null;
+}
+
 function renderBoundarySurfaces(): void {
   ui.boundarySurfaces.replaceChildren(
     boundarySurfaceSection(boundarySurfaceNames, boundarySurfaceColor, (name, color) => {
       boundarySurfaceColors.set(name, color);
+      // The Flow and Transport tabs show the color before the name of the boundary
+      renderFlow();
+      renderTransport();
       void updateViewer((view) => view.setBoundarySurfaceColor(name, color));
     }),
   );
@@ -542,7 +553,8 @@ async function showOutput(result: GenerationOutput): Promise<void> {
   ui.resultsBezel.hidden = false;
   ui.results.hidden = false;
   const mesh = flowMesh();
-  const boundaryNames = mesh === null ? [] : meshBoundaryNames(mesh);
+  // setMesh removes the output: the domain mesh is that of the generation
+  const boundaryNames = mesh === null || files.mesh === null ? [] : flowBoundaryNames(mesh, files.mesh.text);
   updateBoundaries(flowState, boundaryNames);
   updateTransportBoundaries(transportState, boundaryNames);
   renderFlow();

@@ -37,7 +37,7 @@ function boundariesSection(state: FlowState, context: FormContext): HTMLElement 
     element(
       "p",
       "form-note",
-      "The point arrays boundary__<name> of the mesh. Use at least one. A point on two used boundaries keeps the pressure of the first in this list.",
+      "The boundary surfaces of the domain mesh, in their colors of the 3D view. Use at least one. A point on two used boundaries keeps the pressure of the first in this list.",
     ),
   );
   for (const boundary of state.boundaries) {
@@ -45,6 +45,7 @@ function boundariesSection(state: FlowState, context: FormContext): HTMLElement 
       row(
         checkboxField({
           label: boundary.name,
+          labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
           help: "use this boundary",
           value: boundary.isUsed,
           onInput: (value) => {

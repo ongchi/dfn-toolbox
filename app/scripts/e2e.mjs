@@ -77,6 +77,24 @@ async function colorOptions(page) {
   return page.$$eval("#color-select option", (options) => options.map((option) => option.value));
 }
 
+/** The names of the boundary surfaces of the domain mesh (color choosers of the Domain tab) */
+async function domainSurfaceNames(page) {
+  return page.$$eval("#boundary-surfaces .field-label", (nodes) => nodes.map((node) => node.textContent).join(", "));
+}
+
+/** The boundary names of a section of a form; "(no color)" after a name without a color swatch */
+async function boundaryLabels(page, formSelector, sectionTitle) {
+  return page.$eval(
+    formSelector,
+    (form, title) => {
+      const section = [...form.querySelectorAll(".form-section")].find((node) => node.querySelector("h3")?.textContent === title);
+      const labels = [...(section?.querySelectorAll(".field-label") ?? [])].filter((node) => node.textContent !== "Pressure (MPa)");
+      return labels.map((node) => `${node.textContent}${node.querySelector(".label-swatch") ? "" : " (no color)"}`).join(", ");
+    },
+    sectionTitle,
+  );
+}
+
 /** Runs the step of a sidebar tab; returns the status text */
 async function runStep(page, tab) {
   await page.click(`[data-sidebar-tab="${tab}"]`);
@@ -195,6 +213,10 @@ try {
     check(!isBezelShownBefore && isBezelShownAfter, `${name}: results bezel`, `${isBezelShownBefore} → ${isBezelShownAfter}`);
 
     await page.click('[data-sidebar-tab="flow"]');
+    // The boundaries of the flow are only the boundary surfaces, each with its color
+    const exampleSurfaces = await domainSurfaceNames(page);
+    const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
+    check(exampleSurfaces !== "" && flowBoundaries === exampleSurfaces, `${name}: flow boundaries`, flowBoundaries);
     const isFlowNextDisabled = await isNextDisabled();
     const flowStatus = await runStep(page, "flow");
     const isFlowNextEnabled = !(await isNextDisabled());
@@ -215,6 +237,8 @@ try {
 
     // The trajectories and the velocities of the transport are always on
     await page.click('[data-sidebar-tab="transport"]');
+    const transportBoundaries = await boundaryLabels(page, "#transport-form", "Boundaries");
+    check(transportBoundaries === exampleSurfaces, `${name}: transport boundaries`, transportBoundaries);
     const transportStatus = await runStep(page, "transport");
     const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);

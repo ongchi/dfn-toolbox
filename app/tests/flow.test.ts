@@ -6,10 +6,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { addPointArray, triangleGridToPolyData } from "../src/flow/polyData";
-import { defaultFlowState, FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries, type FlowState } from "../src/flow/state";
+import {
+  defaultFlowState,
+  FLOW_MESH_FILE,
+  flowBoundaryNames,
+  meshBoundaryNames,
+  updateBoundaries,
+  type FlowState,
+} from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_flow_input, run_flow } from "../src/pkg/dfn_wasm.js";
-import { compareOutputFolders, generateExample, initWasm, runNativeFehm } from "./cases";
+import { compareOutputFolders, generateExample, initWasm, readMesh, runNativeFehm } from "./cases";
 
 // The example with the boundary arrays of the mesh surface, of the regions
 // west_box, east_box and other_boxes, and of the boundary surfaces north and east
@@ -37,6 +44,10 @@ const PRESSURES = { north: 10.1, east: 10.0 };
 
 test("the boundaries of the mesh are its boundary arrays", () => {
   expect(meshBoundaryNames(mesh)).toEqual(["mesh_surface", "west_box", "east_box", "other_boxes", "north", "east"]);
+});
+
+test("the boundaries of the flow are only the boundary surfaces of the domain mesh", () => {
+  expect(flowBoundaryNames(mesh, readMesh("L-shape.vtu"))).toEqual(["north", "east"]);
 });
 
 test("the TOML of the flow form is a valid input", () => {

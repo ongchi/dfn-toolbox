@@ -258,6 +258,16 @@ input[type="text"] {
   font-size: 13px;
 }
 
+/* The color of a boundary surface before its name (Flow and Transport tabs) */
+.label-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
 .field-help {
   color: var(--muted);
   font-size: 12px;

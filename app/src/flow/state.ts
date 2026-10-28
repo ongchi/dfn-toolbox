@@ -2,6 +2,7 @@
 // format of `../fehm-rs/src/io/input.rs` (see "Input file" of
 // ../fehm-rs/README.md): a change of a key there needs a change here, in
 // `toml.ts` and in `form.ts`.
+import { domainBoundarySurfaceNames } from "../boundarySurfaces";
 
 /** Name of the mesh file in the TOML; the mesh is that of the last generation */
 export const FLOW_MESH_FILE = "dfn_mesh.vtu";
@@ -37,6 +38,16 @@ export function defaultFlowState(): FlowState {
 export function meshBoundaryNames(vtuText: string): string[] {
   const pointData = /<PointData[^>]*>([\s\S]*?)<\/PointData>/.exec(vtuText)?.[1] ?? "";
   return [...pointData.matchAll(/<DataArray[^>]*Name="boundary__([^"]+)"/g)].map((match) => match[1]);
+}
+
+/**
+ * The boundaries of the flow and the transport: the boundary arrays of the
+ * triangle mesh which are boundary surfaces of the domain mesh, not the mesh
+ * surface or a region
+ */
+export function flowBoundaryNames(triangleMesh: string, domainMesh: string): string[] {
+  const surfaceNames = domainBoundarySurfaceNames(domainMesh);
+  return meshBoundaryNames(triangleMesh).filter((name) => surfaceNames.includes(name));
 }
 
 /**

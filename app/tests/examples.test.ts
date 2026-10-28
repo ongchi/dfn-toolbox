@@ -2,7 +2,7 @@
 // workflow file and runs the full workflow (network, flow and transport).
 import { existsSync } from "node:fs";
 import { beforeAll, describe, expect, test } from "vitest";
-import { FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries } from "../src/flow/state";
+import { FLOW_MESH_FILE, flowBoundaryNames, updateBoundaries } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { networkToLibraryToml } from "../src/form/toml";
 import { run_flow, run_generation, run_transport, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
@@ -41,7 +41,7 @@ describe.each(exampleNames)("%s", (exampleName) => {
     );
     expect(generation.error).toBeUndefined();
     const mesh = generation.file(FLOW_MESH_FILE) ?? "";
-    boundaryNames = meshBoundaryNames(mesh);
+    boundaryNames = flowBoundaryNames(mesh, readMesh(network.domain));
 
     updateBoundaries(workflow.flow, boundaryNames);
     const flowToml = flowToLibraryToml(workflow.flow);

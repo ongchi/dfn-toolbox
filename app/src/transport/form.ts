@@ -90,13 +90,14 @@ function boundariesSection(state: TransportState, context: FormContext): HTMLEle
     element(
       "p",
       "form-note",
-      "The point arrays boundary__<name> of the mesh (keys inflow and outflow). Use at least one of each. They need not be pressure boundaries of the flow.",
+      "The boundary surfaces of the domain mesh, in their colors of the 3D view (keys inflow and outflow). Use at least one of each. They need not be pressure boundaries of the flow.",
     ),
   );
   for (const boundary of state.boundaries) {
     container.append(
       selectField<BoundaryRole>({
         label: boundary.name,
+        labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
         value: boundary.role,
         choices: [
           ["none", "not used"],

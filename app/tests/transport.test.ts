@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { pointCount } from "../src/flow/polyData";
-import { FLOW_MESH_FILE, meshBoundaryNames, updateBoundaries } from "../src/flow/state";
+import { FLOW_MESH_FILE, flowBoundaryNames, updateBoundaries } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_transport_input, run_transport } from "../src/pkg/dfn_wasm.js";
 import {
@@ -19,29 +19,31 @@ import {
 import { transportToLibraryToml } from "../src/transport/toml";
 import { markVelocityAsVectors } from "../src/transport/trajectories";
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
-import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans } from "./cases";
+import { compareOutputFolders, generateExample, initWasm, readMesh, runNativeDfntrans } from "./cases";
 
-// The example with the boundary arrays of the mesh surface, and of the boundary surfaces north and east
+// The example with the boundary surfaces north and east
 const EXAMPLE_NAME = "l_shape_north_east";
 
 let mesh = "";
+let boundaryNames: string[] = [];
 let flowToml = "";
 
 beforeAll(() => {
   initWasm();
   const example = generateExample(EXAMPLE_NAME);
   mesh = example.mesh;
+  boundaryNames = flowBoundaryNames(mesh, readMesh(example.workflow.network.domain));
 
   // The flow of the example: from north to east
   const flowState = example.workflow.flow;
-  updateBoundaries(flowState, meshBoundaryNames(mesh));
+  updateBoundaries(flowState, boundaryNames);
   flowToml = flowToLibraryToml(flowState);
 });
 
 /** The transport state with the given boundary roles; one particle on each in-flow line (a few particles) */
 function transportState(roles: Record<string, BoundaryRole>): TransportState {
   const state = defaultTransportState();
-  updateTransportBoundaries(state, meshBoundaryNames(mesh));
+  updateTransportBoundaries(state, boundaryNames);
   for (const boundary of state.boundaries) {
     boundary.role = roles[boundary.name] ?? "none";
   }

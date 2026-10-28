@@ -49,13 +49,15 @@ There is no server: `npm run build` gives a folder of static files.
     (the flow needs them), thus each family needs an aperture.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
   `dfn_mesh.vtu` of the last generation; the boundaries are its point
-  arrays `boundary__<name>`, each with "use" and a pressure. A new
+  arrays `boundary__<name>` of the boundary surfaces of the domain mesh
+  (not `mesh_surface` and not the regions), each with the color of its
+  surface, "use" and a pressure. A new
   generation removes the flow output; a boundary with the same name keeps
   its values, and a used boundary of no array stays (fehm then reports it).
 - Transport tab: a form with one field for each key of `[transport]`. It
   uses the flow of the last "Solve flow": dfntrans solves the flow input of
-  that run again. Each boundary array of the mesh is "not used", "in-flow"
-  or "out-flow". A new flow removes the transport output. The form has no
+  that run again. Each boundary of the Flow tab (with the color of its
+  surface) is "not used", "in-flow" or "out-flow". A new flow removes the transport output. The form has no
   output section: dfntrans always writes the trajectories and the
   velocities (`trajectories = true`, `velocities = true`), and only the
   particles which exit (`all_particles = false`).
@@ -293,7 +295,8 @@ npm run dev & npm run e2e -- http://localhost:5173/
   normals of the three conventions, the half turn for the normal -z), the
   region arrays, and the region boxes of the predefined meshes.
 - `tests/flow.test.ts`: on the mesh of the example `l_shape_north_east`
-  (generated in WebAssembly), the fehm input of the flow form is a valid
+  (generated in WebAssembly), the boundaries of the form are only the
+  boundary surfaces, the fehm input of the flow form is a valid
   input, the output files agree with the `fehm` binary (within 1e-9), the
   in-flow is equal to the out-flow, and a boundary array with no point and
   no boundary are errors.
@@ -303,7 +306,8 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
-  the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example, the flow without a
+  the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example (the
+  boundaries of the Flow and Transport tabs are the boundary surfaces, with their colors), the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh and its description, the
   limits of the center of a new user-defined fracture, a bad input and the
   cancel; it saves screenshots.

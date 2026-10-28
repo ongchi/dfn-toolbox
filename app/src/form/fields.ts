@@ -7,6 +7,8 @@ export interface FieldOptions {
   key?: string;
   help?: string;
   isDisabled?: boolean;
+  /** A swatch of this CSS color before the label */
+  labelColor?: string;
 }
 
 export interface NumberFieldOptions extends FieldOptions {
@@ -40,10 +42,19 @@ function fieldShell(options: FieldOptions, input: HTMLElement): HTMLElement {
   if (options.isDisabled) {
     field.classList.add("is-disabled");
   }
-  const title = element("span", "field-label", options.label);
-  field.append(title, input);
+  field.append(fieldLabel(options), input);
   appendHelp(field, options);
   return field;
+}
+
+function fieldLabel(options: FieldOptions): HTMLElement {
+  const title = element("span", "field-label", options.label);
+  if (options.labelColor !== undefined) {
+    const swatch = element("span", "label-swatch");
+    swatch.style.backgroundColor = options.labelColor;
+    title.prepend(swatch);
+  }
+  return title;
 }
 
 /** Help text: the key and the help, with `code` in backticks; null without both */
@@ -169,8 +180,7 @@ export function checkboxField(options: FieldOptions & { value: boolean; onInput:
   input.checked = options.value;
   input.disabled = options.isDisabled ?? false;
   input.addEventListener("change", () => options.onInput(input.checked));
-  const text = element("span", "field-label", options.label);
-  field.append(input, text);
+  field.append(input, fieldLabel(options));
   appendHelp(field, options);
   return field;
 }
