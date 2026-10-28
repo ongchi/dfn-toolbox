@@ -52,6 +52,7 @@ pub struct GenerationResult {
     accepted_count: usize,
     final_count: usize,
     rejected_count: usize,
+    is_without_cluster_on_all_surfaces: bool,
 }
 
 #[wasm_bindgen]
@@ -101,6 +102,12 @@ impl GenerationResult {
     #[wasm_bindgen(getter)]
     pub fn rejected_count(&self) -> usize {
         self.rejected_count
+    }
+
+    /// True if no cluster connects all boundary surfaces: the generation kept all clusters
+    #[wasm_bindgen(getter)]
+    pub fn is_without_cluster_on_all_surfaces(&self) -> bool {
+        self.is_without_cluster_on_all_surfaces
     }
 }
 
@@ -155,6 +162,7 @@ pub fn run_generation(
         accepted_count: 0,
         final_count: 0,
         rejected_count: 0,
+        is_without_cluster_on_all_surfaces: false,
     };
     match outcome {
         Ok((network, files)) => {
@@ -162,6 +170,7 @@ pub fn run_generation(
             result.accepted_count = network.dfn.accepted_polys.len();
             result.final_count = network.final_fractures.len();
             result.rejected_count = network.dfn.rejected_polys.len();
+            result.is_without_cluster_on_all_surfaces = network.is_without_cluster_on_all_surfaces;
         }
         Err(report) => result.error = Some(report),
     }

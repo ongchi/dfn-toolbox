@@ -105,6 +105,15 @@ test("[network.region_boundaries] is an error: the boundary lines are always on 
   expect(problemsOf(toml)).toEqual(["[network]: `region_boundaries` is an unknown key"]);
 });
 
+test("keep_only_connected_to_surfaces in [network.clusters] is an error: it is always on", () => {
+  const toml = BOX.replace("[network.clusters]", "[network.clusters]\nkeep_only_connected_to_surfaces = true");
+  expect(problemsOf(toml)).toEqual(["[network.clusters]: `keep_only_connected_to_surfaces` is an unknown key"]);
+});
+
+test("the dfngen input keeps only the clusters which connect all boundary surfaces", () => {
+  expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).toMatch(/^keep_only_connected_to_surfaces = true$/m);
+});
+
 test("[transport.control_planes] is an error: the transport has no control planes", () => {
   const toml = `${BOX}\n[transport.control_planes]\nshape = "plane"\ndirection = "x"\nspacing = 1.0\n`;
   expect(problemsOf(toml)).toEqual(["[transport]: `control_planes` is an unknown key"]);

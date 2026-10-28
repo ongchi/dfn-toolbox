@@ -390,6 +390,11 @@ progress {
   background: #fef3f2;
 }
 
+.status.is-warning {
+  color: var(--warning);
+  background: var(--warning-background);
+}
+
 /* ---------------------------------------------------------------- viewer */
 
 .viewer {

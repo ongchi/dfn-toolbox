@@ -357,6 +357,27 @@ try {
     badInputStatus,
   );
 
+  // No cluster connects west and east (Box, default forms, this seed): the network shows, with a warning
+  await selectDomainSource(page, "example");
+  await selectDomainSource(page, "shape");
+  await page.evaluate(() => {
+    const input = [...document.querySelectorAll("#form input")].find(
+      (node) => node.closest(".field")?.querySelector(".field-label")?.textContent === "Seed",
+    );
+    input.value = "1837757520";
+    input.dispatchEvent(new Event("input"));
+  });
+  const noClusterStatus = await runStep(page, "network");
+  const isStatusWarning = await page.$eval("#status", (node) => node.classList.contains("is-warning"));
+  const hasNetwork = await page.$eval("#results-bezel", (node) => !node.hidden);
+  check(
+    isStatusWarning && hasNetwork && noClusterStatus.includes("No cluster connects all boundary surfaces"),
+    "no cluster on all boundary surfaces",
+    noClusterStatus,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_no_cluster_on_all_surfaces.png` });
+
   // Cancel: a large run, cancelled at once
   await selectExample(page, "box_west_east");
   await page.evaluate(() => {

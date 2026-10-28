@@ -39,6 +39,8 @@ export interface GenerationOutput {
   acceptedCount: number;
   finalCount: number;
   rejectedCount: number;
+  /** No cluster connects all boundary surfaces: the generation kept all clusters */
+  isWithoutClusterOnAllSurfaces: boolean;
 }
 
 export interface BoundaryFlow {

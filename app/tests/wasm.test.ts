@@ -88,6 +88,24 @@ test("bad input gives the error message of the library", () => {
   expect(check_input(toml, files.mesh, files.userFractures)?.message).toMatch(/unknown field `sede`/);
 });
 
+test("a network with no cluster on all boundary surfaces keeps its clusters and tells it", () => {
+  // With 100 fractures, no cluster of the case connects the faces west and east
+  const files = readCase("clusters_connect_surfaces");
+  const toml = files.toml.replace(/^n_poly = 300$/m, "n_poly = 100");
+  const result = run_generation(toml, files.mesh, files.userFractures, 1n, () => {});
+  expect([result.error, result.final_count > 0, result.is_without_cluster_on_all_surfaces]).toEqual([
+    undefined,
+    true,
+    true,
+  ]);
+});
+
+test("a network with a cluster on all boundary surfaces does not tell it", () => {
+  const files = readCase("clusters_connect_surfaces");
+  const result = run_generation(files.toml, files.mesh, files.userFractures, 1n, () => {});
+  expect(result.is_without_cluster_on_all_surfaces).toBe(false);
+});
+
 test("progress is reported", () => {
   const files = readCase("base");
   const fractions: number[] = [];

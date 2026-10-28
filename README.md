@@ -46,7 +46,12 @@ There is no server: `npm run build` gives a folder of static files.
     center, shape, aperture and orientation; see "User-defined fractures").
   - DFN tab: a form with one field for each other key of `[network]`.
     The boundary lines of the regions and the triangle mesh are always on
-    (the flow needs them), thus each family needs an aperture.
+    (the flow needs them), thus each family needs an aperture. The dfngen
+    input always has `keep_only_connected_to_surfaces = true` (the flow
+    needs a path between the boundary surfaces); the workflow file has no
+    key for it, and the section "Clusters" tells it in a note. If no cluster
+    connects all boundary surfaces, dfngen keeps all clusters: the network
+    shows, and the status line gives a warning (amber).
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
   `dfn_mesh.vtu` of the last generation; the boundaries are its point
   arrays `boundary__<name>` of the boundary surfaces of the domain mesh
@@ -309,8 +314,10 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example (the
   boundaries of the Flow and Transport tabs are the boundary surfaces, with their colors), the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh and its description, the
-  limits of the center of a new user-defined fracture, a bad input and the
-  cancel; it saves screenshots.
+  limits of the center of a new user-defined fracture, a bad input, a
+  network with no cluster on all boundary surfaces (Box, default forms, seed
+  1837757520: the network and an amber warning) and the cancel; it saves
+  screenshots.
 
 ## VTK.wasm notes
 

@@ -109,12 +109,13 @@ pub fn dfngen_report(error: &DfngenError) -> ErrorReport {
             .with("other", other),
         DfngenError::Family { family, source } => family_report(error, *family, source),
         DfngenError::MeshNeedsRegionBoundaries => report("dfngen.MeshNeedsRegionBoundaries"),
+        DfngenError::ClustersNeedRegionBoundaries => report("dfngen.ClustersNeedRegionBoundaries"),
+        DfngenError::ClustersNeedBoundarySurfaces => report("dfngen.ClustersNeedBoundarySurfaces"),
         DfngenError::MeshMaxSizeFactor => report("dfngen.MeshMaxSizeFactor"),
         DfngenError::MeshSlope => report("dfngen.MeshSlope"),
         DfngenError::NoFractureDefined => report("dfngen.NoFractureDefined"),
         DfngenError::Mesh(_) => report("dfngen.Mesh"),
-        DfngenError::NoIntersectingFractures => report("dfngen.NoIntersectingFractures"),
-    }
+        DfngenError::NoIntersectingFractures => report("dfngen.NoIntersectingFractures"),    }
 }
 
 fn family_report(error: &DfngenError, family: usize, source: &FamilyError) -> ErrorReport {

@@ -57,6 +57,9 @@ const TRAJECTORIES_FILE = "trajectories.vtp";
 const VELOCITIES_FILE = "velocities.vtp";
 const FLOW_VELOCITY_OPTION = colorOptionValue(FLOW_VELOCITY_ARRAY);
 const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
+// The generation keeps all clusters when none connects all boundary surfaces
+const NO_CLUSTER_ON_ALL_SURFACES =
+  "No cluster connects all boundary surfaces: all clusters stay. The flow needs a path between the boundary surfaces; increase the number of fractures or their size, or try another seed.";
 
 // The domain, the user fractures and the network are the three tabs of the network input
 const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
@@ -147,6 +150,13 @@ function showStatus(text: string, isError = false): void {
   ui.status.hidden = text === "";
   ui.status.textContent = text;
   ui.status.classList.toggle("is-error", isError);
+  ui.status.classList.remove("is-warning");
+}
+
+/** A status which is not an error, but which the user must see */
+function showWarningStatus(text: string): void {
+  showStatus(text);
+  ui.status.classList.add("is-warning");
 }
 
 function errorText(error: unknown): string {
@@ -387,7 +397,12 @@ async function runGeneration(): Promise<void> {
       showStatus(toolErrorText(result.error), true);
       return;
     }
-    showStatus(`Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`);
+    const doneText = `Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`;
+    if (result.isWithoutClusterOnAllSurfaces) {
+      showWarningStatus(`${doneText}\n${NO_CLUSTER_ON_ALL_SURFACES}`);
+    } else {
+      showStatus(doneText);
+    }
     await showOutput(result);
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));

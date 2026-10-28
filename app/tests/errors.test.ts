@@ -85,6 +85,18 @@ test("a user fracture aperture of 0 names the fracture and the field of the form
   expect(text).toBe("Fracture 1 (User fractures tab): Aperture must be greater than 0.");
 });
 
+test("a domain without boundary surfaces asks for another domain shape", () => {
+  // The mesh of the case base has no boundary surfaces
+  const text = networkErrorText((toml) =>
+    toml
+      .replace("[region_boundaries]\nenable = false", "[region_boundaries]\nenable = true")
+      .replace("keep_only_connected_to_surfaces = false", "keep_only_connected_to_surfaces = true"),
+  );
+  expect(text).toBe(
+    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect them. Choose another domain shape (Domain tab).",
+  );
+});
+
 test("a family with 2 points names the family", () => {
   const text = networkErrorText((toml) => toml.replace(/number_of_points = \d+/, "number_of_points = 2"));
   expect(text).toBe("Family 1 (DFN tab): Number of points must be 3 or more.");

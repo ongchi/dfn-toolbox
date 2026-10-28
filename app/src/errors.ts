@@ -65,6 +65,8 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.UserFracture.EmptyRegion": (f) =>
     `${USER_FRACTURE(f)}: the region ${f.region} has no cell in the domain. Choose another region.`,
   "dfngen.UserFracture.Aperture": (f) => `${USER_FRACTURE(f)}: Aperture must be greater than 0.`,
+  "dfngen.ClustersNeedBoundarySurfaces": () =>
+    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect them. Choose another domain shape (Domain tab).",
   "dfngen.MeshMaxSizeFactor": () => `Maximum size factor (${MESH_SECTION}) must be 1 or more.`,
   "dfngen.MeshSlope": () => `Slope (${MESH_SECTION}) must be greater than 0.`,
   "dfngen.NoFractureDefined": () =>
