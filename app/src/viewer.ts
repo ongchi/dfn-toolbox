@@ -14,7 +14,6 @@ import {
   type VtkNamespace,
   type vtkActor,
   type vtkLookupTable,
-  type vtkOrientationMarkerWidget,
   type vtkPolyDataMapper,
   type vtkRenderer,
   type vtkScalarBarActor,
@@ -108,17 +107,14 @@ export class NetworkViewer {
   private boundarySurfaceActors = new Map<string, vtkActor>();
   private colorArray: ColorArray | null = null;
   private readonly canvas: HTMLCanvasElement;
-  private readonly axesWidget: vtkOrientationMarkerWidget;
 
   private constructor(
     session: StandaloneSession,
     renderer: vtkRenderer,
     window: vtkWebAssemblyOpenGLRenderWindow,
     canvas: HTMLCanvasElement,
-    axesWidget: vtkOrientationMarkerWidget,
   ) {
     this.canvas = canvas;
-    this.axesWidget = axesWidget;
     this.vtk = session.vtk;
     this.renderer = renderer;
     this.window = window;
@@ -176,12 +172,7 @@ export class NetworkViewer {
     axesWidget.setEnabled(1);
     axesWidget.setInteractive(0);
 
-    return new NetworkViewer(session, renderer, window, canvas, axesWidget);
-  }
-
-  /** Shows or hides the x, y, z axes in the corner */
-  setAxesVisible(isVisible: boolean): void {
-    this.axesWidget.setEnabled(isVisible ? 1 : 0);
+    return new NetworkViewer(session, renderer, window, canvas);
   }
 
   /** Shows the domain mesh (text of an ASCII .vtu file) as a wireframe. */

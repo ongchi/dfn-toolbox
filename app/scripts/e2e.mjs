@@ -127,13 +127,6 @@ try {
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surfaces.png` });
 
-  // The x, y, z axes in the corner: the checkbox "Axes" hides them
-  await page.click("#show-axes");
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  const canvasWithoutAxes = Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
-  await page.click("#show-axes");
-  check(!canvasAfter.equals(canvasWithoutAxes), "axes checkbox", canvasAfter.equals(canvasWithoutAxes) ? "unchanged" : "changed");
-
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
   const domainRows = async () =>
     page.evaluate(
