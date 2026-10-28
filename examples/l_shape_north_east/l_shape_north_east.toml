@@ -33,7 +33,6 @@ slope = 0.5
 
 [network.clusters]
 keep_only_largest = true
-keep_isolated_fractures = false
 
 [[network.family]]
 number_of_points = 8

@@ -38,7 +38,6 @@ export interface MeshState {
 
 export interface ClustersState {
   keepOnlyLargest: boolean;
-  keepIsolatedFractures: boolean;
 }
 
 export type LogNormalSampling = "rejection" | "inverse_cdf";
@@ -202,7 +201,7 @@ export function defaultFormState(): FormState {
     generation: { stopCondition: "n_poly", nPoly: 100, forceLargeFractures: false, removeFracturesLessThan: 0.0 },
     fram: { ...FRAM_DEFAULTS, enable: true },
     mesh: { ...MESH_DEFAULTS },
-    clusters: { keepOnlyLargest: false, keepIsolatedFractures: false },
+    clusters: { keepOnlyLargest: false },
     families: [defaultFamily()],
   };
 }

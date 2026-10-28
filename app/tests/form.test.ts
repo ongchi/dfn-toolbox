@@ -114,6 +114,15 @@ test("the dfngen input keeps only the clusters which connect all boundary surfac
   expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).toMatch(/^keep_only_connected_to_surfaces = true$/m);
 });
 
+test("keep_isolated_fractures in [network.clusters] is an error: the isolated fractures are always removed", () => {
+  const toml = BOX.replace("[network.clusters]", "[network.clusters]\nkeep_isolated_fractures = false");
+  expect(problemsOf(toml)).toEqual(["[network.clusters]: `keep_isolated_fractures` is an unknown key"]);
+});
+
+test("the dfngen input removes the isolated fractures", () => {
+  expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).toMatch(/^keep_isolated_fractures = false$/m);
+});
+
 test("[transport.control_planes] is an error: the transport has no control planes", () => {
   const toml = `${BOX}\n[transport.control_planes]\nshape = "plane"\ndirection = "x"\nspacing = 1.0\n`;
   expect(problemsOf(toml)).toEqual(["[transport]: `control_planes` is an unknown key"]);

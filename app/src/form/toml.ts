@@ -204,10 +204,7 @@ export function networkTables(state: FormState): TomlTable[] {
   tables.push({
     name: "clusters",
     isArray: false,
-    lines: [
-      `keep_only_largest = ${state.clusters.keepOnlyLargest}`,
-      `keep_isolated_fractures = ${state.clusters.keepIsolatedFractures}`,
-    ],
+    lines: [`keep_only_largest = ${state.clusters.keepOnlyLargest}`],
   });
 
   for (const family of state.families) {
@@ -226,11 +223,12 @@ export function networkTables(state: FormState): TomlTable[] {
 const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray: false, lines: ["enable = true"] };
 
 /**
- * The clusters which do not connect all boundary surfaces are always removed
- * in dfn-web (the flow needs a path between them), thus the workflow file has
- * no key for it; the dfngen input needs it
+ * The isolated fractures and the clusters which do not connect all boundary
+ * surfaces are always removed in dfn-web (the flow needs a path between the
+ * surfaces), thus the workflow file has no keys for them; the dfngen input
+ * needs them
  */
-const CONNECTED_TO_SURFACES_LINE = "keep_only_connected_to_surfaces = true";
+const FIXED_CLUSTERS_LINES = ["keep_isolated_fractures = false", "keep_only_connected_to_surfaces = true"];
 
 /**
  * The dfngen input file of the network. The mesh is always on in dfn-web. The
@@ -247,7 +245,7 @@ export function networkToLibraryToml(state: FormState): string {
       return [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }];
     }
     if (table.name === "clusters") {
-      return [{ ...table, lines: [...table.lines, CONNECTED_TO_SURFACES_LINE] }];
+      return [{ ...table, lines: [...table.lines, ...FIXED_CLUSTERS_LINES] }];
     }
     return table.name === "user_fracture" ? [] : [table];
   });
@@ -630,7 +628,6 @@ export function readNetwork(table: Table, problems: string[]): FormState {
   const clustersReader = new TableReader(reader.subTable("clusters"), "[network.clusters]", problems);
   const clusters = {
     keepOnlyLargest: clustersReader.boolean("keep_only_largest", false),
-    keepIsolatedFractures: clustersReader.boolean("keep_isolated_fractures", false),
   };
   clustersReader.checkUnknownKeys();
 

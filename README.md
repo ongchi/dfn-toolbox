@@ -48,9 +48,10 @@ There is no server: `npm run build` gives a folder of static files.
   - DFN tab: a form with one field for each other key of `[network]`.
     The boundary lines of the regions and the triangle mesh are always on
     (the flow needs them), thus each family needs an aperture. The dfngen
-    input always has `keep_only_connected_to_surfaces = true` (the flow
-    needs a path between the boundary surfaces); the workflow file has no
-    key for it, and the section "Clusters" tells it in a note. If no cluster
+    input always has `keep_isolated_fractures = false` and
+    `keep_only_connected_to_surfaces = true` (the flow needs a path between
+    the boundary surfaces); the workflow file has no keys for them, and the
+    section "Clusters" tells it in a note. If no cluster
     connects all boundary surfaces, dfngen keeps all clusters: the network
     shows, the status line gives a warning (amber), and "Next" stays
     disabled.
@@ -129,7 +130,7 @@ domain = "Box.vtu"                 # the name of a predefined mesh (`meshes/`); 
 [network.mesh]                     # optional; no [network.region_boundaries]: the boundary lines are always on
 max_size_factor = 5.0              # no `enable`: always on
 slope = 0.5
-[network.clusters]                 # as [clusters]
+[network.clusters]                 # as [clusters]; only keep_only_largest (no keep_isolated_fractures, no keep_only_connected_to_surfaces)
 [[network.family]]                 # as [[family]]; `aperture` is necessary
 [[network.user_fracture]]          # optional; one table for each user-defined fracture, all keys necessary
 region = "box"                     # one region of the mesh
