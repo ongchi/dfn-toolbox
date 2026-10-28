@@ -71,7 +71,8 @@ There is no server: `npm run build` gives a folder of static files.
   particles which exit (`all_particles = false`).
   `trajectories.vtp` has a point for each time step: with many particles
   it is very large (about 1 MB for each particle in the examples), thus the
-  default seeding has few particles (50, or 3 per line), and the help of
+  default seeding has few particles (method "uniform per in-flow line",
+  3 per line; 50 for the methods with a particle count), and the help of
   the particle fields tells the size.
 - "Generate", "Solve flow" and "Track particles" run in a Web Worker;
   "Cancel" stops them. An error of the library shows in the status line,

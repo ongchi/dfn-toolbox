@@ -60,7 +60,7 @@ export function defaultTransportState(): TransportState {
     routing: "complete_mixing",
     boundaries: [],
     seeding: {
-      method: "flux_weighted",
+      method: "uniform_per_line",
       // Few particles: the trajectories have about 1 MB for each particle
       particlesPerLine: 3,
       isWeightedByFlux: true,
