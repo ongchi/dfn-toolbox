@@ -370,10 +370,15 @@ try {
   const noClusterStatus = await runStep(page, "network");
   const isStatusWarning = await page.$eval("#status", (node) => node.classList.contains("is-warning"));
   const hasNetwork = await page.$eval("#results-bezel", (node) => !node.hidden);
+  // "Next" of the DFN tab needs a cluster which connects all boundary surfaces
+  const isNoClusterNextDisabled = await page.$eval("#next-button", (node) => node.disabled);
   check(
-    isStatusWarning && hasNetwork && noClusterStatus.includes("No cluster connects all boundary surfaces"),
+    isStatusWarning &&
+      hasNetwork &&
+      isNoClusterNextDisabled &&
+      noClusterStatus.includes("No cluster connects all boundary surfaces"),
     "no cluster on all boundary surfaces",
-    noClusterStatus,
+    `${noClusterStatus}; next ${isNoClusterNextDisabled ? "disabled" : "enabled"}`,
   );
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_no_cluster_on_all_surfaces.png` });

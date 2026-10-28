@@ -183,12 +183,14 @@ function setBusy(busy: boolean): void {
 
 /**
  * "Next" goes to the next tab; the Transport tab has none. On the DFN tab it
- * needs the fracture mesh of a generation, on the Flow tab a solved flow.
+ * needs the fracture mesh of a generation with a cluster which connects all
+ * boundary surfaces, on the Flow tab a solved flow.
  */
 function updateNextButton(): void {
   const isLastTab = activeSidebarTab === SIDEBAR_TABS[SIDEBAR_TABS.length - 1];
+  const isNetworkMissing = flowMesh() === null || output?.isWithoutClusterOnAllSurfaces === true;
   const isOutputMissing =
-    (activeSidebarTab === "network" && flowMesh() === null) || (activeSidebarTab === "flow" && flowOutput === null);
+    (activeSidebarTab === "network" && isNetworkMissing) || (activeSidebarTab === "flow" && flowOutput === null);
   ui.nextButton.hidden = isLastTab;
   ui.nextButton.disabled = isBusy || isOutputMissing;
 }

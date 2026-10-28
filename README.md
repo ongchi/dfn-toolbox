@@ -29,7 +29,8 @@ There is no server: `npm run build` gives a folder of static files.
 - The input of `[network]` is in three tabs: Domain, User fractures and
   DFN; "Generate" is on the DFN tab. The page opens on the Domain tab.
   "Next" goes to the next tab (each tab but Transport); on the DFN tab it
-  needs the fracture mesh of a generation, on the Flow tab a solved flow.
+  needs the fracture mesh of a generation with a cluster which connects all
+  boundary surfaces, on the Flow tab a solved flow.
   - Domain tab: two radio buttons. "Example" shows the example (a dropdown
     of `examples/`) and its description; an example loads the full
     workflow. "Predefined domain shape" shows the domain mesh: one of the
@@ -51,7 +52,8 @@ There is no server: `npm run build` gives a folder of static files.
     needs a path between the boundary surfaces); the workflow file has no
     key for it, and the section "Clusters" tells it in a note. If no cluster
     connects all boundary surfaces, dfngen keeps all clusters: the network
-    shows, and the status line gives a warning (amber).
+    shows, the status line gives a warning (amber), and "Next" stays
+    disabled.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
   `dfn_mesh.vtu` of the last generation; the boundaries are its point
   arrays `boundary__<name>` of the boundary surfaces of the domain mesh
@@ -316,7 +318,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   mesh, the transport without a flow, the choice of a predefined mesh and its description, the
   limits of the center of a new user-defined fracture, a bad input, a
   network with no cluster on all boundary surfaces (Box, default forms, seed
-  1837757520: the network and an amber warning) and the cancel; it saves
+  1837757520: the network, an amber warning and "Next" disabled) and the cancel; it saves
   screenshots.
 
 ## VTK.wasm notes
