@@ -512,12 +512,31 @@ function clearOutput(): void {
   renderFlow();
 }
 
+/**
+ * Removes the "Color by" options of a cleared output. If one of them is
+ * selected, the default array: the viewer must not color a new mesh by an
+ * array which it does not have.
+ */
+function removeColorOptions(optionValues: string[]): void {
+  const isSelected = optionValues.includes(ui.colorSelect.value);
+  for (const option of [...ui.colorSelect.options]) {
+    if (optionValues.includes(option.value)) {
+      option.remove();
+    }
+  }
+  if (isSelected) {
+    ui.colorSelect.value = DEFAULT_COLOR_OPTION;
+    void viewer?.colorBy(colorArrayOf(ui.colorSelect.value));
+  }
+}
+
 /** The flow output belongs to the mesh of one generation */
 function clearFlowOutput(): void {
   flowOutput = null;
   updateNextButton();
   flowOutputToml = null;
   ui.flowResults.hidden = true;
+  removeColorOptions([PRESSURE_OPTION, FLOW_VELOCITY_OPTION]);
   clearTransportOutput();
   renderTransport();
 }
@@ -525,6 +544,7 @@ function clearFlowOutput(): void {
 /** The transport output belongs to one flow output */
 function clearTransportOutput(): void {
   transportOutput = null;
+  removeColorOptions([TRANSPORT_VELOCITY_OPTION]);
   ui.transportResults.hidden = true;
   ui.showTrajectories.checked = false;
   ui.showTrajectories.disabled = true;

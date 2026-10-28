@@ -86,7 +86,9 @@ There is no server: `npm run build` gives a folder of static files.
   done; "Flow velocity": the magnitude of the `darcy_velocity` of each
   triangle of `pressure.vtu`, m/s; "Transport velocity", with the output
   `velocities` of the transport: the mean speed of the sectors of each
-  point in `velocities.vtp`, in m/s), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
+  point in `velocities.vtp`, in m/s; a new generation removes the flow and
+  transport options, a new flow the transport option, and a removed
+  selected option gives `fracture_id`), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
   (layer "Domain", a wireframe, and each boundary surface in its color
   with an opacity of 0.5), the polygons of the user-defined
   fractures of the form (layer "User fractures", blue; updated at each
@@ -316,7 +318,8 @@ npm run dev & npm run e2e -- http://localhost:5173/
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
   the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example (the
-  boundaries of the Flow and Transport tabs are the boundary surfaces, with their colors), the flow without a
+  boundaries of the Flow and Transport tabs are the boundary surfaces, with their colors), the flow again
+  after the transport and the generation again after the flow (no error of a removed "Color by" array), the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh and its description, the
   limits of the center of a new user-defined fracture, a bad input, a
   network with no cluster on all boundary surfaces (Box, default forms, seed

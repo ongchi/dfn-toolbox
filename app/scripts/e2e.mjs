@@ -274,6 +274,29 @@ try {
     sectionStates.join(" | "),
   );
 
+  // A new run of an earlier step removes the "Color by" options of the later
+  // outputs; the new mesh is not colored by an array which it does not have
+  await page.select("#color-select", "point:transport_velocity");
+  const reflowStatus = await runStep(page, "flow");
+  const reflowOptions = await colorOptions(page);
+  check(
+    reflowStatus.startsWith("Done") && !(await isStatusError(page)) && !reflowOptions.includes("point:transport_velocity"),
+    "flow again after the transport",
+    reflowStatus,
+  );
+  await page.select("#color-select", "point:pressure");
+  const regenerateStatus = await runStep(page, "network");
+  const regenerateOptions = await colorOptions(page);
+  const regenerateColor = await page.$eval("#color-select", (node) => node.value);
+  check(
+    regenerateStatus.startsWith("Done") &&
+      !(await isStatusError(page)) &&
+      !regenerateOptions.includes("point:pressure") &&
+      regenerateColor === "cell:fracture_id",
+    "generate again after the flow",
+    `${regenerateStatus}; Color by ${regenerateColor}`,
+  );
+
   // Flow without a mesh and transport without a flow: a new example has no output
   await page.click('[data-sidebar-tab="network"]');
   await selectExample(page, "box_west_east");
