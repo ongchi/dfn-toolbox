@@ -1,9 +1,10 @@
 # L shape north -> east: an L-shaped domain (the L-shape) of 4 boxes: the
 # west, middle and east boxes along x (y 20 to 25), and the north box at
 # +y of the west box (x 10 to 15, y 25 to 30). The regions are west_box,
-# east_box and other_boxes (the middle and the north box). The end face of
-# the north box (y = 30) is the boundary surface north, the end face of the
-# east box (x = 25) the boundary surface east. One family in each region:
+# east_box and other_boxes (the middle and the north box). Each plane of
+# the outer faces is a boundary surface. The end face of the north box
+# (y = 30), north, is the in-flow; the end face of the east box (x = 25),
+# east, is the out-flow; the other surfaces are no-flow. One family in each region:
 # the region gives only the fracture centers. The fractures are cut only at
 # the mesh surface, thus they connect the regions. The flow goes through
 # the L from north (10.1 MPa) to east (10.0 MPa), with gravity; the

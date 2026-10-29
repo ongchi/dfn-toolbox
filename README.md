@@ -213,9 +213,9 @@ region `box` (its hexahedron) for the user-defined fracture of
 
 | Example | Content |
 |---|---|
-| `box_west_east` | A cube of 10 m (`Box.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
+| `box_west_east` | A cube of 10 m (`Box.vtu`: one hexahedron and its 6 faces as quads, each a boundary surface: west at x = 0, east at x = 10, south, north, bottom and top). One family; flow and particles from west to east (the other surfaces no-flow). |
 | `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
-| `l_shape_north_east` | An L-shaped domain of 4 boxes (`L-shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
+| `l_shape_north_east` | An L-shaped domain of 4 boxes (`L-shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); each plane of the outer faces is one boundary surface (16 quads): north (the end face of the north box), east (the end face of the east box), west, south, inner_east and inner_north (the two faces of the inner corner), bottom and top. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
 | `user_fractures_stochastic` | The same cube, a large user-defined fracture in the region `box` (a rectangle in the plane y = 5) from west to east with a larger aperture, and a stochastic family. |
 
 The seeds of the examples give a network which connects the in-flow and

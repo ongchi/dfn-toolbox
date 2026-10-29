@@ -109,9 +109,9 @@ test("no in-flow boundary is an error", () => {
 });
 
 test("an unknown boundary is an error of the run", () => {
-  const toml = transportToml().replace('inflow = ["north"]', 'inflow = ["west"]');
+  const toml = transportToml().replace('inflow = ["north"]', 'inflow = ["nowhere"]');
   const error = run_transport(toml, flowToml, mesh, 1).error;
-  expect([error?.kind, error?.field_values]).toEqual(["dfntrans.UnknownBoundary", ["west"]]);
+  expect([error?.kind, error?.field_values]).toEqual(["dfntrans.UnknownBoundary", ["nowhere"]]);
 });
 
 test("the transport velocities give a speed at the points of the mesh", () => {

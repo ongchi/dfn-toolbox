@@ -1,12 +1,14 @@
 <?xml version="1.0"?>
 <!-- A cube of 10 m, from (0, 0, 0) to (10, 10, 10): one hexahedron (cell 0)
-     and its 6 faces as quads (cells 1 to 6). The face at x = 0 is on the
-     boundary surface west, the face at x = 10 on the boundary surface east:
-     they are the in-flow and the out-flow. The other faces are on no
-     boundary surface. The hexahedron is the region box. -->
+     and its 6 faces as quads (cells 1 to 6), each on its boundary surface:
+     west (x = 0, cell 1), east (x = 10, cell 2), south (y = 0, cell 3),
+     north (y = 10, cell 4), bottom (z = 0, cell 5) and top (z = 10, cell 6).
+     west and east are first: a new shape makes them the in-flow and the
+     out-flow. The hexahedron is the region box. -->
 <!-- Description: A cube of 10 m, from (0, 0, 0) to (10, 10, 10), with the
-     region box. The face at x = 0 is the boundary surface west, the face at
-     x = 10 the boundary surface east. -->
+     region box. Each face is a boundary surface: west (x = 0), east
+     (x = 10), south (y = 0), north (y = 10), bottom (z = 0) and top
+     (z = 10). -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
 <Piece NumberOfPoints="8" NumberOfCells="7">
@@ -19,6 +21,18 @@
 </DataArray>
 <DataArray type="Int32" Name="boundary__east" format="ascii">
 0 0 1 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__south" format="ascii">
+0 0 0 1 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__north" format="ascii">
+0 0 0 0 1 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__bottom" format="ascii">
+0 0 0 0 0 1 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__top" format="ascii">
+0 0 0 0 0 0 1
 </DataArray>
 </CellData>
 <Points>

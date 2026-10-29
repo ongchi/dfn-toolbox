@@ -1,9 +1,9 @@
 # Box west -> east: the simplest workflow. One family of fractures in a
-# cube of 10 m (the Box shape). The faces of the cube are surface cells
-# of the mesh: the face at x = 0 is the boundary surface west, the face at
-# x = 10 the boundary surface east. The flow goes from west (10.1 MPa) to
-# east (10.0 MPa); the lines on the other faces (mesh_surface) have no flow.
-# The particles start on the in-flow lines and leave at east.
+# cube of 10 m (the Box shape). Each face of the cube is a boundary
+# surface: west (x = 0) is the in-flow, east (x = 10) the out-flow, and
+# south, north, bottom and top are no-flow surfaces. The flow goes from
+# west (10.1 MPa) to east (10.0 MPa). The particles start on the in-flow
+# lines and leave at east.
 
 [boundaries]
 inflow = ["west"]

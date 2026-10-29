@@ -11,6 +11,8 @@ const url = process.argv[2] ?? "http://localhost:5173/";
 const screenshotDir = process.argv[3] ?? ".";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const RUN_TIMEOUT = 300000;
+// The roles of the surfaces of the Box shape (example box_west_east, and a new shape)
+const BOX_ROLES = "west: inflow, east: outflow, south: noflow, north: noflow, bottom: noflow, top: noflow";
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -162,7 +164,7 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 500));
   const canvasAfter = Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
   check(
-    surfaceNames === "west, east" && !canvasBefore.equals(canvasAfter),
+    surfaceNames === "west, east, south, north, bottom, top" && !canvasBefore.equals(canvasAfter),
     "boundary surface colors",
     `${surfaceNames}; view ${canvasBefore.equals(canvasAfter) ? "unchanged" : "changed"}`,
   );
@@ -170,7 +172,8 @@ try {
 
   // The roles of the boundary surfaces of the example
   const exampleRoles = await domainRoles(page);
-  check(exampleRoles === "west: inflow, east: outflow", "boundary surface roles", exampleRoles);
+  check(exampleRoles === BOX_ROLES, "boundary surface roles", exampleRoles);
+
 
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
   const domainRows = async () =>
@@ -438,7 +441,7 @@ try {
 
   // A predefined shape: the first surface is in-flow, the second out-flow
   const shapeRoles = await domainRoles(page);
-  check(shapeRoles === "west: inflow, east: outflow", "default roles of a shape", shapeRoles);
+  check(shapeRoles === BOX_ROLES, "default roles of a shape", shapeRoles);
 
   // A change of a role clears the network; with no out-flow surface, the generation asks for one
   await setRole(page, "east", "noflow");

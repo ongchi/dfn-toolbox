@@ -4,12 +4,26 @@ import { boundarySurfacePolyData, domainBoundarySurfaceNames } from "../src/boun
 import { dataArrayValues } from "../src/inputFiles";
 import { readMesh } from "./cases";
 
-test("the box mesh has the boundary surfaces west and east", () => {
-  expect(domainBoundarySurfaceNames(readMesh("Box.vtu"))).toEqual(["west", "east"]);
+test("the box mesh has a boundary surface for each face, west and east first", () => {
+  expect(domainBoundarySurfaceNames(readMesh("Box.vtu"))).toEqual(["west", "east", "south", "north", "bottom", "top"]);
 });
 
-test("the L-shaped mesh has the boundary surfaces north and east", () => {
-  expect(domainBoundarySurfaceNames(readMesh("L-shape.vtu"))).toEqual(["north", "east"]);
+test("the L-shaped mesh has a boundary surface for each plane of its faces, north and east first", () => {
+  expect(domainBoundarySurfaceNames(readMesh("L-shape.vtu"))).toEqual([
+    "north",
+    "east",
+    "west",
+    "south",
+    "inner_east",
+    "inner_north",
+    "bottom",
+    "top",
+  ]);
+});
+
+test("the faces of the L-shaped mesh on one plane are one surface", () => {
+  const polygonCount = (name: string) => dataArrayValues(boundarySurfacePolyData(readMesh("L-shape.vtu"), name), "offsets")?.length;
+  expect(["west", "south", "inner_north", "bottom", "top"].map(polygonCount)).toEqual([2, 3, 2, 4, 4]);
 });
 
 test("the surface west of the box is its quad at x = 0", () => {
@@ -28,5 +42,5 @@ test("the surface keeps all points of the mesh", () => {
 });
 
 test("a missing boundary surface is an error", () => {
-  expect(() => boundarySurfacePolyData(readMesh("Box.vtu"), "south")).toThrow("south");
+  expect(() => boundarySurfacePolyData(readMesh("Box.vtu"), "nowhere")).toThrow("nowhere");
 });

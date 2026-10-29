@@ -5,32 +5,63 @@
      (x 10 to 15), the middle box (x 15 to 20) and the east box (x 20 to 25).
      Cell 3: a hexahedron in +y of the west box (the north box, y 25 to 30).
      Regions: west_box = cell 0, east_box = cell 2, other_boxes = cells 1, 3.
-     Cell 4: the end face of the north box (y = 30), boundary surface north.
-     Cell 5: the end face of the east box (x = 25), boundary surface east. -->
+     Cells 4 to 21: the outer faces as quads; the faces on one plane are one
+     boundary surface:
+       north (y = 30): cell 4, the end face of the north box
+       east (x = 25): cell 5, the end face of the east box
+       west (x = 10): cells 6, 7 (west box, north box)
+       south (y = 20): cells 8 to 10 (west, middle, east box)
+       inner_east (x = 15, y 25 to 30): cell 11 (north box, side to +x)
+       inner_north (y = 25, x 15 to 25): cells 12, 13 (middle, east box,
+         side to +y)
+       bottom (z = 30): cells 14 to 17 (west, middle, east, north box)
+       top (z = 35): cells 18 to 21 (west, middle, east, north box)
+     north and east are first: a new shape makes them the in-flow and the
+     out-flow. -->
 <!-- Description: An L shape of four boxes of 5 m: the west, middle and east
      boxes along x, and the north box at +y of the west box; from
      (10, 20, 30) to (25, 30, 35). Regions: west_box, east_box and
-     other_boxes (the middle and the north box). The end face of the north
-     box is the boundary surface north, the end face of the east box the
-     boundary surface east. -->
+     other_boxes (the middle and the north box). Each plane of the outer
+     faces is a boundary surface: north (end face of the north box, y = 30),
+     east (end face of the east box, x = 25), west (x = 10), south (y = 20),
+     inner_east and inner_north (the two faces of the inner corner, x = 15
+     and y = 25), bottom (z = 30) and top (z = 35). -->
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
-<Piece NumberOfPoints="20" NumberOfCells="6">
+<Piece NumberOfPoints="20" NumberOfCells="22">
 <CellData Scalars="region__west_box">
 <DataArray type="Int32" Name="region__west_box" format="ascii">
-1 0 0 0 0 0
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="region__east_box" format="ascii">
-0 0 1 0 0 0
+0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="region__other_boxes" format="ascii">
-0 1 0 1 0 0
+0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="boundary__north" format="ascii">
-0 0 0 0 1 0
+0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="boundary__east" format="ascii">
-0 0 0 0 0 1
+0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__west" format="ascii">
+0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__south" format="ascii">
+0 0 0 0 0 0 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__inner_east" format="ascii">
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__inner_north" format="ascii">
+0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__bottom" format="ascii">
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0 0 0
+</DataArray>
+<DataArray type="Int32" Name="boundary__top" format="ascii">
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1
 </DataArray>
 </CellData>
 <Points>
@@ -65,12 +96,28 @@
 4 5 9 8 14 15 19 18
 8 9 19 18
 3 7 17 13
+0 4 14 10
+4 8 18 14
+0 1 11 10
+1 2 12 11
+2 3 13 12
+5 9 19 15
+5 6 16 15
+6 7 17 16
+0 1 5 4
+1 2 6 5
+2 3 7 6
+4 5 9 8
+10 11 15 14
+11 12 16 15
+12 13 17 16
+14 15 19 18
 </DataArray>
 <DataArray type="Int64" Name="offsets" format="ascii">
-8 16 24 32 36 40
+8 16 24 32 36 40 44 48 52 56 60 64 68 72 76 80 84 88 92 96 100 104
 </DataArray>
 <DataArray type="UInt8" Name="types" format="ascii">
-12 12 12 12 9 9
+12 12 12 12 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9
 </DataArray>
 </Cells>
 </Piece>

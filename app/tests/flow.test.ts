@@ -38,7 +38,7 @@ function meshWithEmptyArray(): string {
 }
 
 test("the surfaces with points are the boundary arrays with a value above 0", () => {
-  expect(surfacesWithPoints(meshWithEmptyArray(), ["north", "empty", "east", "west"])).toEqual(["north", "east"]);
+  expect(surfacesWithPoints(meshWithEmptyArray(), ["north", "empty", "east", "nowhere"])).toEqual(["north", "east"]);
 });
 
 test("the TOML of the flow form is a valid input", () => {
