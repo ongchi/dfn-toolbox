@@ -8,8 +8,19 @@ import { dataArrayValues } from "./inputFiles";
 // VTK_TRIANGLE and VTK_QUAD
 const SURFACE_CELL_TYPES = new Set([5, 9]);
 
-/** The color of surface N is color N modulo the length; not the colors of the other layers of the viewer */
-export const DEFAULT_SURFACE_COLORS = ["#2ca02c", "#ff7f0e", "#17becf", "#bcbd22", "#8c564b", "#7f7f7f"];
+/** The color of surface N is color N modulo the length: Category10 of D3 (d3-scale-chromatic `schemeCategory10`) */
+export const DEFAULT_SURFACE_COLORS = [
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
+];
 
 /** Names of the boundary surfaces of a domain mesh: the cell data arrays `boundary__<name>`, in the order of the file */
 export function domainBoundarySurfaceNames(vtuText: string): string[] {
