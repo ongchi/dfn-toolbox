@@ -7,22 +7,40 @@ import type { BoundaryRole, RoutingRule, SeedingMethod, TimeUnit, TransportState
 /** Help text of the particle numbers: the trajectories are always on */
 const TRAJECTORY_SIZE = "the trajectories have about 1 MB for each particle";
 
+/** dfntrans has a u32 seed */
+const MAX_RANDOM_SEED = 2 ** 32;
+
 function generalSection(state: TransportState, context: FormContext): HTMLElement {
+  const randomButton = element("button", "button-small", "Random");
+  randomButton.type = "button";
+  randomButton.title = "Set a new random seed";
+  const seed = numberField({
+    label: "Seed",
+    key: "seed",
+    help: "0 = a random seed for each run",
+    value: state.seed,
+    isInteger: true,
+    min: 0,
+    button: randomButton,
+    onInput: (value) => {
+      state.seed = value;
+      context.changed();
+    },
+  });
+  randomButton.addEventListener("click", () => {
+    state.seed = 1 + Math.floor(Math.random() * (MAX_RANDOM_SEED - 1));
+    const input = seed.querySelector("input");
+    if (input) {
+      input.value = String(state.seed);
+      input.classList.remove("is-invalid");
+    }
+    context.changed();
+  });
+
   return section(
     "General",
     row(
-      numberField({
-        label: "Seed",
-        key: "seed",
-        help: "0 = a random seed for each run",
-        value: state.seed,
-        isInteger: true,
-        min: 0,
-        onInput: (value) => {
-          state.seed = value;
-          context.changed();
-        },
-      }),
+      seed,
       selectField<TimeUnit>({
         label: "Time unit",
         key: "time_unit",

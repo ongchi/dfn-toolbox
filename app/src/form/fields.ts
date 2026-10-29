@@ -19,6 +19,8 @@ export interface NumberFieldOptions extends FieldOptions {
   isMinExclusive?: boolean;
   max?: number;
   step?: number | "any";
+  /** A button at the right of the input */
+  button?: HTMLElement;
   onInput: (value: number) => void;
 }
 
@@ -106,7 +108,12 @@ export function numberField(options: NumberFieldOptions): HTMLElement {
       options.onInput(value);
     }
   });
-  return fieldShell(options, input);
+  if (!options.button) {
+    return fieldShell(options, input);
+  }
+  const inputRow = element("span", "input-with-button");
+  inputRow.append(input, options.button);
+  return fieldShell(options, inputRow);
 }
 
 /** Number input which can be empty (an optional key) */
