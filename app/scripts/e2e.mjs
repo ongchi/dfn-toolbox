@@ -77,19 +77,42 @@ async function colorOptions(page) {
   return page.$$eval("#color-select option", (options) => options.map((option) => option.value));
 }
 
-/** The names of the boundary surfaces of the domain mesh (color choosers of the Domain tab) */
-async function domainSurfaceNames(page) {
-  return page.$$eval("#boundary-surfaces .field-label", (nodes) => nodes.map((node) => node.textContent).join(", "));
+/** The roles of the boundary surfaces in the Domain tab, as "name: role" */
+async function domainRoles(page) {
+  return page.$$eval("#boundary-surfaces select[data-surface]", (nodes) =>
+    nodes.map((node) => `${node.dataset.surface}: ${node.value}`).join(", "),
+  );
 }
 
-/** The boundary names of a section of a form; "(no color)" after a name without a color swatch */
+/** The in-flow and then the out-flow surfaces of the Domain tab: the pressure boundaries of the flow */
+async function flowSurfaceNames(page) {
+  const roles = await page.$$eval("#boundary-surfaces select[data-surface]", (nodes) =>
+    nodes.map((node) => [node.dataset.surface, node.value]),
+  );
+  return ["inflow", "outflow"]
+    .flatMap((role) => roles.filter(([, value]) => value === role).map(([name]) => name))
+    .join(", ");
+}
+
+/** Sets the role of a boundary surface in the Domain tab */
+async function setRole(page, surface, role) {
+  await page.click('[data-sidebar-tab="domain"]');
+  await page.select(`#boundary-surfaces select[data-surface="${surface}"]`, role);
+}
+
+/**
+ * The boundary names of a section of a form (the label up to ":"); "(no
+ * color)" after a name without a color swatch
+ */
 async function boundaryLabels(page, formSelector, sectionTitle) {
   return page.$eval(
     formSelector,
     (form, title) => {
       const section = [...form.querySelectorAll(".form-section")].find((node) => node.querySelector("h3")?.textContent === title);
-      const labels = [...(section?.querySelectorAll(".field-label") ?? [])].filter((node) => node.textContent !== "Pressure (MPa)");
-      return labels.map((node) => `${node.textContent}${node.querySelector(".label-swatch") ? "" : " (no color)"}`).join(", ");
+      const labels = [...(section?.querySelectorAll(".field-label") ?? [])];
+      return labels
+        .map((node) => `${node.textContent.split(":")[0]}${node.querySelector(".label-swatch") ? "" : " (no color)"}`)
+        .join(", ");
     },
     sectionTitle,
   );
@@ -144,6 +167,10 @@ try {
     `${surfaceNames}; view ${canvasBefore.equals(canvasAfter) ? "unchanged" : "changed"}`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surfaces.png` });
+
+  // The roles of the boundary surfaces of the example
+  const exampleRoles = await domainRoles(page);
+  check(exampleRoles === "west: inflow, east: outflow", "boundary surface roles", exampleRoles);
 
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
   const domainRows = async () =>
@@ -213,8 +240,8 @@ try {
     check(!isBezelShownBefore && isBezelShownAfter, `${name}: results bezel`, `${isBezelShownBefore} → ${isBezelShownAfter}`);
 
     await page.click('[data-sidebar-tab="flow"]');
-    // The boundaries of the flow are only the boundary surfaces, each with its color
-    const exampleSurfaces = await domainSurfaceNames(page);
+    // The boundaries of the flow are the in-flow and out-flow surfaces, each with its color
+    const exampleSurfaces = await flowSurfaceNames(page);
     const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
     check(exampleSurfaces !== "" && flowBoundaries === exampleSurfaces, `${name}: flow boundaries`, flowBoundaries);
     const isFlowNextDisabled = await isNextDisabled();
@@ -237,8 +264,11 @@ try {
 
     // The trajectories and the velocities of the transport are always on
     await page.click('[data-sidebar-tab="transport"]');
-    const transportBoundaries = await boundaryLabels(page, "#transport-form", "Boundaries");
-    check(transportBoundaries === exampleSurfaces, `${name}: transport boundaries`, transportBoundaries);
+    // The Domain tab gives the in-flow and out-flow boundaries: the Transport tab has no section for them
+    const hasTransportBoundaries = await page.$$eval("#transport-form .form-section h3", (nodes) =>
+      nodes.some((node) => node.textContent === "Boundaries"),
+    );
+    check(!hasTransportBoundaries, `${name}: no transport boundaries`, String(hasTransportBoundaries));
     const transportStatus = await runStep(page, "transport");
     const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
@@ -393,18 +423,32 @@ try {
   const noClusterStatus = await runStep(page, "network");
   const isStatusWarning = await page.$eval("#status", (node) => node.classList.contains("is-warning"));
   const hasNetwork = await page.$eval("#results-bezel", (node) => !node.hidden);
-  // "Next" of the DFN tab needs a cluster which connects all boundary surfaces
+  // "Next" of the DFN tab needs a cluster which connects an in-flow and an out-flow surface
   const isNoClusterNextDisabled = await page.$eval("#next-button", (node) => node.disabled);
   check(
     isStatusWarning &&
       hasNetwork &&
       isNoClusterNextDisabled &&
-      noClusterStatus.includes("No cluster connects all boundary surfaces"),
-    "no cluster on all boundary surfaces",
+      noClusterStatus.includes("No cluster connects an in-flow and an out-flow surface"),
+    "no connecting cluster",
     `${noClusterStatus}; next ${isNoClusterNextDisabled ? "disabled" : "enabled"}`,
   );
   await new Promise((resolve) => setTimeout(resolve, 500));
-  await page.screenshot({ path: `${screenshotDir}/e2e_no_cluster_on_all_surfaces.png` });
+  await page.screenshot({ path: `${screenshotDir}/e2e_no_connecting_cluster.png` });
+
+  // A predefined shape: the first surface is in-flow, the second out-flow
+  const shapeRoles = await domainRoles(page);
+  check(shapeRoles === "west: inflow, east: outflow", "default roles of a shape", shapeRoles);
+
+  // A change of a role clears the network; with no out-flow surface, the generation asks for one
+  await setRole(page, "east", "noflow");
+  const isNetworkCleared = await page.$eval("#results-bezel", (node) => node.hidden);
+  const noOutflowStatus = await runStep(page, "network");
+  check(
+    isNetworkCleared && noOutflowStatus === "Set at least one out-flow surface (Domain tab, Boundary surfaces).",
+    "no out-flow surface",
+    `${isNetworkCleared ? "cleared" : "not cleared"}; ${noOutflowStatus}`,
+  );
 
   // Cancel: a large run, cancelled at once
   await selectExample(page, "box_west_east");

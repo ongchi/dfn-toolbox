@@ -9,6 +9,10 @@
 # the L from north (10.1 MPa) to east (10.0 MPa), with gravity; the
 # particles leave at east.
 
+[boundaries]
+inflow = ["north"]
+outflow = ["east"]
+
 [network]
 seed = 376
 min_feature_size = 0.3
@@ -71,8 +75,6 @@ seed = 12345
 time_unit = "days"
 porosity = 1.0
 max_time_steps = 1000000
-inflow = ["north"]
-outflow = ["east"]
 routing = "complete_mixing"
 
 [transport.seeding]

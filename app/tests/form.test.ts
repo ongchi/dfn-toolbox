@@ -36,15 +36,15 @@ const GENERATION_TIMEOUT = 60000;
 describe.each(exampleNames)("example %s", (exampleName) => {
   test("the dfngen input of the network is valid", () => {
     const example = readExample(exampleName);
-    const network = tomlToWorkflow(example.toml).network;
-    expect(check_input(networkToLibraryToml(network), readMesh(network.domain), userFracturesFile(network))).toBeUndefined();
+    const { network, boundaries } = tomlToWorkflow(example.toml);
+    expect(check_input(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFracturesFile(network))).toBeUndefined();
   });
 
   test("the dfngen input of the network gives the output of the native binary", () => {
     const example = readExample(exampleName);
-    const network = tomlToWorkflow(example.toml).network;
+    const { network, boundaries } = tomlToWorkflow(example.toml);
     const userFractures = userFracturesFile(network);
-    const result = run_generation(networkToLibraryToml(network), readMesh(network.domain), userFractures, 1n, () => {});
+    const result = run_generation(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFractures, 1n, () => {});
     expect(result.error).toBeUndefined();
     const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${exampleName}-`));
     for (const name of result.file_names.filter((fileName: string) => !UNCOMPARED_FILES.includes(fileName))) {
@@ -57,7 +57,7 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     if (userFractures !== undefined) {
       writeFileSync(join(inputDir, USER_FRACTURES_FILE), userFractures);
     }
-    writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network));
+    writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network, boundaries));
     const nativeDir = runNativeDfngen(join(inputDir, "input.toml"));
     for (const name of UNCOMPARED_FILES) {
       rmSync(join(nativeDir, name), { force: true });
@@ -79,6 +79,12 @@ function problemsOf(toml: string): string[] {
 }
 
 const BOX = readExample("box_west_east").toml;
+
+/** The dfngen input of the network of a workflow file */
+function networkLibraryToml(toml: string): string {
+  const { network, boundaries } = tomlToWorkflow(toml);
+  return networkToLibraryToml(network, boundaries);
+}
 
 test("an unknown key is an error", () => {
   const toml = BOX.replace("[network.clusters]", "[network.clusters]\nkeep_all = true");
@@ -105,13 +111,42 @@ test("[network.region_boundaries] is an error: the boundary lines are always on 
   expect(problemsOf(toml)).toEqual(["[network]: `region_boundaries` is an unknown key"]);
 });
 
-test("keep_only_connected_to_surfaces in [network.clusters] is an error: it is always on", () => {
-  const toml = BOX.replace("[network.clusters]", "[network.clusters]\nkeep_only_connected_to_surfaces = true");
-  expect(problemsOf(toml)).toEqual(["[network.clusters]: `keep_only_connected_to_surfaces` is an unknown key"]);
+test("keep_only_connected_to in [network.clusters] is an error: the roles of the surfaces give it", () => {
+  const toml = BOX.replace("[network.clusters]", '[network.clusters]\nkeep_only_connected_to = [["west"]]');
+  expect(problemsOf(toml)).toEqual(["[network.clusters]: `keep_only_connected_to` is an unknown key"]);
 });
 
-test("the dfngen input keeps only the clusters which connect all boundary surfaces", () => {
-  expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).toMatch(/^keep_only_connected_to_surfaces = true$/m);
+test("the dfngen input keeps only the clusters which connect the in-flow and the out-flow surfaces", () => {
+  expect(networkLibraryToml(BOX)).toMatch(/^keep_only_connected_to = \[\["west"\], \["east"\]\]$/m);
+});
+
+test("the roles of the surfaces are read from [boundaries]", () => {
+  expect(tomlToWorkflow(BOX).boundaries).toEqual({ inflow: ["west"], outflow: ["east"] });
+});
+
+test("a surface in inflow and outflow is an error", () => {
+  const toml = BOX.replace('outflow = ["east"]', 'outflow = ["east", "west"]');
+  expect(problemsOf(toml)).toContain("[boundaries]: `west` cannot be in inflow and outflow");
+});
+
+test("a pressure of a surface with no role is an error", () => {
+  const toml = BOX.replace("pressure = { west = 10.1, east = 10.0 }", "pressure = { west = 10.1, east = 10.0, north = 9.0 }");
+  expect(problemsOf(toml)).toEqual(["[flow]: pressure: `north` is not an in-flow or out-flow surface of [boundaries]"]);
+});
+
+test("a missing pressure of an in-flow surface is an error", () => {
+  const toml = BOX.replace("pressure = { west = 10.1, east = 10.0 }", "pressure = { east = 10.0 }");
+  expect(problemsOf(toml)).toEqual(["[flow]: pressure: `west` is missing"]);
+});
+
+test("inflow in [transport] is an error: the roles are in [boundaries]", () => {
+  const toml = BOX.replace("[transport]\n", '[transport]\ninflow = ["west"]\n');
+  expect(problemsOf(toml)).toEqual(["[transport]: `inflow` is an unknown key"]);
+});
+
+test("a missing [boundaries] section is an error", () => {
+  const toml = BOX.replace(/\[boundaries\]\ninflow = .*\noutflow = .*\n/, "");
+  expect(problemsOf(toml)).toContain("`boundaries` is missing");
 });
 
 test("keep_isolated_fractures in [network.clusters] is an error: the isolated fractures are always removed", () => {
@@ -120,7 +155,7 @@ test("keep_isolated_fractures in [network.clusters] is an error: the isolated fr
 });
 
 test("the dfngen input removes the isolated fractures", () => {
-  expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).toMatch(/^keep_isolated_fractures = false$/m);
+  expect(networkLibraryToml(BOX)).toMatch(/^keep_isolated_fractures = false$/m);
 });
 
 test("[transport.control_planes] is an error: the transport has no control planes", () => {
@@ -201,8 +236,8 @@ test("the key user_fractures (a fracture file) is an error", () => {
 });
 
 test("the dfngen input names the fracture file only with user fractures", () => {
-  expect(networkToLibraryToml(tomlToWorkflow(USER_FRACTURES).network)).toMatch(/^user_fractures = "user_fractures\.vtp"$/m);
-  expect(networkToLibraryToml(tomlToWorkflow(BOX).network)).not.toMatch(/^user_fractures =/m);
+  expect(networkLibraryToml(USER_FRACTURES)).toMatch(/^user_fractures = "user_fractures\.vtp"$/m);
+  expect(networkLibraryToml(BOX)).not.toMatch(/^user_fractures =/m);
 });
 
 test("an unknown key in [flow] is an error", () => {

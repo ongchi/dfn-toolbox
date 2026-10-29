@@ -111,6 +111,12 @@ pub fn dfngen_report(error: &DfngenError) -> ErrorReport {
         DfngenError::MeshNeedsRegionBoundaries => report("dfngen.MeshNeedsRegionBoundaries"),
         DfngenError::ClustersNeedRegionBoundaries => report("dfngen.ClustersNeedRegionBoundaries"),
         DfngenError::ClustersNeedBoundarySurfaces => report("dfngen.ClustersNeedBoundarySurfaces"),
+        DfngenError::EmptyClusterSurfaceGroup { group } => {
+            report("dfngen.EmptyClusterSurfaceGroup").with("group", group)
+        }
+        DfngenError::UnknownClusterSurface { name } => {
+            report("dfngen.UnknownClusterSurface").with("name", name)
+        }
         DfngenError::MeshMaxSizeFactor => report("dfngen.MeshMaxSizeFactor"),
         DfngenError::MeshSlope => report("dfngen.MeshSlope"),
         DfngenError::NoFractureDefined => report("dfngen.NoFractureDefined"),

@@ -1,13 +1,12 @@
 // Conversion between the flow form state and `[flow]` of the workflow file,
 // and the fehm input file of the flow (fehm checks the values).
+import { flowSurfaces, type BoundaryRoles } from "../boundaryRoles";
 import { float, inlineTable, key, string, TableReader, type Table, type TomlTable } from "../form/toml";
-import { defaultFlowState, FLOW_MESH_FILE, type FlowState } from "./state";
+import { defaultFlowState, FLOW_MESH_FILE, pressureOf, type FlowState } from "./state";
 
-/** The tables of `[flow]` of the workflow file */
-export function flowTables(state: FlowState): TomlTable[] {
-  const pressures = state.boundaries
-    .filter((boundary) => boundary.isUsed)
-    .map((boundary): [string, string] => [key(boundary.name), float(boundary.pressure)]);
+/** The tables of `[flow]` of the workflow file: a pressure for each in-flow and out-flow surface */
+export function flowTables(state: FlowState, roles: BoundaryRoles): TomlTable[] {
+  const pressures = flowSurfaces(roles).map((name): [string, string] => [key(name), float(pressureOf(state, name))]);
   return [
     {
       name: "",
@@ -21,37 +20,43 @@ export function flowTables(state: FlowState): TomlTable[] {
   ];
 }
 
-/** The fehm input file of the flow, on the mesh of the last generation */
-export function flowToLibraryToml(state: FlowState): string {
+/**
+ * The fehm input file of the flow, on the mesh of the last generation.
+ * `boundaryNames`: the in-flow and out-flow surfaces with a point in the mesh.
+ */
+export function flowToLibraryToml(state: FlowState, boundaryNames: string[]): string {
   const lines = [
     `mesh = ${string(FLOW_MESH_FILE)}`,
     `temperature = ${float(state.temperature)}`,
     `gravity = ${state.hasGravity}`,
   ];
-  for (const boundary of state.boundaries.filter((candidate) => candidate.isUsed)) {
-    lines.push("", "[[boundary]]", `name = ${string(boundary.name)}`, `pressure = ${float(boundary.pressure)}`);
+  for (const name of boundaryNames) {
+    lines.push("", "[[boundary]]", `name = ${string(name)}`, `pressure = ${float(pressureOf(state, name))}`);
   }
   return `${lines.join("\n")}\n`;
 }
 
 /**
- * Reads `[flow]` of the workflow file. The boundaries are the names of
- * `pressure`, all used; the mesh of the generation adds its other boundaries.
+ * Reads `[flow]` of the workflow file. `pressure` must have one pressure for
+ * each in-flow and out-flow surface of `[boundaries]`, and no other.
  */
-export function readFlow(table: Table, problems: string[]): FlowState {
+export function readFlow(table: Table, roles: BoundaryRoles, problems: string[]): FlowState {
   const defaults = defaultFlowState();
   const reader = new TableReader(table, "[flow]", problems);
   const pressureTable = reader.subTable("pressure");
   const pressureReader = new TableReader(pressureTable, "[flow]: pressure", problems);
-  const boundaries = Object.keys(pressureTable).map((name) => ({
-    name,
-    isUsed: true,
-    pressure: pressureReader.float(name, 0),
-  }));
+  const surfaces = flowSurfaces(roles);
+  const pressures: Record<string, number> = {};
+  for (const name of surfaces) {
+    pressures[name] = pressureReader.float(name, pressureOf(defaults, name));
+  }
+  for (const name of Object.keys(pressureTable).filter((candidate) => !surfaces.includes(candidate))) {
+    problems.push(`[flow]: pressure: \`${name}\` is not an in-flow or out-flow surface of [boundaries]`);
+  }
   const state: FlowState = {
     temperature: reader.float("temperature", defaults.temperature),
     hasGravity: reader.boolean("gravity", defaults.hasGravity),
-    boundaries,
+    pressures,
   };
   reader.checkUnknownKeys();
   return state;

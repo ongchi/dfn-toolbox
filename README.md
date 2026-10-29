@@ -39,33 +39,42 @@ There is no server: `npm run build` gives a folder of static files.
     loads the example of its dropdown again (the default example if none),
     and "Predefined domain shape" gives the default values of all the forms
     on the last shape (the first mesh at the start). In both modes, the
-    section "Boundary surfaces" has a color chooser for each boundary
-    surface of the domain mesh (cell array `boundary__<name>`), for the 3D
-    view only: the workflow file does not have the colors. A chosen color
-    stays with its surface name while the page is open.
+    section "Boundary surfaces" has a role and a color chooser for each
+    boundary surface of the domain mesh (cell array `boundary__<name>`).
+    The role is in-flow, out-flow or no-flow (`[boundaries]` of the
+    workflow file): the network keeps only the clusters which connect an
+    in-flow and an out-flow surface, the flow has a pressure on each of
+    them, and the particles go from the in-flow to the out-flow surfaces.
+    A predefined shape starts with its first surface in-flow, its second
+    out-flow and the others no-flow; a new shape gives these roles again.
+    A change of a role removes the output. The color is for the 3D view
+    only: the workflow file does not have the colors. A chosen color stays
+    with its surface name while the page is open.
   - User fractures tab: each user-defined fracture is a card (region,
     center, shape, aperture and orientation; see "User-defined fractures").
   - DFN tab: a form with one field for each other key of `[network]`.
     The boundary lines of the regions and the triangle mesh are always on
     (the flow needs them), thus each family needs an aperture. The dfngen
     input always has `keep_isolated_fractures = false` and
-    `keep_only_connected_to_surfaces = true` (the flow needs a path between
-    the boundary surfaces); the workflow file has no keys for them, and the
-    section "Clusters" tells it in a note. If no cluster
-    connects all boundary surfaces, dfngen keeps all clusters: the network
-    shows, the status line gives a warning (amber), and "Next" stays
-    disabled.
+    `keep_only_connected_to = [[in-flow surfaces], [out-flow surfaces]]`
+    (the particles need a path between them); the workflow file has no
+    keys for them, and the section "Clusters" tells it in a note. If no
+    cluster connects an in-flow and an out-flow surface, dfngen keeps all
+    clusters: the network shows, the status line gives a warning (amber),
+    and "Next" stays disabled.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
-  `dfn_mesh.vtu` of the last generation; the boundaries are its point
-  arrays `boundary__<name>` of the boundary surfaces of the domain mesh
-  (not `mesh_surface` and not the regions), each with the color of its
-  surface, "use" and a pressure. A new
-  generation removes the flow output; a boundary with the same name keeps
-  its values, and a used boundary of no array stays (fehm then reports it).
-- Transport tab: a form with one field for each key of `[transport]`. It
+  `dfn_mesh.vtu` of the last generation; the pressure boundaries are the
+  in-flow and out-flow surfaces of the Domain tab, each with the color of
+  its surface and a pressure. A surface with no point in the mesh (its
+  point array `boundary__<name>` has no value above 0; possible with two
+  or more in-flow or out-flow surfaces) is shown disabled and is not in the
+  fehm input. A surface which loses its role keeps its pressure while the
+  page is open. A new generation removes the flow output.
+- Transport tab: a form with one field for each key of `[transport]`,
+  except `inflow` and `outflow`: they are the in-flow and out-flow surfaces
+  of the Domain tab, without the surfaces with no point in the mesh. It
   uses the flow of the last "Solve flow": dfntrans solves the flow input of
-  that run again. Each boundary of the Flow tab (with the color of its
-  surface) is "not used", "in-flow" or "out-flow". A new flow removes the transport output. The form has no
+  that run again. A new flow removes the transport output. The form has no
   output section: dfntrans always writes the trajectories and the
   velocities (`trajectories = true`, `velocities = true`), and only the
   particles which exit (`all_particles = false`).
@@ -115,14 +124,18 @@ differences over thousands of time steps (up to about 1e-6, relative).
 
 ## Workflow file
 
-One TOML file with three sections. The comment at the top is the
+One TOML file with four sections. The comment at the top is the
 description of the input. The app makes the input files of the libraries
-from it: `[network]` → the dfngen input with `[region_boundaries]` and
-`[mesh]` on, `[flow]` → the fehm input on `dfn_mesh.vtu`, `[transport]` →
-the dfntrans input on that flow.
+from it: `[boundaries]` and `[network]` → the dfngen input with
+`[region_boundaries]` and `[mesh]` on, `[flow]` → the fehm input on
+`dfn_mesh.vtu`, `[transport]` → the dfntrans input on that flow.
 
 ```toml
 # Description of the input.
+
+[boundaries]                       # the roles of the boundary surfaces of the domain mesh (Domain tab)
+inflow = ["west"]                  # dfngen keep_only_connected_to, fehm [[boundary]], dfntrans inflow
+outflow = ["east"]                 # a surface in no list is a no-flow surface
 
 [network]                          # the dfngen input (see "Input file" in ../dfngen-rs/README.md)
 seed = 12345
@@ -133,7 +146,7 @@ domain = "Box.vtu"                 # the name of a predefined mesh (`meshes/`); 
 [network.mesh]                     # optional; no [network.region_boundaries]: the boundary lines are always on
 max_size_factor = 5.0              # no `enable`: always on
 slope = 0.5
-[network.clusters]                 # as [clusters]; only keep_only_largest (no keep_isolated_fractures, no keep_only_connected_to_surfaces)
+[network.clusters]                 # as [clusters]; only keep_only_largest (no keep_isolated_fractures, no keep_only_connected_to)
 [[network.family]]                 # as [[family]]; `aperture` is necessary
 [[network.user_fracture]]          # optional; one table for each user-defined fracture, all keys necessary
 region = "box"                     # one region of the mesh
@@ -148,23 +161,22 @@ orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without k
 [flow]                             # the fehm input (see "Input file" in ../fehm-rs/README.md), without `mesh`
 temperature = 20.0
 gravity = false
-pressure = { west = 10.1, east = 10.0 }   # MPa; the used boundaries, in place of [[boundary]]; no [solver]
+pressure = { west = 10.1, east = 10.0 }   # MPa; each in-flow and out-flow surface, in place of [[boundary]]; no [solver]
 
 [transport]                        # the dfntrans input (see "Input file" in ../dfntrans-rs/README.md), without `flow`
 seed = 12345
 time_unit = "days"
 porosity = 1.0
 max_time_steps = 1000000
-inflow = ["west"]
-outflow = ["east"]
-routing = "complete_mixing"
+routing = "complete_mixing"        # no inflow, no outflow: [boundaries] gives them
 [transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
 ```
 
 The reader is strict: an unknown key and a missing key are errors, so the
-forms never lose a value. A boundary name of `[flow]` or `[transport]` is
-checked only by "Solve flow" and "Track particles": the names are those of
-the mesh of the generation.
+forms never lose a value. `pressure` of `[flow]` must have each in-flow
+and out-flow surface of `[boundaries]` and no other name, and a surface
+cannot be in `inflow` and `outflow`. A name of `[boundaries]` which is not
+a boundary surface of the domain mesh is checked only by "Generate".
 
 ### User-defined fractures
 
@@ -290,38 +302,44 @@ npm run dev & npm run e2e -- http://localhost:5173/
   progress.
 - `tests/examples.test.ts`: each example, workflow file → forms → workflow
   file, gives the same state, and in WebAssembly runs the full workflow: the
-  mesh has the boundaries of the file, the in-flow is equal to the
-  out-flow, and particles exit.
+  mesh has a point on each in-flow and out-flow surface, the in-flow is
+  equal to the out-flow, and particles exit.
 - `tests/form.test.ts`: the dfngen input of each example is valid and gives
   the output files of the binary, except `dfn_mesh.vtu` and
   `rejections.dat` (a rounding difference changes the reason of some FRAM
   rejections; the final network is the same); the errors of the reader of
   the workflow file (an unknown key, a missing key or section, `enable` in
   `[network.mesh]`, a family without aperture, a user fracture without
-  region or with a bad center, and others).
+  region or with a bad center, a surface in `inflow` and `outflow`, a
+  pressure of a surface with no role or a missing one, and others); the
+  dfngen cluster key from `[boundaries]`.
 - `tests/userFractures.test.ts`: the polygons of the user-defined fractures
   against the steps of dfngen-rs (the rectangle of `Poly::new`, `beta`, the
   normals of the three conventions, the half turn for the normal -z), the
   region arrays, and the region boxes of the predefined meshes.
 - `tests/flow.test.ts`: on the mesh of the example `l_shape_north_east`
-  (generated in WebAssembly), the boundaries of the form are only the
-  boundary surfaces, the fehm input of the flow form is a valid
+  (generated in WebAssembly), the surfaces with a point in the mesh, the
+  pressures of the workflow file (only the in-flow and out-flow surfaces),
+  the fehm input of the flow form is a valid
   input, the output files agree with the `fehm` binary (within 1e-9), the
   in-flow is equal to the out-flow, and a boundary array with no point and
   no boundary are errors.
 - `tests/transport.test.ts`: on the flow of that example (from north to
-  east), the dfntrans input of the transport form is a valid input,
+  east), the dfntrans input of the transport form is a valid input with
+  the in-flow and out-flow surfaces of the roles (not in the workflow file),
   the output files agree with the `dfntrans` binary (the integers exactly,
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
-  the color choosers of the boundary surfaces, the "Next" button, the full workflow of each example (the
-  boundaries of the Flow and Transport tabs are the boundary surfaces, with their colors), the flow again
+  the color choosers and the roles of the boundary surfaces, the "Next" button, the full workflow of each example (the
+  boundaries of the Flow tab are the in-flow and out-flow surfaces, with their colors; the Transport tab has no
+  boundaries), the flow again
   after the transport and the generation again after the flow (no error of a removed "Color by" array), the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh and its description, the
   limits of the center of a new user-defined fracture, a bad input, a
-  network with no cluster on all boundary surfaces (Box, default forms, seed
-  1837757520: the network, an amber warning and "Next" disabled) and the cancel; it saves
+  network with no cluster which connects the in-flow and out-flow surfaces (Box, default forms, seed
+  1837757520: the network, an amber warning and "Next" disabled), the default roles of a shape, no
+  out-flow surface (the output is removed; "Generate" asks for one) and the cancel; it saves
   screenshots.
 
 ## VTK.wasm notes

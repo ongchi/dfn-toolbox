@@ -5,78 +5,61 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
+import { flowSurfaces, type BoundaryRoles } from "../src/boundaryRoles";
 import { pointCount } from "../src/flow/polyData";
-import { FLOW_MESH_FILE, flowBoundaryNames, updateBoundaries } from "../src/flow/state";
+import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_transport_input, run_transport } from "../src/pkg/dfn_wasm.js";
-import {
-  defaultTransportState,
-  TRANSPORT_FLOW_FILE,
-  updateTransportBoundaries,
-  type BoundaryRole,
-  type TransportState,
-} from "../src/transport/state";
-import { transportToLibraryToml } from "../src/transport/toml";
+import { defaultTransportState, TRANSPORT_FLOW_FILE, type TransportState } from "../src/transport/state";
+import { transportTables, transportToLibraryToml } from "../src/transport/toml";
 import { markVelocityAsVectors } from "../src/transport/trajectories";
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
-import { compareOutputFolders, generateExample, initWasm, readMesh, runNativeDfntrans } from "./cases";
+import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans } from "./cases";
 
 // The example with the boundary surfaces north and east
 const EXAMPLE_NAME = "l_shape_north_east";
 
+/** The roles of the example: from north to east */
+const ROLES: BoundaryRoles = { inflow: ["north"], outflow: ["east"] };
+
 let mesh = "";
-let boundaryNames: string[] = [];
 let flowToml = "";
 
 beforeAll(() => {
   initWasm();
   const example = generateExample(EXAMPLE_NAME);
   mesh = example.mesh;
-  boundaryNames = flowBoundaryNames(mesh, readMesh(example.workflow.network.domain));
-
-  // The flow of the example: from north to east
-  const flowState = example.workflow.flow;
-  updateBoundaries(flowState, boundaryNames);
-  flowToml = flowToLibraryToml(flowState);
+  flowToml = flowToLibraryToml(example.workflow.flow, flowSurfaces(ROLES));
 });
 
-/** The transport state with the given boundary roles; one particle on each in-flow line (a few particles) */
-function transportState(roles: Record<string, BoundaryRole>): TransportState {
+/** The transport state with one particle on each in-flow line (a few particles) */
+function transportState(): TransportState {
   const state = defaultTransportState();
-  updateTransportBoundaries(state, boundaryNames);
-  for (const boundary of state.boundaries) {
-    boundary.role = roles[boundary.name] ?? "none";
-  }
   state.seeding.method = "uniform_per_line";
   state.seeding.particlesPerLine = 1;
   return state;
 }
 
-const ROLES: Record<string, BoundaryRole> = { north: "inflow", east: "outflow" };
+/** The dfntrans input of a transport state and roles */
+function transportToml(state = transportState(), roles = ROLES): string {
+  return transportToLibraryToml(state, roles);
+}
 
 test("the TOML of the transport form is a valid input", () => {
-  expect(check_transport_input(transportToLibraryToml(transportState(ROLES)), flowToml, mesh)).toBeUndefined();
+  expect(check_transport_input(transportToml(), flowToml, mesh)).toBeUndefined();
+});
+
+test("the dfntrans input has the in-flow and out-flow surfaces of the roles", () => {
+  expect(transportToml()).toMatch(/^inflow = \["north"\]\noutflow = \["east"\]$/m);
+});
+
+test("the workflow file has no in-flow and out-flow surfaces in the transport", () => {
+  const [root] = transportTables(transportState());
+  expect(root.lines.filter((line) => /^(inflow|outflow) =/.test(line))).toEqual([]);
 });
 
 test("the dfntrans input always has the trajectories and the velocities, and only the particles which exit", () => {
-  expect(transportToLibraryToml(transportState(ROLES))).toContain(
-    "[output]\ntrajectories = true\nall_particles = false\nvelocities = true\n",
-  );
-});
-
-test("a new mesh keeps the roles of the boundaries with the same name", () => {
-  const state = transportState(ROLES);
-  updateTransportBoundaries(state, ["north", "west"]);
-  expect(state.boundaries.slice(0, 2)).toEqual([
-    { name: "north", role: "inflow" },
-    { name: "west", role: "none" },
-  ]);
-});
-
-test("a used boundary which is not in the new mesh stays at the end", () => {
-  const state = transportState(ROLES);
-  updateTransportBoundaries(state, ["north", "west"]);
-  expect(state.boundaries.map((boundary) => boundary.name)).toEqual(["north", "west", "east"]);
+  expect(transportToml()).toContain("[output]\ntrajectories = true\nall_particles = false\nvelocities = true\n");
 });
 
 // The times add up the rounding differences of wasm and native over
@@ -85,7 +68,7 @@ test("a used boundary which is not in the new mesh stays at the end", () => {
 const TRANSPORT_TOLERANCE = "1e-5";
 
 test("the output files agree with the native binary of dfntrans", () => {
-  const toml = transportToLibraryToml(transportState(ROLES));
+  const toml = transportToml();
   const result = run_transport(toml, flowToml, mesh, 1);
   expect(result.error).toBeUndefined();
 
@@ -102,38 +85,38 @@ test("the output files agree with the native binary of dfntrans", () => {
 });
 
 test("some particles exit through the out-flow boundary", () => {
-  const result = run_transport(transportToLibraryToml(transportState(ROLES)), flowToml, mesh, 1);
+  const result = run_transport(transportToml(), flowToml, mesh, 1);
   expect(result.particle_count).toBeGreaterThan(0);
   expect(result.exit_count).toBeGreaterThan(0);
   expect(result.inflow_volume_flux).toBeGreaterThan(0);
 });
 
 test("the trajectories have the velocity as the active vectors for the view", () => {
-  const result = run_transport(transportToLibraryToml(transportState(ROLES)), flowToml, mesh, 1);
+  const result = run_transport(transportToml(), flowToml, mesh, 1);
   const trajectories = markVelocityAsVectors(result.file("trajectories.vtp") ?? "");
   expect(trajectories).toMatch(/<PointData Vectors="velocity">[\s\S]*Name="velocity" NumberOfComponents="3"/);
 });
 
 test("seed 0 uses the seed of the page", () => {
-  const state = transportState(ROLES);
+  const state = transportState();
   state.seed = 0;
-  expect(run_transport(transportToLibraryToml(state), flowToml, mesh, 77).seed).toBe(77);
+  expect(run_transport(transportToml(state), flowToml, mesh, 77).seed).toBe(77);
 });
 
 test("no in-flow boundary is an error", () => {
-  const error = check_transport_input(transportToLibraryToml(transportState({ east: "outflow" })), flowToml, mesh);
+  const error = check_transport_input(transportToml(transportState(), { inflow: [], outflow: ["east"] }), flowToml, mesh);
   expect(error?.kind).toBe("dfntrans.InflowOutflowMissing");
 });
 
 test("an unknown boundary is an error of the run", () => {
-  const toml = transportToLibraryToml(transportState(ROLES)).replace('inflow = ["north"]', 'inflow = ["west"]');
+  const toml = transportToml().replace('inflow = ["north"]', 'inflow = ["west"]');
   const error = run_transport(toml, flowToml, mesh, 1).error;
   expect([error?.kind, error?.field_values]).toEqual(["dfntrans.UnknownBoundary", ["west"]]);
 });
 
 test("the transport velocities give a speed at the points of the mesh", () => {
-  const state = transportState(ROLES);
-  const result = run_transport(transportToLibraryToml(state), flowToml, mesh, 1);
+  const state = transportState();
+  const result = run_transport(transportToml(state), flowToml, mesh, 1);
   expect(result.error).toBeUndefined();
   const speeds = nodeVelocityMagnitudes(result.file("velocities.vtp") ?? "", pointCount(mesh), state.timeUnit);
   expect(speeds.every((speed) => Number.isFinite(speed) && speed >= 0) && speeds.some((speed) => speed > 0)).toBe(true);

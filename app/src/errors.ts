@@ -66,7 +66,12 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     `${USER_FRACTURE(f)}: the region ${f.region} has no cell in the domain. Choose another region.`,
   "dfngen.UserFracture.Aperture": (f) => `${USER_FRACTURE(f)}: Aperture must be greater than 0.`,
   "dfngen.ClustersNeedBoundarySurfaces": () =>
-    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect them. Choose another domain shape (Domain tab).",
+    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect an in-flow and an out-flow surface. Choose another domain shape (Domain tab).",
+  // dfn-web gives dfngen the in-flow surfaces as group 1, the out-flow surfaces as group 2
+  "dfngen.EmptyClusterSurfaceGroup": (f) =>
+    `Set at least one ${f.group === "1" ? "in-flow" : "out-flow"} surface (Domain tab, Boundary surfaces).`,
+  "dfngen.UnknownClusterSurface": (f) =>
+    `The domain has no boundary surface ${f.name}. Choose the roles of the surfaces again (Domain tab).`,
   "dfngen.MeshMaxSizeFactor": () => `Maximum size factor (${MESH_SECTION}) must be 1 or more.`,
   "dfngen.MeshSlope": () => `Slope (${MESH_SECTION}) must be greater than 0.`,
   "dfngen.NoFractureDefined": () =>
@@ -76,39 +81,41 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (DFN tab, General). Details: ${f.message}`,
 
   "fehm.TemperatureRange": (f) => `Temperature (Flow tab) must be ${f.min} to ${f.max} °C.`,
-  "fehm.NoBoundaryDefined": () => "Use at least one pressure boundary (Flow tab).",
+  "fehm.NoBoundaryDefined": () =>
+    "The network has no point on an in-flow or out-flow surface. Change the roles of the surfaces (Domain tab), or generate another network.",
   "fehm.PressureRange": (f) => `The pressure of the boundary ${f.boundary} (Flow tab) must be ${f.min} to ${f.max} MPa.`,
   "fehm.UnknownBoundary": (f) =>
-    `The boundary ${f.boundary} (Flow tab) is not in the network. Do not use it, or generate the network again.`,
+    `The boundary ${f.boundary} is not in the network. Generate the network again.`,
   "fehm.EmptyBoundary": (f) =>
-    `The boundary ${f.boundary} (Flow tab) has no point in the network. Do not use it, or generate another network.`,
+    `The boundary ${f.boundary} has no point in the network. Change its role (Domain tab), or generate another network.`,
   "fehm.BoundaryWithoutEffect": (f) =>
-    `Each point of the boundary ${f.boundary} (Flow tab) is on an earlier boundary with another pressure. Do not use it.`,
+    `Each point of the boundary ${f.boundary} is on an earlier boundary with another pressure. Change its role (Domain tab).`,
   "fehm.SolverTolerance": () => "The tolerance of the flow solver must be above 0 and below 1.",
   "fehm.SolverMaxIterations": () => "The maximum iterations of the flow solver must be 1 or more.",
   "fehm.DegenerateTriangle": () => "The network has a triangle with no area. Generate another network.",
   "fehm.NoBoundary": (f) =>
-    `The fractures ${f.fractures} have no connection to a used pressure boundary, thus their pressure has no unique value. Use another boundary (Flow tab), or generate another network.`,
+    `The fractures ${f.fractures} have no connection to an in-flow or out-flow surface, thus their pressure has no unique value. Change the roles of the surfaces (Domain tab), or generate another network.`,
   "fehm.NoConvergence": (f) =>
     `The flow did not converge in ${f.iterations} iterations. Check the pressures (Flow tab), or generate another network.`,
 
   "dfntrans.Porosity": () => "Porosity (Transport tab) must be above 0 and at most 1.",
   "dfntrans.MaxTimeSteps": () => "Maximum time steps (Transport tab) must be 1 or more.",
-  "dfntrans.InflowOutflowMissing": () => "Set at least one in-flow and one out-flow boundary (Transport tab, Boundaries).",
-  "dfntrans.BoundaryInInflowAndOutflow": (f) =>
-    `The boundary ${f.boundary} (Transport tab) cannot be in-flow and out-flow.`,
+  "dfntrans.InflowOutflowMissing": () =>
+    "The network needs a point on an in-flow and on an out-flow surface. Change the roles of the surfaces (Domain tab), or generate another network.",
+  "dfntrans.BoundaryInInflowAndOutflow": (f) => `The boundary ${f.boundary} cannot be in-flow and out-flow.`,
   "dfntrans.ParticleCount": () => "The number of particles (Transport tab, Seeding) must be 1 or more.",
   "dfntrans.MatrixPorosity": () => "The matrix porosity must be above 0 and at most 1.",
   "dfntrans.MatrixDiffusivity": () => "The matrix diffusivity must be above 0.",
   "dfntrans.EmptyInflowOutflow": () =>
-    "The in-flow or the out-flow boundary (Transport tab) has no point in the network. Choose other boundaries.",
+    "The in-flow or the out-flow surfaces have no point in the network. Change the roles of the surfaces (Domain tab).",
   "dfntrans.UnknownBoundary": (f) =>
-    `The boundary ${f.boundary} (Transport tab) is not in the network. Choose another boundary.`,
-  "dfntrans.NoSeededParticle": () => "The seeding places no particle. Check the in-flow boundary (Transport tab).",
+    `The boundary ${f.boundary} is not in the network. Change its role (Domain tab), or generate the network again.`,
+  "dfntrans.NoSeededParticle": () =>
+    "The seeding places no particle. Check the in-flow surfaces (Domain tab) and the seeding (Transport tab).",
   "dfntrans.NoCellForSeeding": () =>
-    "Each cell has a point on the out-flow boundary, thus the seeding cannot place a particle. Choose another out-flow boundary (Transport tab).",
+    "Each cell has a point on the out-flow surfaces, thus the seeding cannot place a particle. Change the roles of the surfaces (Domain tab).",
   "dfntrans.NoInflowFlux": (f) =>
-    `The flow into the network at the in-flow boundary is ${f.volume_flux} m³/s, not above 0. Choose another in-flow boundary (Transport tab), or change the pressures (Flow tab).`,
+    `The flow into the network at the in-flow surfaces is ${f.volume_flux} m³/s, not above 0. Change the pressures (Flow tab): the in-flow pressure must be higher.`,
 };
 
 /** The text of an error for the user */

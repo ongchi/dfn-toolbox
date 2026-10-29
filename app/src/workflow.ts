@@ -1,8 +1,9 @@
-// The workflow file of dfn-web: one TOML with `[network]`, `[flow]` and
-// `[transport]` (see "Workflow file" of README.md). The comment at the top is
-// the description. The app makes the input files of dfngen, fehm and
-// dfntrans from it (`networkToLibraryToml`, `flowToLibraryToml`,
+// The workflow file of dfn-web: one TOML with `[boundaries]`, `[network]`,
+// `[flow]` and `[transport]` (see "Workflow file" of README.md). The comment
+// at the top is the description. The app makes the input files of dfngen,
+// fehm and dfntrans from it (`networkToLibraryToml`, `flowToLibraryToml`,
 // `transportToLibraryToml`).
+import { boundariesTables, readBoundaries, type BoundaryRoles } from "./boundaryRoles";
 import { flowTables, readFlow } from "./flow/toml";
 import type { FlowState } from "./flow/state";
 import { InputFormError, networkTables, parseToml, readNetwork, TableReader, tablesToToml, type Table } from "./form/toml";
@@ -15,6 +16,8 @@ const DESCRIPTION_WIDTH = 76;
 export interface Workflow {
   /** The comment at the top of the file, as one line; "" = none */
   description: string;
+  /** The roles of the boundary surfaces of the domain mesh (Domain tab) */
+  boundaries: BoundaryRoles;
   network: FormState;
   flow: FlowState;
   transport: TransportState;
@@ -52,9 +55,11 @@ export function workflowToToml(workflow: Workflow): string {
   const description = descriptionLines(workflow.description);
   return [
     description.length === 0 ? "" : `${description.join("\n")}\n\n`,
+    tablesToToml(boundariesTables(workflow.boundaries), "boundaries"),
+    "\n",
     tablesToToml(networkTables(workflow.network), "network"),
     "\n",
-    tablesToToml(flowTables(workflow.flow), "flow"),
+    tablesToToml(flowTables(workflow.flow, workflow.boundaries), "flow"),
     "\n",
     tablesToToml(transportTables(workflow.transport), "transport"),
   ].join("");
@@ -69,10 +74,12 @@ export function tomlToWorkflow(text: string): Workflow {
     const table = reader.subTable(key);
     return read(table, reader.has(key) ? problems : []);
   };
+  const boundaries = readSection("boundaries", readBoundaries);
   const workflow: Workflow = {
     description: readDescription(text),
+    boundaries,
     network: readSection("network", readNetwork),
-    flow: readSection("flow", readFlow),
+    flow: readSection("flow", (table, sectionProblems) => readFlow(table, boundaries, sectionProblems)),
     transport: readSection("transport", readTransport),
   };
   reader.checkUnknownKeys();

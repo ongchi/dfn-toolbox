@@ -1,27 +1,21 @@
 // Conversion between the transport form state and `[transport]` of the
 // workflow file, and the dfntrans input file of the transport (dfntrans
 // checks the values).
+import { nameList, type BoundaryRoles } from "../boundaryRoles";
 import { float, integer, string, TableReader, tablesToToml, type Table, type TomlTable } from "../form/toml";
 import {
   defaultTransportState,
   TRANSPORT_FLOW_FILE,
-  type BoundaryRole,
   type RoutingRule,
   type SeedingMethod,
   type SeedingState,
   type TimeUnit,
-  type TransportBoundaryState,
   type TransportState,
 } from "./state";
 
 const TIME_UNITS: readonly TimeUnit[] = ["seconds", "minutes", "hours", "days", "years"];
 const ROUTING_RULES: readonly RoutingRule[] = ["complete_mixing", "streamline_routing"];
 const SEEDING_METHODS: readonly SeedingMethod[] = ["uniform_per_line", "equidistant", "random", "flux_weighted", "at_nodes"];
-
-function boundaryNames(state: TransportState, role: BoundaryRole): string {
-  const names = state.boundaries.filter((boundary) => boundary.role === role).map((boundary) => string(boundary.name));
-  return `[${names.join(", ")}]`;
-}
 
 function seedingLines(seeding: SeedingState): string[] {
   const lines = [`method = ${string(seeding.method)}`];
@@ -53,8 +47,6 @@ export function transportTables(state: TransportState): TomlTable[] {
         `time_unit = ${string(state.timeUnit)}`,
         `porosity = ${float(state.porosity)}`,
         `max_time_steps = ${integer(state.maxTimeSteps)}`,
-        `inflow = ${boundaryNames(state, "inflow")}`,
-        `outflow = ${boundaryNames(state, "outflow")}`,
         `routing = ${string(state.routing)}`,
       ],
     },
@@ -73,10 +65,21 @@ const OUTPUT_TABLE: TomlTable = {
   lines: ["trajectories = true", "all_particles = false", "velocities = true"],
 };
 
-/** The dfntrans input file of the transport, on the flow of the last "Solve flow" */
-export function transportToLibraryToml(state: TransportState): string {
+/**
+ * The dfntrans input file of the transport, on the flow of the last "Solve
+ * flow". `boundaries`: the in-flow and out-flow surfaces with a point in the mesh.
+ */
+export function transportToLibraryToml(state: TransportState, boundaries: BoundaryRoles): string {
   const [root, ...others] = transportTables(state);
-  const flowRoot = { ...root, lines: [`flow = ${string(TRANSPORT_FLOW_FILE)}`, ...root.lines] };
+  const flowRoot = {
+    ...root,
+    lines: [
+      `flow = ${string(TRANSPORT_FLOW_FILE)}`,
+      ...root.lines,
+      `inflow = ${nameList(boundaries.inflow)}`,
+      `outflow = ${nameList(boundaries.outflow)}`,
+    ],
+  };
   return tablesToToml([flowRoot, ...others, OUTPUT_TABLE], "");
 }
 
@@ -102,25 +105,16 @@ function readSeeding(table: Table, problems: string[]): SeedingState {
   return seeding;
 }
 
-/**
- * Reads `[transport]` of the workflow file. The boundaries are the names of
- * `inflow` and `outflow`; the mesh of the generation adds its other boundaries.
- */
+/** Reads `[transport]` of the workflow file */
 export function readTransport(table: Table, problems: string[]): TransportState {
   const defaults = defaultTransportState();
   const reader = new TableReader(table, "[transport]", problems);
-  const boundaries: TransportBoundaryState[] = [
-    ...reader.stringArray("inflow").map((name) => ({ name, role: "inflow" as const })),
-    ...reader.stringArray("outflow").map((name) => ({ name, role: "outflow" as const })),
-  ];
-
   const state: TransportState = {
     seed: reader.integer("seed", defaults.seed),
     timeUnit: reader.choice("time_unit", TIME_UNITS, defaults.timeUnit),
     porosity: reader.float("porosity", defaults.porosity),
     maxTimeSteps: reader.integer("max_time_steps", defaults.maxTimeSteps),
     routing: reader.choice("routing", ROUTING_RULES, defaults.routing),
-    boundaries,
     seeding: readSeeding(reader.subTable("seeding"), problems),
   };
   reader.checkUnknownKeys();

@@ -1,12 +1,20 @@
 // The page: input forms (network, flow and transport), generation, flow and
 // transport in the worker, 3D view and output files.
 import "./style.css";
+import {
+  defaultBoundaryRoles,
+  flowSurfaces,
+  roleOf,
+  setRole,
+  surfacesWithPoints,
+  type BoundaryRoles,
+} from "./boundaryRoles";
 import { boundarySurfacePolyData, DEFAULT_SURFACE_COLORS, domainBoundarySurfaceNames } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
-import { renderFlowForm } from "./flow/form";
+import { renderFlowForm, type FlowBoundary } from "./flow/form";
 import { addArray, addPointArray, pointCount, triangleGridToPolyData, vectorMagnitudes } from "./flow/polyData";
-import { defaultFlowState, FLOW_MESH_FILE, flowBoundaryNames, updateBoundaries, type FlowState } from "./flow/state";
+import { defaultFlowState, FLOW_MESH_FILE, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
@@ -33,7 +41,7 @@ import {
 } from "./inputFiles";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm } from "./transport/form";
-import { defaultTransportState, updateTransportBoundaries, type TimeUnit, type TransportState } from "./transport/state";
+import { defaultTransportState, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { markVelocityAsVectors } from "./transport/trajectories";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
@@ -57,9 +65,9 @@ const TRAJECTORIES_FILE = "trajectories.vtp";
 const VELOCITIES_FILE = "velocities.vtp";
 const FLOW_VELOCITY_OPTION = colorOptionValue(FLOW_VELOCITY_ARRAY);
 const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
-// The generation keeps all clusters when none connects all boundary surfaces
-const NO_CLUSTER_ON_ALL_SURFACES =
-  "No cluster connects all boundary surfaces: all clusters stay. The flow needs a path between the boundary surfaces; increase the number of fractures or their size, or try another seed.";
+// The generation keeps all clusters when none connects an in-flow and an out-flow surface
+const NO_CONNECTING_CLUSTER =
+  "No cluster connects an in-flow and an out-flow surface: all clusters stay. The particles need a path between them; increase the number of fractures or their size, try another seed, or change the roles of the surfaces (Domain tab).";
 
 // The domain, the user fractures and the network are the three tabs of the network input
 const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
@@ -123,6 +131,8 @@ let files: InputFiles = { mesh: null };
 let regionNames: string[] = [];
 let regionBounds: RegionBounds[] = [];
 let boundarySurfaceNames: string[] = [];
+/** The roles of the boundary surfaces (Domain tab) */
+let boundaryRoles: BoundaryRoles = { inflow: [], outflow: [] };
 /** The colors which the user chose, by boundary surface name; they stay while the page is open */
 const boundarySurfaceColors = new Map<string, string>();
 let meshNames: string[] = [];
@@ -183,12 +193,12 @@ function setBusy(busy: boolean): void {
 
 /**
  * "Next" goes to the next tab; the Transport tab has none. On the DFN tab it
- * needs the fracture mesh of a generation with a cluster which connects all
- * boundary surfaces, on the Flow tab a solved flow.
+ * needs the fracture mesh of a generation with a cluster which connects an
+ * in-flow and an out-flow surface, on the Flow tab a solved flow.
  */
 function updateNextButton(): void {
   const isLastTab = activeSidebarTab === SIDEBAR_TABS[SIDEBAR_TABS.length - 1];
-  const isNetworkMissing = flowMesh() === null || output?.isWithoutClusterOnAllSurfaces === true;
+  const isNetworkMissing = flowMesh() === null || output?.isWithoutConnectingCluster === true;
   const isOutputMissing =
     (activeSidebarTab === "network" && isNetworkMissing) || (activeSidebarTab === "flow" && flowOutput === null);
   ui.nextButton.hidden = isLastTab;
@@ -218,6 +228,7 @@ const fileHandlers: FileHandlers = {
       const mesh = await loadMesh(name);
       state.domain = name;
       lastShape = name;
+      boundaryRoles = defaultBoundaryRoles(domainBoundarySurfaceNames(mesh.text));
       await setMesh(mesh);
       render();
     } catch (error) {
@@ -249,8 +260,22 @@ function render(): void {
   updateUserFracturesInViewer();
 }
 
+/** The pressure boundaries of the flow form; null without a triangle mesh */
+function flowBoundaries(): FlowBoundary[] | null {
+  const mesh = flowMesh();
+  if (mesh === null) {
+    return null;
+  }
+  const withPoints = surfacesWithPoints(mesh, flowSurfaces(boundaryRoles));
+  return flowSurfaces(boundaryRoles).map((name) => ({
+    name,
+    isInflow: roleOf(boundaryRoles, name) === "inflow",
+    hasPoints: withPoints.includes(name),
+  }));
+}
+
 function renderFlow(): void {
-  renderFlowForm(ui.flowForm, flowState, flowMesh() !== null, flowContext);
+  renderFlowForm(ui.flowForm, flowState, flowBoundaries(), flowContext);
 }
 
 function renderTransport(): void {
@@ -304,12 +329,20 @@ function knownBoundarySurfaceColor(name: string): string | null {
 
 function renderBoundarySurfaces(): void {
   ui.boundarySurfaces.replaceChildren(
-    boundarySurfaceSection(boundarySurfaceNames, boundarySurfaceColor, (name, color) => {
-      boundarySurfaceColors.set(name, color);
-      // The Flow and Transport tabs show the color before the name of the boundary
-      renderFlow();
-      renderTransport();
-      void updateViewer((view) => view.setBoundarySurfaceColor(name, color));
+    boundarySurfaceSection(boundarySurfaceNames, {
+      colorOf: boundarySurfaceColor,
+      onColor: (name, color) => {
+        boundarySurfaceColors.set(name, color);
+        // The Flow tab shows the color before the name of the boundary
+        renderFlow();
+        void updateViewer((view) => view.setBoundarySurfaceColor(name, color));
+      },
+      roleOf: (name) => roleOf(boundaryRoles, name),
+      onRole: (name, role) => {
+        setRole(boundaryRoles, name, role, boundarySurfaceNames);
+        // The network keeps the clusters which connect the in-flow and out-flow surfaces
+        clearOutput();
+      },
     }),
   );
   updateDomainSource();
@@ -345,6 +378,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
 
 /** Loads a new workflow into the three forms: the old output does not belong to it */
 async function loadInput(workflow: Workflow, newFiles: InputFiles): Promise<void> {
+  boundaryRoles = workflow.boundaries;
   state = workflow.network;
   flowState = workflow.flow;
   transportState = workflow.transport;
@@ -374,7 +408,7 @@ function generationInput(): GenerationInput | string {
     return `The region ${unknownRegion.region} of a user-defined fracture is not in the domain mesh. Choose another region.`;
   }
   return {
-    toml: networkToLibraryToml(state),
+    toml: networkToLibraryToml(state, boundaryRoles),
     mesh: files.mesh.text,
     userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, regionNames),
   };
@@ -400,8 +434,8 @@ async function runGeneration(): Promise<void> {
       return;
     }
     const doneText = `Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`;
-    if (result.isWithoutClusterOnAllSurfaces) {
-      showWarningStatus(`${doneText}\n${NO_CLUSTER_ON_ALL_SURFACES}`);
+    if (result.isWithoutConnectingCluster) {
+      showWarningStatus(`${doneText}\n${NO_CONNECTING_CLUSTER}`);
     } else {
       showStatus(doneText);
     }
@@ -422,7 +456,7 @@ function flowInput(): FlowInput | string {
   if (ui.flowForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
-  return { toml: flowToLibraryToml(flowState), mesh };
+  return { toml: flowToLibraryToml(flowState, surfacesWithPoints(mesh, flowSurfaces(boundaryRoles))), mesh };
 }
 
 async function runFlow(): Promise<void> {
@@ -462,7 +496,11 @@ function transportInput(): TransportInput | string {
   if (ui.transportForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
-  return { toml: transportToLibraryToml(transportState), flowToml: flowOutputToml, mesh };
+  const boundaries = {
+    inflow: surfacesWithPoints(mesh, boundaryRoles.inflow),
+    outflow: surfacesWithPoints(mesh, boundaryRoles.outflow),
+  };
+  return { toml: transportToLibraryToml(transportState, boundaries), flowToml: flowOutputToml, mesh };
 }
 
 async function runTransport(): Promise<void> {
@@ -589,11 +627,6 @@ async function showOutput(result: GenerationOutput): Promise<void> {
   updateNextButton();
   ui.resultsBezel.hidden = false;
   ui.results.hidden = false;
-  const mesh = flowMesh();
-  // setMesh removes the output: the domain mesh is that of the generation
-  const boundaryNames = mesh === null || files.mesh === null ? [] : flowBoundaryNames(mesh, files.mesh.text);
-  updateBoundaries(flowState, boundaryNames);
-  updateTransportBoundaries(transportState, boundaryNames);
   renderFlow();
 
   showStats(ui.resultsStats, [
@@ -817,7 +850,13 @@ async function startFromShape(): Promise<void> {
     const network = defaultFormState();
     network.domain = name;
     await loadInput(
-      { description: "", network, flow: defaultFlowState(), transport: defaultTransportState() },
+      {
+        description: "",
+        boundaries: defaultBoundaryRoles(domainBoundarySurfaceNames(mesh.text)),
+        network,
+        flow: defaultFlowState(),
+        transport: defaultTransportState(),
+      },
       { mesh },
     );
     ui.form.dataset.shape = name;

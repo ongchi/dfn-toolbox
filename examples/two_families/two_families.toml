@@ -4,6 +4,10 @@
 # aperture which grows with the radius. Color the network by "family" and
 # compare the pressure and the particle paths in the two families.
 
+[boundaries]
+inflow = ["west"]
+outflow = ["east"]
+
 [network]
 seed = 3
 min_feature_size = 0.4
@@ -55,8 +59,6 @@ seed = 12345
 time_unit = "days"
 porosity = 1.0
 max_time_steps = 1000000
-inflow = ["west"]
-outflow = ["east"]
 routing = "complete_mixing"
 
 [transport.seeding]

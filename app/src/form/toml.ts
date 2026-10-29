@@ -8,6 +8,7 @@
 // values ("Generate").
 
 import { parse } from "smol-toml";
+import { clustersLine, type BoundaryRoles } from "../boundaryRoles";
 import {
   FRAM_DEFAULTS,
   MESH_DEFAULTS,
@@ -223,19 +224,15 @@ export function networkTables(state: FormState): TomlTable[] {
 const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray: false, lines: ["enable = true"] };
 
 /**
- * The isolated fractures and the clusters which do not connect all boundary
- * surfaces are always removed in dfn-web (the flow needs a path between the
- * surfaces), thus the workflow file has no keys for them; the dfngen input
- * needs them
- */
-const FIXED_CLUSTERS_LINES = ["keep_isolated_fractures = false", "keep_only_connected_to_surfaces = true"];
-
-/**
  * The dfngen input file of the network. The mesh is always on in dfn-web. The
  * user-defined fractures are the polygons of `USER_FRACTURES_FILE` (made by
- * `userFracturesToVtp`), not tables.
+ * `userFracturesToVtp`), not tables. The isolated fractures and the clusters
+ * which do not connect an in-flow and an out-flow surface are always removed
+ * (the particles need a path between them), thus the workflow file has no
+ * keys for them.
  */
-export function networkToLibraryToml(state: FormState): string {
+export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): string {
+  const clustersLines = ["keep_isolated_fractures = false", clustersLine(roles)];
   const tables = networkTables(state).flatMap((table) => {
     if (table.name === "") {
       const fileLines = state.userFractures.length === 0 ? [] : [`user_fractures = ${string(USER_FRACTURES_FILE)}`];
@@ -245,7 +242,7 @@ export function networkToLibraryToml(state: FormState): string {
       return [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }];
     }
     if (table.name === "clusters") {
-      return [{ ...table, lines: [...table.lines, ...FIXED_CLUSTERS_LINES] }];
+      return [{ ...table, lines: [...table.lines, ...clustersLines] }];
     }
     return table.name === "user_fracture" ? [] : [table];
   });

@@ -5,6 +5,10 @@
 # east (10.0 MPa); the lines on the other faces (mesh_surface) have no flow.
 # The particles start on the in-flow lines and leave at east.
 
+[boundaries]
+inflow = ["west"]
+outflow = ["east"]
+
 [network]
 seed = 1
 min_feature_size = 0.4
@@ -48,8 +52,6 @@ seed = 12345
 time_unit = "days"
 porosity = 1.0
 max_time_steps = 1000000
-inflow = ["west"]
-outflow = ["east"]
 routing = "complete_mixing"
 
 [transport.seeding]

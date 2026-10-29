@@ -89,7 +89,7 @@ function handle(request: WorkerRequest): void {
     acceptedCount: result.accepted_count,
     finalCount: result.final_count,
     rejectedCount: result.rejected_count,
-    isWithoutClusterOnAllSurfaces: result.is_without_cluster_on_all_surfaces,
+    isWithoutConnectingCluster: result.is_without_connecting_cluster,
   });
   result.free();
 }

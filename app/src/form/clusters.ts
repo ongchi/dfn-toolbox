@@ -9,7 +9,7 @@ export function clustersSection(state: FormState, context: FormContext): HTMLEle
     element(
       "p",
       "form-note",
-      "The fractures with no intersection are removed. Only the clusters which connect all boundary surfaces of the domain stay.",
+      "The fractures with no intersection are removed. Only the clusters which connect an in-flow and an out-flow surface (Domain tab) stay.",
     ),
     checkboxField({
       label: "Keep only the largest cluster",

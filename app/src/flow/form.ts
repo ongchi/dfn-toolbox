@@ -1,7 +1,8 @@
-// The flow form: one field for each key of the fehm input file.
+// The flow form: one field for each key of the fehm input file. The pressure
+// boundaries are the in-flow and out-flow surfaces of the Domain tab.
 import type { FormContext } from "../form/context";
 import { checkboxField, element, numberField, row, section } from "../form/fields";
-import type { FlowState } from "./state";
+import { pressureOf, type FlowState } from "./state";
 
 function fluidSection(state: FlowState, context: FormContext): HTMLElement {
   return section(
@@ -31,49 +32,52 @@ function fluidSection(state: FlowState, context: FormContext): HTMLElement {
   );
 }
 
-function boundariesSection(state: FlowState, context: FormContext): HTMLElement {
+/** A pressure boundary of the flow: an in-flow or out-flow surface of the Domain tab */
+export interface FlowBoundary {
+  name: string;
+  isInflow: boolean;
+  /** False if the network has no point on the surface: the flow does not use it */
+  hasPoints: boolean;
+}
+
+function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context: FormContext): HTMLElement {
   const container = section("Pressure boundaries");
   container.append(
     element(
       "p",
       "form-note",
-      "The boundary surfaces of the domain mesh, in their colors of the 3D view. Use at least one. A point on two used boundaries keeps the pressure of the first in this list.",
+      "The in-flow and out-flow surfaces of the Domain tab, in their colors of the 3D view. A point on two surfaces keeps the pressure of the first in this list.",
     ),
   );
-  for (const boundary of state.boundaries) {
+  for (const boundary of boundaries) {
+    const role = boundary.isInflow ? "in-flow" : "out-flow";
     container.append(
-      row(
-        checkboxField({
-          label: boundary.name,
-          labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
-          help: "use this boundary",
-          value: boundary.isUsed,
-          onInput: (value) => {
-            boundary.isUsed = value;
-            context.rerender();
-          },
-        }),
-        numberField({
-          label: "Pressure (MPa)",
-          key: "pressure",
-          help: "0.001 to 110",
-          value: boundary.pressure,
-          isDisabled: !boundary.isUsed,
-          onInput: (value) => {
-            boundary.pressure = value;
-            context.changed();
-          },
-        }),
-      ),
+      numberField({
+        label: `${boundary.name}: pressure (MPa)`,
+        labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
+        key: "pressure",
+        help: boundary.hasPoints ? `${role}; 0.001 to 110` : `${role}; the network has no point on it: not used`,
+        value: pressureOf(state, boundary.name),
+        isDisabled: !boundary.hasPoints,
+        onInput: (value) => {
+          state.pressures[boundary.name] = value;
+          context.changed();
+        },
+      }),
     );
   }
   return container;
 }
 
-/** Shows the flow form; `hasMesh` = the last generation has a triangle mesh */
-export function renderFlowForm(container: HTMLElement, state: FlowState, hasMesh: boolean, context: FormContext): void {
+/** Shows the flow form; `boundaries` = null: the last generation has no triangle mesh */
+export function renderFlowForm(
+  container: HTMLElement,
+  state: FlowState,
+  boundaries: FlowBoundary[] | null,
+  context: FormContext,
+): void {
   const scrollTop = container.scrollTop;
-  if (!hasMesh) {
+  if (boundaries === null) {
     container.replaceChildren(
       element(
         "p",
@@ -83,6 +87,6 @@ export function renderFlowForm(container: HTMLElement, state: FlowState, hasMesh
     );
     return;
   }
-  container.replaceChildren(fluidSection(state, context), boundariesSection(state, context));
+  container.replaceChildren(fluidSection(state, context), boundariesSection(state, boundaries, context));
   container.scrollTop = scrollTop;
 }

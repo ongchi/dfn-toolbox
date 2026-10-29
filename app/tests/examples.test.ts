@@ -2,11 +2,11 @@
 // workflow file and runs the full workflow (network, flow and transport).
 import { existsSync } from "node:fs";
 import { beforeAll, describe, expect, test } from "vitest";
-import { FLOW_MESH_FILE, flowBoundaryNames, updateBoundaries } from "../src/flow/state";
+import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
+import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { networkToLibraryToml } from "../src/form/toml";
 import { run_flow, run_generation, run_transport, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
-import { updateTransportBoundaries } from "../src/transport/state";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "../src/workflow";
 import { exampleNames, initWasm, meshPath, readExample, readMesh, userFracturesFile } from "./cases";
@@ -24,7 +24,7 @@ test("there are examples", () => {
 
 describe.each(exampleNames)("%s", (exampleName) => {
   let workflow: Workflow;
-  let boundaryNames: string[] = [];
+  let surfacesInMesh: string[] = [];
   let flow: FlowResult;
   let transport: TransportResult;
 
@@ -32,8 +32,9 @@ describe.each(exampleNames)("%s", (exampleName) => {
     const example = readExample(exampleName);
     workflow = tomlToWorkflow(example.toml);
     const network = workflow.network;
+    const roles = workflow.boundaries;
     const generation = run_generation(
-      networkToLibraryToml(network),
+      networkToLibraryToml(network, roles),
       readMesh(network.domain),
       userFracturesFile(network),
       1n,
@@ -41,14 +42,16 @@ describe.each(exampleNames)("%s", (exampleName) => {
     );
     expect(generation.error).toBeUndefined();
     const mesh = generation.file(FLOW_MESH_FILE) ?? "";
-    boundaryNames = flowBoundaryNames(mesh, readMesh(network.domain));
+    surfacesInMesh = surfacesWithPoints(mesh, flowSurfaces(roles));
 
-    updateBoundaries(workflow.flow, boundaryNames);
-    const flowToml = flowToLibraryToml(workflow.flow);
+    const flowToml = flowToLibraryToml(workflow.flow, surfacesInMesh);
     flow = run_flow(flowToml, mesh);
 
-    updateTransportBoundaries(workflow.transport, boundaryNames);
-    transport = run_transport(transportToLibraryToml(workflow.transport), flowToml, mesh, 1);
+    const boundaries = {
+      inflow: surfacesWithPoints(mesh, roles.inflow),
+      outflow: surfacesWithPoints(mesh, roles.outflow),
+    };
+    transport = run_transport(transportToLibraryToml(workflow.transport, boundaries), flowToml, mesh, 1);
   }, WORKFLOW_TIMEOUT);
 
   test("the domain is a predefined mesh", () => {
@@ -60,12 +63,8 @@ describe.each(exampleNames)("%s", (exampleName) => {
     expect(tomlToWorkflow(workflowToToml(original))).toEqual(original);
   });
 
-  test("the mesh has the boundaries of the flow and the transport", () => {
-    const used = [
-      ...workflow.flow.boundaries.filter((boundary) => boundary.isUsed),
-      ...workflow.transport.boundaries.filter((boundary) => boundary.role !== "none"),
-    ];
-    expect(used.map((boundary) => boundary.name).filter((name) => !boundaryNames.includes(name))).toEqual([]);
+  test("the mesh has a point on each in-flow and out-flow surface", () => {
+    expect(surfacesInMesh).toEqual(flowSurfaces(workflow.boundaries));
   });
 
   test("the in-flow is equal to the out-flow", () => {

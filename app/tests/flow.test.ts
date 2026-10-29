@@ -5,18 +5,12 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
+import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
 import { addPointArray, triangleGridToPolyData } from "../src/flow/polyData";
-import {
-  defaultFlowState,
-  FLOW_MESH_FILE,
-  flowBoundaryNames,
-  meshBoundaryNames,
-  updateBoundaries,
-  type FlowState,
-} from "../src/flow/state";
-import { flowToLibraryToml } from "../src/flow/toml";
+import { defaultFlowState, FLOW_MESH_FILE, pressureOf } from "../src/flow/state";
+import { flowTables, flowToLibraryToml } from "../src/flow/toml";
 import { check_flow_input, run_flow } from "../src/pkg/dfn_wasm.js";
-import { compareOutputFolders, generateExample, initWasm, readMesh, runNativeFehm } from "./cases";
+import { compareOutputFolders, generateExample, initWasm, runNativeFehm } from "./cases";
 
 // The example with the boundary arrays of the mesh surface, of the regions
 // west_box, east_box and other_boxes, and of the boundary surfaces north and east
@@ -29,54 +23,45 @@ beforeAll(() => {
   mesh = generateExample(EXAMPLE_NAME).mesh;
 });
 
-/** The flow state with the given boundaries of the mesh used, at their pressures (MPa) */
-function flowState(pressures: Record<string, number>, boundaryMesh = mesh): FlowState {
-  const state = defaultFlowState();
-  updateBoundaries(state, meshBoundaryNames(boundaryMesh));
-  for (const boundary of state.boundaries) {
-    boundary.isUsed = boundary.name in pressures;
-    boundary.pressure = pressures[boundary.name] ?? boundary.pressure;
-  }
-  return state;
+/** The fehm input with these boundaries at their pressures (MPa) */
+function flowToml(pressures: Record<string, number>): string {
+  return flowToLibraryToml({ ...defaultFlowState(), pressures }, Object.keys(pressures));
 }
 
 const PRESSURES = { north: 10.1, east: 10.0 };
 
-test("the boundaries of the mesh are its boundary arrays", () => {
-  expect(meshBoundaryNames(mesh)).toEqual(["mesh_surface", "west_box", "east_box", "other_boxes", "north", "east"]);
-});
+/** The mesh with one more boundary array, of zeros */
+function meshWithEmptyArray(): string {
+  const pointCount = Number(/NumberOfPoints="(\d+)"/.exec(mesh)?.[1]);
+  const emptyArray = `<DataArray type="Int32" Name="boundary__empty" format="ascii">${"0 ".repeat(pointCount)}</DataArray>`;
+  return mesh.replace("<PointData>", `<PointData>\n${emptyArray}`);
+}
 
-test("the boundaries of the flow are only the boundary surfaces of the domain mesh", () => {
-  expect(flowBoundaryNames(mesh, readMesh("L-shape.vtu"))).toEqual(["north", "east"]);
+test("the surfaces with points are the boundary arrays with a value above 0", () => {
+  expect(surfacesWithPoints(meshWithEmptyArray(), ["north", "empty", "east", "west"])).toEqual(["north", "east"]);
 });
 
 test("the TOML of the flow form is a valid input", () => {
-  expect(check_flow_input(flowToLibraryToml(flowState(PRESSURES)), mesh)).toBeUndefined();
+  expect(check_flow_input(flowToml(PRESSURES), mesh)).toBeUndefined();
 });
 
-test("a new mesh keeps the values of the boundaries with the same name", () => {
-  const state = flowState(PRESSURES);
-  updateBoundaries(state, ["north", "west"]);
-  expect(state.boundaries.slice(0, 2)).toEqual([
-    { name: "north", isUsed: true, pressure: 10.1 },
-    { name: "west", isUsed: false, pressure: 10.0 },
-  ]);
+test("a surface with no pressure of its own has the default pressure", () => {
+  expect(pressureOf(defaultFlowState(), "north")).toBe(10.0);
 });
 
-test("a used boundary which is not in the new mesh stays at the end", () => {
-  const state = flowState(PRESSURES);
-  updateBoundaries(state, ["north", "west"]);
-  expect(state.boundaries.map((boundary) => boundary.name)).toEqual(["north", "west", "east"]);
+test("the workflow file has the pressures of the in-flow and out-flow surfaces only", () => {
+  const state = { ...defaultFlowState(), pressures: { north: 10.1, east: 10.0, west: 9.0 } };
+  const [root] = flowTables(state, { inflow: ["north"], outflow: ["east"] });
+  expect(root.lines).toContain("pressure = { north = 10.1, east = 10.0 }");
 });
 
 test("the flow of the workflow file is a valid input", () => {
-  const { flow } = generateExample(EXAMPLE_NAME).workflow;
-  updateBoundaries(flow, meshBoundaryNames(mesh));
-  expect(check_flow_input(flowToLibraryToml(flow), mesh)).toBeUndefined();
+  const { flow, boundaries } = generateExample(EXAMPLE_NAME).workflow;
+  expect(check_flow_input(flowToLibraryToml(flow, flowSurfaces(boundaries)), mesh)).toBeUndefined();
 });
 
 test("the output files agree with the native binary of fehm", () => {
-  const toml = flowToLibraryToml(flowState(PRESSURES));
+  const toml = flowToml(PRESSURES);
   const result = run_flow(toml, mesh);
   expect(result.error).toBeUndefined();
 
@@ -88,7 +73,7 @@ test("the output files agree with the native binary of fehm", () => {
 });
 
 test("the in-flow and the out-flow are equal", () => {
-  const result = run_flow(flowToLibraryToml(flowState(PRESSURES)), mesh);
+  const result = run_flow(flowToml(PRESSURES), mesh);
   const [inflow, outflow] = result.boundary_flows;
   expect(result.boundary_names).toEqual(["north", "east"]);
   expect(inflow).toBeGreaterThan(0);
@@ -96,21 +81,16 @@ test("the in-flow and the out-flow are equal", () => {
 });
 
 test("a boundary array with no point is an error", () => {
-  // The mesh with one more boundary array, of zeros
-  const pointCount = Number(/NumberOfPoints="(\d+)"/.exec(mesh)?.[1]);
-  const emptyArray = `<DataArray type="Int32" Name="boundary__empty" format="ascii">${"0 ".repeat(pointCount)}</DataArray>`;
-  const meshWithEmptyArray = mesh.replace("<PointData>", `<PointData>\n${emptyArray}`);
-  const toml = flowToLibraryToml(flowState({ empty: 10.0, north: 10.0 }, meshWithEmptyArray));
-  const error = check_flow_input(toml, meshWithEmptyArray);
+  const error = check_flow_input(flowToml({ empty: 10.0, north: 10.0 }), meshWithEmptyArray());
   expect([error?.kind, error?.field_values]).toEqual(["fehm.EmptyBoundary", ["empty"]]);
 });
 
 test("no boundary is an error", () => {
-  expect(check_flow_input(flowToLibraryToml(flowState({})), mesh)?.kind).toBe("fehm.NoBoundaryDefined");
+  expect(check_flow_input(flowToml({}), mesh)?.kind).toBe("fehm.NoBoundaryDefined");
 });
 
 test("the pressure file as PolyData has the triangles and the pressure", () => {
-  const result = run_flow(flowToLibraryToml(flowState(PRESSURES)), mesh);
+  const result = run_flow(flowToml(PRESSURES), mesh);
   const polyData = triangleGridToPolyData(result.file("pressure.vtu") ?? "");
   expect(polyData).toMatch(/<VTKFile type="PolyData"/);
   expect(polyData).toMatch(/<Piece NumberOfPoints="\d+" NumberOfVerts="0" NumberOfLines="0" NumberOfStrips="0" NumberOfPolys="\d+">/);
@@ -120,7 +100,7 @@ test("the pressure file as PolyData has the triangles and the pressure", () => {
 });
 
 test("the mesh with the pressure has the pressure of fehm in its point data", () => {
-  const pressureVtu = run_flow(flowToLibraryToml(flowState(PRESSURES)), mesh).file("pressure.vtu") ?? "";
+  const pressureVtu = run_flow(flowToml(PRESSURES), mesh).file("pressure.vtu") ?? "";
   const pressureArray = pressureVtu.match(/<DataArray[^>]*Name="pressure"[^>]*>[^<]*<\/DataArray>/)?.[0] ?? "";
   const pointData = addPointArray(mesh, pressureVtu, "pressure").match(/<PointData>[\s\S]*<\/PointData>/)?.[0] ?? "";
   expect(pressureArray).not.toBe("");
@@ -128,7 +108,7 @@ test("the mesh with the pressure has the pressure of fehm in its point data", ()
 });
 
 test("a pressure file with other points is an error", () => {
-  const pressureVtu = run_flow(flowToLibraryToml(flowState(PRESSURES)), mesh).file("pressure.vtu") ?? "";
+  const pressureVtu = run_flow(flowToml(PRESSURES), mesh).file("pressure.vtu") ?? "";
   const otherPoints = pressureVtu.replace(/NumberOfPoints="\d+"/, 'NumberOfPoints="1"');
   expect(() => addPointArray(mesh, otherPoints, "pressure")).toThrow(/not the same number of points/);
 });

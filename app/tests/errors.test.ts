@@ -90,10 +90,31 @@ test("a domain without boundary surfaces asks for another domain shape", () => {
   const text = networkErrorText((toml) =>
     toml
       .replace("[region_boundaries]\nenable = false", "[region_boundaries]\nenable = true")
-      .replace("keep_only_connected_to_surfaces = false", "keep_only_connected_to_surfaces = true"),
+      .replace("keep_only_connected_to = []", 'keep_only_connected_to = [["west"], ["east"]]'),
   );
   expect(text).toBe(
-    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect them. Choose another domain shape (Domain tab).",
+    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect an in-flow and an out-flow surface. Choose another domain shape (Domain tab).",
+  );
+});
+
+/** The text of the error of the case clusters_connect_surfaces (surfaces west and east) with these groups */
+function clusterGroupsErrorText(groups: string): string {
+  const files = readCase("clusters_connect_surfaces");
+  const toml = files.toml.replace(/^keep_only_connected_to = .*$/m, `keep_only_connected_to = ${groups}`);
+  return userText(check_input(toml, files.mesh, files.userFractures));
+}
+
+test("no out-flow surface asks for one", () => {
+  expect(clusterGroupsErrorText('[["west"], []]')).toBe("Set at least one out-flow surface (Domain tab, Boundary surfaces).");
+});
+
+test("no in-flow surface asks for one", () => {
+  expect(clusterGroupsErrorText('[[], ["east"]]')).toBe("Set at least one in-flow surface (Domain tab, Boundary surfaces).");
+});
+
+test("a role of a surface which the domain does not have names the surface", () => {
+  expect(clusterGroupsErrorText('[["west"], ["north"]]')).toBe(
+    "The domain has no boundary surface north. Choose the roles of the surfaces again (Domain tab).",
   );
 });
 
@@ -110,7 +131,7 @@ test("a temperature outside the range gives the range of fehm", () => {
 test("a boundary with no point names the boundary", () => {
   const text = userText(check_flow_input(FLOW_TOML.replace('"west"', '"none"'), MESH));
   expect(text).toBe(
-    "The boundary none (Flow tab) has no point in the network. Do not use it, or generate another network.",
+    "The boundary none has no point in the network. Change its role (Domain tab), or generate another network.",
   );
 });
 

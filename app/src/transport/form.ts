@@ -1,8 +1,9 @@
 // The transport form: one field for each key of the dfntrans input file,
-// except the output (the trajectories and the velocities are always on).
+// except the output (the trajectories and the velocities are always on) and
+// the in-flow and out-flow boundaries (the roles of the Domain tab).
 import type { FormContext } from "../form/context";
 import { checkboxField, element, numberField, row, section, selectField } from "../form/fields";
-import type { BoundaryRole, RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
+import type { RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
 
 /** Help text of the particle numbers: the trajectories are always on */
 const TRAJECTORY_SIZE = "the trajectories have about 1 MB for each particle";
@@ -100,36 +101,6 @@ function generalSection(state: TransportState, context: FormContext): HTMLElemen
       },
     }),
   );
-}
-
-function boundariesSection(state: TransportState, context: FormContext): HTMLElement {
-  const container = section("Boundaries");
-  container.append(
-    element(
-      "p",
-      "form-note",
-      "The boundary surfaces of the domain mesh, in their colors of the 3D view (keys inflow and outflow). Use at least one of each. They need not be pressure boundaries of the flow.",
-    ),
-  );
-  for (const boundary of state.boundaries) {
-    container.append(
-      selectField<BoundaryRole>({
-        label: boundary.name,
-        labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
-        value: boundary.role,
-        choices: [
-          ["none", "not used"],
-          ["inflow", "in-flow"],
-          ["outflow", "out-flow"],
-        ],
-        onInput: (value) => {
-          boundary.role = value;
-          context.changed();
-        },
-      }),
-    );
-  }
-  return container;
 }
 
 function seedingSection(state: TransportState, context: FormContext): HTMLElement {
@@ -246,8 +217,8 @@ export function renderTransportForm(
     return;
   }
   container.replaceChildren(
+    element("p", "form-note", "The particles go from the in-flow to the out-flow surfaces of the Domain tab."),
     generalSection(state, context),
-    boundariesSection(state, context),
     seedingSection(state, context),
   );
   container.scrollTop = scrollTop;
