@@ -67,7 +67,8 @@ There is no server: `npm run build` gives a folder of static files.
 - Flow tab: a form with one field for each key of `[flow]`. The mesh is the
   `dfn_mesh.vtu` of the last generation; the pressure boundaries are the
   in-flow and out-flow surfaces of the Domain tab, each with the color of
-  its surface and a pressure. A surface with no point in the mesh (its
+  its surface and a pressure; the pointer over a pressure field shows the
+  outline of its surface, as in the Domain tab. A surface with no point in the mesh (its
   point array `boundary__<name>` has no value above 0; possible with two
   or more in-flow or out-flow surfaces) is shown disabled and is not in the
   fehm input. A surface which loses its role keeps its pressure while the
@@ -334,7 +335,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
   the color choosers, the roles and the outline on hover of the boundary surfaces, the "Next" button, the full workflow of each example (the
-  boundaries of the Flow tab are the in-flow and out-flow surfaces, with their colors; the Transport tab has no
+  boundaries of the Flow tab are the in-flow and out-flow surfaces, with their colors and the outline on hover; the Transport tab has no
   boundaries), the flow again
   after the transport and the generation again after the flow (no error of a removed "Color by" array), the flow without a
   mesh, the transport without a flow, the choice of a predefined mesh and its description, the

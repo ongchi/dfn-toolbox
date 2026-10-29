@@ -267,6 +267,26 @@ try {
     const exampleSurfaces = await flowSurfaceNames(page);
     const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
     check(exampleSurfaces !== "" && flowBoundaries === exampleSurfaces, `${name}: flow boundaries`, flowBoundaries);
+    // The pointer over a pressure field shows the outline of its surface
+    await page.mouse.move(0, 0);
+    const flowViewBefore = await viewerScreenshot();
+    const pressureField = await page.evaluateHandle(() =>
+      [...document.querySelectorAll("#flow-form .form-section")]
+        .find((node) => node.querySelector("h3")?.textContent === "Pressure boundaries")
+        .querySelector(".field"),
+    );
+    await pressureField.hover();
+    const flowViewOnHover = await viewerScreenshot();
+    if (name === "box_west_east") {
+      await page.screenshot({ path: `${screenshotDir}/e2e_pressure_boundary_hover.png` });
+    }
+    await page.mouse.move(0, 0);
+    const flowViewAfter = await viewerScreenshot();
+    check(
+      !flowViewOnHover.equals(flowViewBefore) && flowViewAfter.equals(flowViewBefore),
+      `${name}: pressure boundary outline on hover`,
+      `hover ${flowViewOnHover.equals(flowViewBefore) ? "unchanged" : "changed"}, after ${flowViewAfter.equals(flowViewBefore) ? "same" : "different"}`,
+    );
     const isFlowNextDisabled = await isNextDisabled();
     const flowStatus = await runStep(page, "flow");
     const isFlowNextEnabled = !(await isNextDisabled());

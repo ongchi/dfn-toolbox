@@ -218,6 +218,7 @@ const formContext: FormContext = {
     return regionBounds;
   },
   boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
+  highlightBoundarySurface: (name) => highlightBoundarySurface(name),
   changed: () => updateUserFracturesInViewer(),
   rerender: () => render(),
 };
@@ -242,6 +243,7 @@ const flowContext: FormContext = {
   meshNames: [],
   regionBounds: [],
   boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
+  highlightBoundarySurface: (name) => highlightBoundarySurface(name),
   changed: () => {},
   rerender: () => renderFlow(),
 };
@@ -251,6 +253,7 @@ const transportContext: FormContext = {
   meshNames: [],
   regionBounds: [],
   boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
+  highlightBoundarySurface: (name) => highlightBoundarySurface(name),
   changed: () => {},
   rerender: () => renderTransport(),
 };
@@ -327,6 +330,11 @@ function knownBoundarySurfaceColor(name: string): string | null {
   return boundarySurfaceNames.includes(name) ? boundarySurfaceColor(name) : null;
 }
 
+/** Shows the outline of a boundary surface in the 3D view (pointer over its row or field); null hides it */
+function highlightBoundarySurface(name: string | null): void {
+  void updateViewer((view) => view.highlightBoundarySurface(name));
+}
+
 function renderBoundarySurfaces(): void {
   ui.boundarySurfaces.replaceChildren(
     boundarySurfaceSection(boundarySurfaceNames, {
@@ -343,7 +351,7 @@ function renderBoundarySurfaces(): void {
         // The network keeps the clusters which connect the in-flow and out-flow surfaces
         clearOutput();
       },
-      onHover: (name) => void updateViewer((view) => view.highlightBoundarySurface(name)),
+      onHover: (name) => highlightBoundarySurface(name),
     }),
   );
   updateDomainSource();

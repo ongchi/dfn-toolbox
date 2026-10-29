@@ -46,25 +46,26 @@ function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context
     element(
       "p",
       "form-note",
-      "The in-flow and out-flow surfaces of the Domain tab, in their colors of the 3D view. A point on two surfaces keeps the pressure of the first in this list.",
+      "The in-flow and out-flow surfaces of the Domain tab, in their colors of the 3D view; the pointer over a field shows the outline of its surface. A point on two surfaces keeps the pressure of the first in this list.",
     ),
   );
   for (const boundary of boundaries) {
     const role = boundary.isInflow ? "in-flow" : "out-flow";
-    container.append(
-      numberField({
-        label: `${boundary.name}: pressure (MPa)`,
-        labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
-        key: "pressure",
-        help: boundary.hasPoints ? `${role}; 0.001 to 110` : `${role}; the network has no point on it: not used`,
-        value: pressureOf(state, boundary.name),
-        isDisabled: !boundary.hasPoints,
-        onInput: (value) => {
-          state.pressures[boundary.name] = value;
-          context.changed();
-        },
-      }),
-    );
+    const field = numberField({
+      label: `${boundary.name}: pressure (MPa)`,
+      labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
+      key: "pressure",
+      help: boundary.hasPoints ? `${role}; 0.001 to 110` : `${role}; the network has no point on it: not used`,
+      value: pressureOf(state, boundary.name),
+      isDisabled: !boundary.hasPoints,
+      onInput: (value) => {
+        state.pressures[boundary.name] = value;
+        context.changed();
+      },
+    });
+    field.addEventListener("mouseenter", () => context.highlightBoundarySurface(boundary.name));
+    field.addEventListener("mouseleave", () => context.highlightBoundarySurface(null));
+    container.append(field);
   }
   return container;
 }
