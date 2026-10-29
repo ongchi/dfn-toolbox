@@ -343,6 +343,7 @@ function renderBoundarySurfaces(): void {
         // The network keeps the clusters which connect the in-flow and out-flow surfaces
         clearOutput();
       },
+      onHover: (name) => void updateViewer((view) => view.highlightBoundarySurface(name)),
     }),
   );
   updateDomainSource();

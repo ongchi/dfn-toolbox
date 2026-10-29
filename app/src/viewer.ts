@@ -47,6 +47,10 @@ const MAX_CONE_COUNT = 500;
 const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
 // The boundary surfaces of the domain do not hide the fractures behind them
 const BOUNDARY_SURFACE_OPACITY = 0.5;
+/** Pixels: the outline of a highlighted boundary surface */
+const BOUNDARY_OUTLINE_WIDTH = 15;
+/** Yellow: one color for the outline of each surface, which stands out from the surface colors */
+const BOUNDARY_OUTLINE_COLOR = [1.0, 0.85, 0.0] as const;
 // The x, y, z axes in the top-left corner (fractions of the view: x min, y min, x max, y max);
 // the results bezel is at the bottom-left, the scalar bar at the right
 const AXES_VIEWPORT = [0, 0.8, 0.2, 1] as const;
@@ -105,6 +109,8 @@ export class NetworkViewer {
   private domainActor: vtkActor | null = null;
   /** The boundary surfaces of the domain mesh, by name; part of the layer "domain" */
   private boundarySurfaceActors = new Map<string, vtkActor>();
+  /** The outline of each boundary surface, by name; visible only while highlighted */
+  private boundaryOutlineActors = new Map<string, vtkActor>();
   private colorArray: ColorArray | null = null;
   private readonly canvas: HTMLCanvasElement;
 
@@ -197,12 +203,17 @@ export class NetworkViewer {
     this.domainActor = actor;
   }
 
-  /** Shows the boundary surfaces of the domain mesh, each with its color; replaces the old ones */
+  /**
+   * Shows the boundary surfaces of the domain mesh, each with its color;
+   * replaces the old ones. Each surface also gets its outline (the boundary
+   * edges of its cells), hidden until `highlightBoundarySurface`.
+   */
   async setBoundarySurfaces(surfaces: BoundarySurface[]): Promise<void> {
-    for (const actor of this.boundarySurfaceActors.values()) {
+    for (const actor of [...this.boundarySurfaceActors.values(), ...this.boundaryOutlineActors.values()]) {
       this.renderer.removeActor(actor);
     }
     this.boundarySurfaceActors.clear();
+    this.boundaryOutlineActors.clear();
     for (const { name, vtpText, color } of surfaces) {
       const reader = this.vtk.vtkXMLPolyDataReader();
       reader.readFromInputStringOn();
@@ -218,12 +229,38 @@ export class NetworkViewer {
       property.setOpacity(BOUNDARY_SURFACE_OPACITY);
       this.renderer.addActor(actor);
       this.boundarySurfaceActors.set(name, actor);
+
+      // Faces on one plane are one surface: only the outer edges, not the edges between its cells
+      const outline = this.vtk.vtkFeatureEdges();
+      outline.setInputConnection(0, reader.getOutputPort(0));
+      outline.setBoundaryEdges(true);
+      outline.setFeatureEdges(false);
+      outline.setManifoldEdges(false);
+      outline.setNonManifoldEdges(false);
+      outline.setColoring(false);
+      const outlineMapper = this.vtk.vtkPolyDataMapper();
+      outlineMapper.setInputConnection(0, outline.getOutputPort(0));
+      outlineMapper.setScalarVisibility(0);
+      const outlineActor = this.vtk.vtkActor({ mapper: outlineMapper });
+      outlineActor.getProperty().setColor(...BOUNDARY_OUTLINE_COLOR);
+      outlineActor.getProperty().setLineWidth(BOUNDARY_OUTLINE_WIDTH);
+      // WebGL draws lines 1 pixel wide: as tubes, the line width has an effect
+      outlineActor.getProperty().setRenderLinesAsTubes(true);
+      outlineActor.setVisibility(0);
+      this.renderer.addActor(outlineActor);
+      this.boundaryOutlineActors.set(name, outlineActor);
     }
   }
 
   /** A new color ("#rrggbb") of a boundary surface of the domain mesh */
   setBoundarySurfaceColor(name: string, color: string): void {
-    this.boundarySurfaceActors.get(name)?.getProperty().setColor(...colorComponents(color));
+    this.boundarySurfaceActors.get(name)?.getProperty().setColor(...colorComponents(color));  }
+
+  /** Shows the outline of one boundary surface; null hides all outlines */
+  highlightBoundarySurface(name: string | null): void {
+    for (const [surface, actor] of this.boundaryOutlineActors) {
+      actor.setVisibility(surface === name ? 1 : 0);
+    }
   }
 
   /**

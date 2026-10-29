@@ -174,6 +174,26 @@ try {
   const exampleRoles = await domainRoles(page);
   check(exampleRoles === BOX_ROLES, "boundary surface roles", exampleRoles);
 
+  // The pointer over the row of a surface shows its outline; the view is the same again after it leaves
+  const viewerScreenshot = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
+  };
+  await page.mouse.move(0, 0);
+  const viewBeforeHover = await viewerScreenshot();
+  const surfaceRow = await page.evaluateHandle(() =>
+    document.querySelector('#boundary-surfaces select[data-surface="south"]').closest("label"),
+  );
+  await surfaceRow.hover();
+  const viewOnHover = await viewerScreenshot();
+  await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surface_hover.png` });
+  await page.mouse.move(0, 0);
+  const viewAfterHover = await viewerScreenshot();
+  check(
+    !viewOnHover.equals(viewBeforeHover) && viewAfterHover.equals(viewBeforeHover),
+    "boundary surface outline on hover",
+    `hover ${viewOnHover.equals(viewBeforeHover) ? "unchanged" : "changed"}, after ${viewAfterHover.equals(viewBeforeHover) ? "same" : "different"}`,
+  );
 
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
   const domainRows = async () =>

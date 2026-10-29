@@ -45,6 +45,8 @@ export interface BoundarySurfaceHandlers {
   onColor(name: string, color: string): void;
   roleOf(name: string): SurfaceRole;
   onRole(name: string, role: SurfaceRole): void;
+  /** The pointer is over the row of a surface; null = it left the row */
+  onHover(name: string | null): void;
 }
 
 /** A role and a color chooser for each boundary surface of the domain mesh */
@@ -65,11 +67,13 @@ export function boundarySurfaceSection(names: string[], handlers: BoundarySurfac
     color.addEventListener("input", () => handlers.onColor(name, color.value));
     const label = element("label", "file-row-header");
     label.append(element("span", "field-label", name), role, color);
+    label.addEventListener("mouseenter", () => handlers.onHover(name));
+    label.addEventListener("mouseleave", () => handlers.onHover(null));
     return label;
   });
   const help = helpText(
     undefined,
-    "The role of each boundary surface and its color in the 3D view. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
+    "The role of each boundary surface and its color in the 3D view; the pointer over a row shows the outline of the surface. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
   );
   return section("Boundary surfaces", ...rows, ...(help ? [help] : []));
 }

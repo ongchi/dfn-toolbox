@@ -47,8 +47,10 @@ There is no server: `npm run build` gives a folder of static files.
     them, and the particles go from the in-flow to the out-flow surfaces.
     A predefined shape starts with its first surface in-flow, its second
     out-flow and the others no-flow; a new shape gives these roles again.
-    A change of a role removes the output. The color is for the 3D view
-    only: the workflow file does not have the colors. A chosen color stays
+    A change of a role removes the output. The pointer over the row of a
+    surface shows its outline in the 3D view (the boundary edges of its
+    cells, `vtkFeatureEdges`, as yellow tubes 15 pixels wide). The color is for the 3D view only: the workflow file does not
+    have the colors. A chosen color stays
     with its surface name while the page is open.
   - User fractures tab: each user-defined fracture is a card (region,
     center, shape, aperture and orientation; see "User-defined fractures").
@@ -331,7 +333,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
   the decimal numbers within 1e-5), some particles exit, and no in-flow
   boundary and an unknown boundary are errors.
 - `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
-  the color choosers and the roles of the boundary surfaces, the "Next" button, the full workflow of each example (the
+  the color choosers, the roles and the outline on hover of the boundary surfaces, the "Next" button, the full workflow of each example (the
   boundaries of the Flow tab are the in-flow and out-flow surfaces, with their colors; the Transport tab has no
   boundaries), the flow again
   after the transport and the generation again after the flow (no error of a removed "Color by" array), the flow without a
