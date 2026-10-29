@@ -84,13 +84,13 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     `The boundary ${f.boundary} (Flow tab) has no point in the network. Do not use it, or generate another network.`,
   "fehm.BoundaryWithoutEffect": (f) =>
     `Each point of the boundary ${f.boundary} (Flow tab) is on an earlier boundary with another pressure. Do not use it.`,
-  "fehm.SolverTolerance": () => "Tolerance (Flow tab, Solver) must be above 0 and below 1.",
-  "fehm.SolverMaxIterations": () => "Maximum iterations (Flow tab, Solver) must be 1 or more.",
+  "fehm.SolverTolerance": () => "The tolerance of the flow solver must be above 0 and below 1.",
+  "fehm.SolverMaxIterations": () => "The maximum iterations of the flow solver must be 1 or more.",
   "fehm.DegenerateTriangle": () => "The network has a triangle with no area. Generate another network.",
   "fehm.NoBoundary": (f) =>
     `The fractures ${f.fractures} have no connection to a used pressure boundary, thus their pressure has no unique value. Use another boundary (Flow tab), or generate another network.`,
   "fehm.NoConvergence": (f) =>
-    `The flow did not converge in ${f.iterations} iterations. Increase Maximum iterations or Tolerance (Flow tab, Solver).`,
+    `The flow did not converge in ${f.iterations} iterations. Check the pressures (Flow tab), or generate another network.`,
 
   "dfntrans.Porosity": () => "Porosity (Transport tab) must be above 0 and at most 1.",
   "dfntrans.MaxTimeSteps": () => "Maximum time steps (Transport tab) must be 1 or more.",
@@ -98,8 +98,8 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfntrans.BoundaryInInflowAndOutflow": (f) =>
     `The boundary ${f.boundary} (Transport tab) cannot be in-flow and out-flow.`,
   "dfntrans.ParticleCount": () => "The number of particles (Transport tab, Seeding) must be 1 or more.",
-  "dfntrans.MatrixPorosity": () => "Matrix porosity (Transport tab) must be above 0 and at most 1.",
-  "dfntrans.MatrixDiffusivity": () => "Matrix diffusivity (Transport tab) must be above 0.",
+  "dfntrans.MatrixPorosity": () => "The matrix porosity must be above 0 and at most 1.",
+  "dfntrans.MatrixDiffusivity": () => "The matrix diffusivity must be above 0.",
   "dfntrans.EmptyInflowOutflow": () =>
     "The in-flow or the out-flow boundary (Transport tab) has no point in the network. Choose other boundaries.",
   "dfntrans.UnknownBoundary": (f) =>

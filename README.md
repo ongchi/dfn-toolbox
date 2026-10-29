@@ -148,8 +148,7 @@ orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without k
 [flow]                             # the fehm input (see "Input file" in ../fehm-rs/README.md), without `mesh`
 temperature = 20.0
 gravity = false
-pressure = { west = 10.1, east = 10.0 }   # MPa; the used boundaries, in place of [[boundary]]
-[flow.solver]                      # optional: tolerance, max_iterations
+pressure = { west = 10.1, east = 10.0 }   # MPa; the used boundaries, in place of [[boundary]]; no [solver]
 
 [transport]                        # the dfntrans input (see "Input file" in ../dfntrans-rs/README.md), without `flow`
 seed = 12345
@@ -159,8 +158,7 @@ max_time_steps = 1000000
 inflow = ["west"]
 outflow = ["east"]
 routing = "complete_mixing"
-[transport.seeding]
-[transport.tdrw]                   # optional; no [transport.control_planes], no [transport.output]
+[transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
 ```
 
 The reader is strict: an unknown key and a missing key are errors, so the
@@ -206,7 +204,7 @@ region `box` (its hexahedron) for the user-defined fracture of
 | `box_west_east` | A cube of 10 m (`Box.vtu`: one hexahedron and its 6 faces as quads; the face at x = 0 is the boundary surface west, the face at x = 10 east). One family; flow and particles from west to east. |
 | `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
 | `l_shape_north_east` | An L-shaped domain of 4 boxes (`L-shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); the end face of the north box is the boundary surface north, the end face of the east box east. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
-| `user_fractures_stochastic` | The same cube, a large user-defined fracture in the region `box` (a rectangle in the plane y = 5) from west to east with a larger aperture, a stochastic family, and matrix diffusion. |
+| `user_fractures_stochastic` | The same cube, a large user-defined fracture in the region `box` (a rectangle in the plane y = 5) from west to east with a larger aperture, and a stochastic family. |
 
 The seeds of the examples give a network which connects the in-flow and
 the out-flow boundaries. Many other seeds do not: then no fracture reaches

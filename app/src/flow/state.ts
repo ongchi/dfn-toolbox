@@ -24,14 +24,10 @@ export interface FlowState {
   hasGravity: boolean;
   /** One for each boundary array of the mesh, in the order of the mesh file */
   boundaries: FlowBoundaryState[];
-  /** null = no key (default of fehm) */
-  tolerance: number | null;
-  /** null = no key (default of fehm) */
-  maxIterations: number | null;
 }
 
 export function defaultFlowState(): FlowState {
-  return { temperature: 20.0, hasGravity: true, boundaries: [], tolerance: null, maxIterations: null };
+  return { temperature: 20.0, hasGravity: true, boundaries: [] };
 }
 
 /** Names of the boundaries of a mesh: the point data arrays `boundary__<name>` */

@@ -227,51 +227,6 @@ function seedingSection(state: TransportState, context: FormContext): HTMLElemen
   return container;
 }
 
-function matrixDiffusionSection(state: TransportState, context: FormContext): HTMLElement {
-  const diffusion = state.matrixDiffusion;
-  return section(
-    "Matrix diffusion",
-    checkboxField({
-      label: "Use matrix diffusion",
-      key: "tdrw",
-      help: "time domain random walk",
-      value: diffusion.isUsed,
-      onInput: (value) => {
-        diffusion.isUsed = value;
-        context.rerender();
-      },
-    }),
-    row(
-      numberField({
-        label: "Matrix porosity",
-        key: "matrix_porosity",
-        help: "above 0, at most 1",
-        value: diffusion.matrixPorosity,
-        min: 0,
-        isMinExclusive: true,
-        isDisabled: !diffusion.isUsed,
-        onInput: (value) => {
-          diffusion.matrixPorosity = value;
-          context.changed();
-        },
-      }),
-      numberField({
-        label: "Matrix diffusivity (m²/s)",
-        key: "matrix_diffusivity",
-        help: "above 0",
-        value: diffusion.matrixDiffusivity,
-        min: 0,
-        isMinExclusive: true,
-        isDisabled: !diffusion.isUsed,
-        onInput: (value) => {
-          diffusion.matrixDiffusivity = value;
-          context.changed();
-        },
-      }),
-    ),
-  );
-}
-
 /** Shows the transport form; `hasFlow` = there is a flow output */
 export function renderTransportForm(
   container: HTMLElement,
@@ -294,7 +249,6 @@ export function renderTransportForm(
     generalSection(state, context),
     boundariesSection(state, context),
     seedingSection(state, context),
-    matrixDiffusionSection(state, context),
   );
   container.scrollTop = scrollTop;
 }

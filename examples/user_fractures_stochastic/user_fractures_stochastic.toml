@@ -2,9 +2,7 @@
 # user-defined fracture in the region box (a rectangle of 11 x 6 m in the
 # plane y = 5: the normal +y) across the cube from west to east, and a
 # stochastic family which crosses it. The user fracture has a larger
-# aperture: most of the flow goes through it. The transport has matrix
-# diffusion ([transport.tdrw]): the particles go into the rock matrix and
-# come back, thus their travel times are longer.
+# aperture: most of the flow goes through it.
 
 [network]
 seed = 3
@@ -67,7 +65,3 @@ routing = "complete_mixing"
 method = "uniform_per_line"
 particles_per_line = 3
 weight_by_flux = false
-
-[transport.tdrw]
-matrix_porosity = 0.05
-matrix_diffusivity = 1e-11

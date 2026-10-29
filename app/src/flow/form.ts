@@ -1,6 +1,6 @@
 // The flow form: one field for each key of the fehm input file.
 import type { FormContext } from "../form/context";
-import { checkboxField, element, numberField, optionalNumberField, row, section } from "../form/fields";
+import { checkboxField, element, numberField, row, section } from "../form/fields";
 import type { FlowState } from "./state";
 
 function fluidSection(state: FlowState, context: FormContext): HTMLElement {
@@ -70,36 +70,6 @@ function boundariesSection(state: FlowState, context: FormContext): HTMLElement 
   return container;
 }
 
-function solverSection(state: FlowState, context: FormContext): HTMLElement {
-  return section(
-    "Solver",
-    row(
-      optionalNumberField({
-        label: "Tolerance",
-        key: "tolerance",
-        help: "of the largest mass residual of a point, relative; 0 to 1",
-        placeholder: "1e-10",
-        value: state.tolerance,
-        onInput: (value) => {
-          state.tolerance = value;
-          context.changed();
-        },
-      }),
-      optionalNumberField({
-        label: "Maximum iterations",
-        key: "max_iterations",
-        help: "Newton iterations; 1 or more",
-        placeholder: "20",
-        value: state.maxIterations,
-        onInput: (value) => {
-          state.maxIterations = value;
-          context.changed();
-        },
-      }),
-    ),
-  );
-}
-
 /** Shows the flow form; `hasMesh` = the last generation has a triangle mesh */
 export function renderFlowForm(container: HTMLElement, state: FlowState, hasMesh: boolean, context: FormContext): void {
   const scrollTop = container.scrollTop;
@@ -113,10 +83,6 @@ export function renderFlowForm(container: HTMLElement, state: FlowState, hasMesh
     );
     return;
   }
-  container.replaceChildren(
-    fluidSection(state, context),
-    boundariesSection(state, context),
-    solverSection(state, context),
-  );
+  container.replaceChildren(fluidSection(state, context), boundariesSection(state, context));
   container.scrollTop = scrollTop;
 }

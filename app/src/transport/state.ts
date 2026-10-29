@@ -30,14 +30,6 @@ export interface SeedingState {
   particlesPerNode: number;
 }
 
-export interface MatrixDiffusionState {
-  /** Written into the TOML (`[tdrw]`) only when it is used */
-  isUsed: boolean;
-  matrixPorosity: number;
-  /** m²/s */
-  matrixDiffusivity: number;
-}
-
 export interface TransportState {
   /** 0 = a random seed for each run */
   seed: number;
@@ -48,7 +40,6 @@ export interface TransportState {
   /** One for each boundary array of the mesh, in the order of the mesh file */
   boundaries: TransportBoundaryState[];
   seeding: SeedingState;
-  matrixDiffusion: MatrixDiffusionState;
 }
 
 export function defaultTransportState(): TransportState {
@@ -67,7 +58,6 @@ export function defaultTransportState(): TransportState {
       particleCount: 50,
       particlesPerNode: 1,
     },
-    matrixDiffusion: { isUsed: false, matrixPorosity: 0.02, matrixDiffusivity: 1e-13 },
   };
 }
 

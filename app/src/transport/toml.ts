@@ -44,7 +44,7 @@ function seedingLines(seeding: SeedingState): string[] {
 
 /** The tables of `[transport]` of the workflow file */
 export function transportTables(state: TransportState): TomlTable[] {
-  const tables: TomlTable[] = [
+  return [
     {
       name: "",
       isArray: false,
@@ -60,19 +60,6 @@ export function transportTables(state: TransportState): TomlTable[] {
     },
     { name: "seeding", isArray: false, lines: seedingLines(state.seeding) },
   ];
-
-  const diffusion = state.matrixDiffusion;
-  if (diffusion.isUsed) {
-    tables.push({
-      name: "tdrw",
-      isArray: false,
-      lines: [
-        `matrix_porosity = ${float(diffusion.matrixPorosity)}`,
-        `matrix_diffusivity = ${float(diffusion.matrixDiffusivity)}`,
-      ],
-    });
-  }
-  return tables;
 }
 
 /**
@@ -127,15 +114,6 @@ export function readTransport(table: Table, problems: string[]): TransportState 
     ...reader.stringArray("outflow").map((name) => ({ name, role: "outflow" as const })),
   ];
 
-  const diffusion = defaults.matrixDiffusion;
-  if (reader.has("tdrw")) {
-    const tdrwReader = new TableReader(reader.subTable("tdrw"), "[transport.tdrw]", problems);
-    diffusion.isUsed = true;
-    diffusion.matrixPorosity = tdrwReader.float("matrix_porosity", diffusion.matrixPorosity);
-    diffusion.matrixDiffusivity = tdrwReader.float("matrix_diffusivity", diffusion.matrixDiffusivity);
-    tdrwReader.checkUnknownKeys();
-  }
-
   const state: TransportState = {
     seed: reader.integer("seed", defaults.seed),
     timeUnit: reader.choice("time_unit", TIME_UNITS, defaults.timeUnit),
@@ -144,7 +122,6 @@ export function readTransport(table: Table, problems: string[]): TransportState 
     routing: reader.choice("routing", ROUTING_RULES, defaults.routing),
     boundaries,
     seeding: readSeeding(reader.subTable("seeding"), problems),
-    matrixDiffusion: diffusion,
   };
   reader.checkUnknownKeys();
   return state;
