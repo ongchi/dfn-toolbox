@@ -4,8 +4,8 @@
 // It checks the default example, runs the full workflow (network, flow,
 // transport) of each example, the flow and the transport without their
 // input, the choice of a predefined mesh, a new user-defined fracture, a bad
-// input, the fractures in the view during a run, and a cancel; it saves
-// screenshots.
+// input, the fractures in the view during a run, a cancel, and a stop with
+// the fractures kept and a continue; it saves screenshots.
 import puppeteer from "puppeteer-core";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
@@ -73,6 +73,17 @@ async function selectExample(page, name) {
   await page.$eval("#form", (node) => delete node.dataset.example);
   await page.select("#example-select", name);
   await page.waitForFunction((exampleName) => document.querySelector("#form").dataset.example === exampleName, {}, name);
+}
+
+/** Sets the number of fractures (n_poly) of the DFN tab */
+async function setFractureCount(page, count) {
+  await page.evaluate((value) => {
+    const input = [...document.querySelectorAll("input[type=number]")].find((node) =>
+      node.closest(".field")?.textContent.includes("n_poly"),
+    );
+    input.value = String(value);
+    input.dispatchEvent(new Event("input"));
+  }, count);
 }
 
 /** The values of the options of "Color by" */
@@ -496,22 +507,25 @@ try {
 
   // A large run: the view shows the new fractures during the run; then a cancel
   await selectExample(page, "box_west_east");
-  await page.evaluate(() => {
-    const input = [...document.querySelectorAll("input[type=number]")].find((node) =>
-      node.closest(".field")?.textContent.includes("n_poly"),
-    );
-    input.value = "100000";
-    input.dispatchEvent(new Event("input"));
-  });
+  await setFractureCount(page, 100000);
   await page.click("#run-button");
   await page.waitForFunction(() => document.querySelector("#status").textContent.includes("fractures accepted"), {
     timeout: RUN_TIMEOUT,
   });
+  // The view is drawn again at most each 200 ms
   const viewDuringRun = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     return Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
   };
+  const acceptedCount = () =>
+    page.$eval("#status", (node) => Number(/(\d+) fractures accepted/.exec(node.textContent)?.[1] ?? 0));
   const firstView = await viewDuringRun();
+  // The insertion can be slow: the second view comes after 10 more fractures
+  await page.waitForFunction(
+    (count) => Number(/(\d+) fractures accepted/.exec(document.querySelector("#status").textContent)?.[1] ?? 0) >= count,
+    { timeout: RUN_TIMEOUT },
+    (await acceptedCount()) + 10,
+  );
   const secondView = await viewDuringRun();
   check(
     !firstView.equals(secondView),
@@ -531,6 +545,34 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_network.png` });
   await page.$eval(".family-card", (node) => node.scrollIntoView());
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
+
+  // Stop and keep the fractures after the first checkpoint (5 s), then continue:
+  // the network is that of a run with no stop
+  await selectExample(page, "box_west_east");
+  await setFractureCount(page, 80);
+  const fullRun = await runStep(page, "network");
+  await page.click("#run-button");
+  await page.waitForFunction(() => !document.querySelector("#stop-button").disabled, { timeout: RUN_TIMEOUT });
+  await page.click("#stop-button");
+  await waitIdle(page);
+  const stoppedStatus = await statusText(page);
+  const isContinueShown = await page.$eval("#continue-button", (node) => !node.hidden);
+  check(
+    /^Done in .*until the stop/s.test(stoppedStatus) && isContinueShown,
+    "stop and keep the fractures",
+    `${stoppedStatus.replace("\n", " ")}; Continue ${isContinueShown ? "shown" : "hidden"}`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_stopped.png` });
+  await page.click("#continue-button");
+  await waitIdle(page);
+  const continuedStatus = await statusText(page);
+  const finalCount = (status) => /(\d+) final fractures/.exec(status)?.[1];
+  const isContinueHidden = await page.$eval("#continue-button", (node) => node.hidden);
+  check(
+    finalCount(continuedStatus) !== undefined && finalCount(continuedStatus) === finalCount(fullRun) && isContinueHidden,
+    "continue gives the network of a run with no stop",
+    `${continuedStatus}; with no stop: ${fullRun}`,
+  );
 } finally {
   await browser.close();
 }

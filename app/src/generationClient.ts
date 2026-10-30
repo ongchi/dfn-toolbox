@@ -24,8 +24,16 @@ export interface TransportInput {
   mesh: string;
 }
 
+/** A restart of a stopped generation from its checkpoint */
+export interface Restart {
+  /** The bytes of the checkpoint */
+  checkpoint: Uint8Array;
+  /** "continue": insertion until the stop condition; "finish": the network of the fractures of the checkpoint */
+  mode: "continue" | "finish";
+}
+
 export type WorkerRequest =
-  | ({ type: "run"; seedIfZero: bigint } & GenerationInput)
+  | ({ type: "run"; seedIfZero: bigint; restart: Restart | null } & GenerationInput)
   | ({ type: "runFlow" } & FlowInput)
   | ({ type: "runTransport"; seedIfZero: number } & TransportInput);
 
@@ -83,10 +91,40 @@ export interface FractureBatch {
   families: Int32Array;
 }
 
-export type ProgressCallback = (acceptedCount: number, fraction: number, fractures: FractureBatch) => void;
+/** The first `count` fractures of the batches, in their order, as one batch */
+export function firstFractures(batches: FractureBatch[], count: number): FractureBatch {
+  const vertexCounts = Int32Array.from(batches.flatMap((batch) => [...batch.vertexCounts])).slice(0, count);
+  const families = Int32Array.from(batches.flatMap((batch) => [...batch.families])).slice(0, count);
+  const pointCount = vertexCounts.reduce((sum, vertexCount) => sum + vertexCount, 0);
+  const points = new Float64Array(3 * pointCount);
+  let offset = 0;
+  for (const batch of batches) {
+    const length = Math.min(batch.points.length, points.length - offset);
+    points.set(batch.points.subarray(0, length), offset);
+    offset += length;
+  }
+  return { points, vertexCounts, families };
+}
+
+/** The checkpoint of a generation after `acceptedCount` accepted stochastic fractures */
+export interface GenerationCheckpoint {
+  checkpoint: Uint8Array;
+  acceptedCount: number;
+}
+
+export interface GenerationCallbacks {
+  onProgress: (acceptedCount: number, fraction: number, fractures: FractureBatch) => void;
+  /** The worker sent all accepted fractures until the checkpoint before it */
+  onCheckpoint: (checkpoint: GenerationCheckpoint) => void;
+}
+
+/** A message of the worker during a run */
+type WorkerNotice =
+  | { type: "progress"; acceptedCount: number; fraction: number; fractures: FractureBatch }
+  | ({ type: "checkpoint" } & GenerationCheckpoint);
 
 export type WorkerResponse =
-  | { type: "progress"; acceptedCount: number; fraction: number; fractures: FractureBatch }
+  | WorkerNotice
   /** The WebAssembly module failed (a panic); the worker must be replaced */
   | { type: "crashed"; message: string }
   | ({ type: "result" } & GenerationOutput)
@@ -108,12 +146,20 @@ export class GenerationClient {
     return new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   }
 
+  /** A generation; with `restart`, from the checkpoint of a stopped generation of the same input */
   async run(
     input: GenerationInput,
-    onProgress: ProgressCallback,
+    callbacks: GenerationCallbacks,
+    restart: Restart | null = null,
   ): Promise<GenerationOutput> {
     const seedIfZero = BigInt(1 + Math.floor(Math.random() * 2 ** 32));
-    const response = await this.request({ type: "run", seedIfZero, ...input }, onProgress);
+    const response = await this.request({ type: "run", seedIfZero, restart, ...input }, (notice) => {
+      if (notice.type === "progress") {
+        callbacks.onProgress(notice.acceptedCount, notice.fraction, notice.fractures);
+      } else {
+        callbacks.onCheckpoint({ checkpoint: notice.checkpoint, acceptedCount: notice.acceptedCount });
+      }
+    });
     if (response.type !== "result") {
       throw new Error(`unexpected answer of the worker: ${response.type}`);
     }
@@ -151,7 +197,7 @@ export class GenerationClient {
 
   private request(
     message: WorkerRequest,
-    onProgress?: ProgressCallback,
+    onNotice?: (notice: WorkerNotice) => void,
   ): Promise<WorkerResponse> {
     if (this.rejectPending) {
       return Promise.reject(new Error("the worker is busy"));
@@ -164,8 +210,8 @@ export class GenerationClient {
       };
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const response = event.data;
-        if (response.type === "progress") {
-          onProgress?.(response.acceptedCount, response.fraction, response.fractures);
+        if (response.type === "progress" || response.type === "checkpoint") {
+          onNotice?.(response);
           return;
         }
         this.rejectPending = null;

@@ -23,11 +23,16 @@ import { defaultFormState, type FormState } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
 import {
   CancelledError,
+  firstFractures,
   GenerationClient,
   type FlowInput,
   type FlowOutput,
+  type FractureBatch,
+  type GenerationCallbacks,
+  type GenerationCheckpoint,
   type GenerationInput,
   type GenerationOutput,
+  type Restart,
   type TransportInput,
   type TransportOutput,
 } from "./generationClient";
@@ -106,6 +111,8 @@ const ui = {
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
   cancelButton: byId<HTMLButtonElement>("cancel-button"),
+  stopButton: byId<HTMLButtonElement>("stop-button"),
+  continueButton: byId<HTMLButtonElement>("continue-button"),
   nextButton: byId<HTMLButtonElement>("next-button"),
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
@@ -153,6 +160,14 @@ let activeSidebarTab: SidebarTab = "domain";
 /** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
 let lastShape: string | null = null;
 let isBusy = false;
+/**
+ * The last checkpoint of a generation which did not complete (a stop, a
+ * cancel, or the network of a checkpoint), with the fractures until it:
+ * "Continue" restarts from it. null after a complete generation.
+ */
+let stoppedGeneration: { checkpoint: GenerationCheckpoint; fractures: FractureBatch } | null = null;
+/** "Stop and keep the fractures" was clicked: the cancel of the run starts the network of its checkpoint */
+let isKeepRequested = false;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
 
@@ -189,8 +204,17 @@ function setBusy(busy: boolean): void {
   ui.exampleSelect.disabled = busy;
   ui.domainSource.disabled = busy;
   ui.cancelButton.hidden = !busy;
+  // Only a generation shows it (`generate`)
+  ui.stopButton.hidden = true;
   ui.progress.hidden = !busy;
   updateNextButton();
+  updateContinueButton();
+}
+
+/** "Continue" shows on the DFN tab when a stopped generation has a checkpoint */
+function updateContinueButton(): void {
+  ui.continueButton.hidden = activeSidebarTab !== "network" || stoppedGeneration === null;
+  ui.continueButton.disabled = isBusy;
 }
 
 /**
@@ -301,6 +325,7 @@ function selectSidebarTab(name: SidebarTab): void {
   ui.runButton.hidden = runText === null;
   ui.runButton.textContent = runText ?? "";
   updateNextButton();
+  updateContinueButton();
   showStatus("");
 }
 
@@ -425,43 +450,89 @@ function generationInput(): GenerationInput | string {
   };
 }
 
+/** "Generate": a new generation */
 async function runGeneration(): Promise<void> {
+  await generate(null);
+}
+
+/** "Stop and keep the fractures": the worker stops, and the network is made from the last checkpoint */
+function stopAndKeepFractures(): void {
+  isKeepRequested = true;
+  client.cancel();
+}
+
+/** A generation; with `restartMode`, from the checkpoint of `stoppedGeneration` */
+async function generate(restartMode: Restart["mode"] | null): Promise<void> {
   const input = generationInput();
   if (typeof input === "string") {
     showStatus(input, true);
     return;
   }
+  const stopped = restartMode === null ? null : stoppedGeneration;
+  if (restartMode !== null && stopped === null) {
+    return;
+  }
   setBusy(true);
+  // The network of a checkpoint has no insertion to stop
+  ui.stopButton.hidden = restartMode === "finish";
   ui.progress.value = 0;
-  showStatus("Generating…");
-  // The view shows the new fractures during the run, not the old network
+  showStatus(
+    restartMode === "finish"
+      ? `Making the network of the ${stopped?.checkpoint.acceptedCount} fractures until the stop…`
+      : "Generating…",
+  );
+  // The view shows the new fractures during the run, not the old network;
+  // a restart shows the fractures until its checkpoint again
   clearOutput();
   viewer?.clearGenerationFractures();
+  const fractures: FractureBatch[] = stopped === null ? [] : [stopped.fractures];
+  if (stopped !== null) {
+    viewer?.addGenerationFractures(stopped.fractures);
+    void viewer?.render();
+  }
+  let checkpoint: GenerationCheckpoint | null = stopped?.checkpoint ?? null;
+  ui.stopButton.disabled = checkpoint === null;
   let lastRenderTime = 0;
   const startTime = performance.now();
-  try {
-    const result = await client.run(input, (acceptedCount, fraction, fractures) => {
+  const callbacks: GenerationCallbacks = {
+    onProgress: (acceptedCount, fraction, batch) => {
       ui.progress.value = fraction;
       showStatus(
         fraction >= 1
           ? `Generating… ${acceptedCount} fractures accepted; making the clusters and the mesh`
           : `Generating… ${acceptedCount} fractures accepted`,
       );
+      fractures.push(batch);
       if (!viewer) {
         return;
       }
-      viewer.addGenerationFractures(fractures);
+      viewer.addGenerationFractures(batch);
       const now = performance.now();
       if (now - lastRenderTime >= GENERATION_RENDER_INTERVAL_MS || fraction >= 1) {
         lastRenderTime = now;
         void viewer.render();
       }
-    });
+    },
+    onCheckpoint: (newCheckpoint) => {
+      checkpoint = newCheckpoint;
+      ui.stopButton.disabled = false;
+    },
+  };
+  try {
+    const restart =
+      stopped === null || restartMode === null ? null : { checkpoint: stopped.checkpoint.checkpoint, mode: restartMode };
+    const result = await client.run(input, callbacks, restart);
     if (result.error !== null) {
       showStatus(toolErrorText(result.error), true);
       return;
     }
-    const doneText = `Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.`;
+    // The network of a checkpoint has only the fractures until the stop: "Continue" adds the others
+    stoppedGeneration = restartMode === "finish" ? stopped : null;
+    const finishText =
+      restartMode === "finish"
+        ? `\nThe network has the ${stopped?.checkpoint.acceptedCount} fractures until the stop. "Continue" adds the others.`
+        : "";
+    const doneText = `Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.${finishText}`;
     if (result.isWithoutConnectingCluster) {
       showWarningStatus(`${doneText}\n${NO_CONNECTING_CLUSTER}`);
     } else {
@@ -469,7 +540,14 @@ async function runGeneration(): Promise<void> {
     }
     await showOutput(result);
   } catch (error) {
-    showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
+    if (!(error instanceof CancelledError)) {
+      showStatus(errorText(error), true);
+      return;
+    }
+    // The checkpoint of the run, or that of its restart; none: a new generation stopped before its first checkpoint
+    stoppedGeneration =
+      checkpoint === null ? null : { checkpoint, fractures: firstFractures(fractures, checkpoint.acceptedCount) };
+    showStatus(isKeepRequested ? "Stopped." : "Cancelled.");
   } finally {
     // The final layers replace the fractures of the run; after an error or a cancel, nothing does
     if (viewer) {
@@ -477,6 +555,10 @@ async function runGeneration(): Promise<void> {
       void viewer.render();
     }
     setBusy(false);
+  }
+  if (isKeepRequested) {
+    isKeepRequested = false;
+    await generate("finish");
   }
 }
 
@@ -922,6 +1004,8 @@ function bindEvents(): void {
     selectSidebarTab(SIDEBAR_TABS[SIDEBAR_TABS.indexOf(activeSidebarTab) + 1] ?? activeSidebarTab),
   );
   ui.cancelButton.addEventListener("click", () => client.cancel());
+  ui.stopButton.addEventListener("click", stopAndKeepFractures);
+  ui.continueButton.addEventListener("click", () => void generate("continue"));
 
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),

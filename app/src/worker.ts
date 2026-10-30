@@ -4,12 +4,16 @@ import { toToolError, type ToolError } from "./errors";
 import type { FractureBatch, WorkerRequest, WorkerResponse } from "./generationClient";
 import init, {
   run_flow,
+  resume_generation,
   run_generation,
   run_transport,
+  RestartMode,
   type ErrorReport,
 } from "./pkg/dfn_wasm.js";
 
 const PROGRESS_INTERVAL_MS = 50;
+// A stop of the worker loses the fractures after the last checkpoint
+const CHECKPOINT_INTERVAL_MS = 5000;
 
 const ready = init();
 
@@ -96,26 +100,44 @@ function handle(request: WorkerRequest): void {
   }
 
   let lastProgressTime = 0;
+  let lastCheckpointTime = performance.now();
   const fractures = new FractureCollector();
-  const result = run_generation(
-    request.toml,
-    request.mesh,
-    request.userFractures,
-    request.seedIfZero,
-    (acceptedCount: number, fraction: number, vertices: Float64Array, family: number) => {
-      fractures.add(vertices, family);
-      const now = performance.now();
-      if (now - lastProgressTime >= PROGRESS_INTERVAL_MS || fraction >= 1) {
-        lastProgressTime = now;
-        const batch = fractures.take();
-        post({ type: "progress", acceptedCount, fraction, fractures: batch }, [
-          batch.points.buffer,
-          batch.vertexCounts.buffer,
-          batch.families.buffer,
-        ]);
-      }
-    },
-  );
+  /** Returns true to ask for a checkpoint after the fracture */
+  const onProgress = (acceptedCount: number, fraction: number, vertices: Float64Array, family: number): boolean => {
+    fractures.add(vertices, family);
+    const now = performance.now();
+    // The last checkpoint has all of the insertion: a stop during the mesh keeps the fractures
+    const isCheckpointDue = now - lastCheckpointTime >= CHECKPOINT_INTERVAL_MS || fraction >= 1;
+    // The page gets all fractures of a checkpoint before it
+    if (now - lastProgressTime >= PROGRESS_INTERVAL_MS || isCheckpointDue) {
+      lastProgressTime = now;
+      const batch = fractures.take();
+      post({ type: "progress", acceptedCount, fraction, fractures: batch }, [
+        batch.points.buffer,
+        batch.vertexCounts.buffer,
+        batch.families.buffer,
+      ]);
+    }
+    if (isCheckpointDue) {
+      lastCheckpointTime = now;
+    }
+    return isCheckpointDue;
+  };
+  const onCheckpoint = (checkpoint: Uint8Array, acceptedCount: number) => {
+    post({ type: "checkpoint", checkpoint, acceptedCount }, [checkpoint.buffer]);
+  };
+  const result =
+    request.restart === null
+      ? run_generation(request.toml, request.mesh, request.userFractures, request.seedIfZero, onProgress, onCheckpoint)
+      : resume_generation(
+          request.toml,
+          request.mesh,
+          request.userFractures,
+          request.restart.checkpoint,
+          request.restart.mode === "continue" ? RestartMode.Continue : RestartMode.Finish,
+          onProgress,
+          onCheckpoint,
+        );
   post({
     type: "result",
     error: toolError(result.error),

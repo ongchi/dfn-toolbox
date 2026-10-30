@@ -10,7 +10,13 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
-import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
+import {
+  check_input,
+  resume_generation,
+  run_generation,
+  RestartMode,
+  type GenerationResult,
+} from "../src/pkg/dfn_wasm.js";
 import { caseNames, compareOutputFolders, initWasm, readCase, runNativeBinary } from "./cases";
 
 const MESH_FILE = "dfn_mesh.vtu";
@@ -113,4 +119,69 @@ test("progress is reported", () => {
     fractions.push(fraction);
   });
   expect(fractions.at(-1)).toBe(1);
+});
+
+/** All output files of a result, by name */
+function outputFiles(result: GenerationResult): Map<string, string> {
+  return new Map(result.file_names.map((name: string) => [name, result.file(name) ?? ""]));
+}
+
+/** The checkpoint of a run of the case after the accepted stochastic fracture `acceptedCount` */
+function checkpointAt(caseName: string, acceptedCount: number): Uint8Array {
+  const files = readCase(caseName);
+  let checkpoint: Uint8Array | undefined;
+  run_generation(
+    files.toml,
+    files.mesh,
+    files.userFractures,
+    1n,
+    (count: number) => count === acceptedCount,
+    (bytes: Uint8Array) => {
+      checkpoint = bytes;
+    },
+  );
+  expect(checkpoint).toBeDefined();
+  return checkpoint as Uint8Array;
+}
+
+// The mesh step too: both runs are in WebAssembly
+test.each(["base", "mesh"])("a restart of %s from a checkpoint gives the files of a run with no stop", (caseName) => {
+  const files = readCase(caseName);
+  const full = run_generation(files.toml, files.mesh, files.userFractures, 1n, () => {});
+  const restarted = resume_generation(
+    files.toml,
+    files.mesh,
+    files.userFractures,
+    checkpointAt(caseName, 40),
+    RestartMode.Continue,
+    () => {},
+  );
+  expect(restarted.error).toBeUndefined();
+  expect(outputFiles(restarted)).toEqual(outputFiles(full));
+});
+
+test("the network of a checkpoint has the fractures until the checkpoint", () => {
+  const files = readCase("base");
+  const result = resume_generation(
+    files.toml,
+    files.mesh,
+    files.userFractures,
+    checkpointAt("base", 40),
+    RestartMode.Finish,
+    () => {},
+  );
+  expect(result.accepted_count).toBe(40);
+});
+
+test("a restart with another input gives its error", () => {
+  const files = readCase("base");
+  const result = resume_generation(
+    files.toml.replace("seed = 12345", "seed = 1"),
+    files.mesh,
+    files.userFractures,
+    checkpointAt("base", 40),
+    RestartMode.Continue,
+    () => {},
+  );
+  expect(result.error?.kind).toBe("dfngen.CheckpointInputChanged");
 });

@@ -98,6 +98,19 @@ There is no server: `npm run build` gives a folder of static files.
   The start of a run removes the old network. At the end, the final
   layers replace these fractures (the cluster analysis can remove some
   of them); after an error or a cancel, the view has none of them.
+- Checkpoints of the generation: the worker asks for a checkpoint
+  (`on_progress` returns `true`; `run_generation` and `resume_generation`
+  give its bytes to `on_checkpoint`) each 5 s and after the last accepted
+  fracture, and it sends the fractures until the checkpoint before it. The
+  page keeps the last checkpoint in memory only (user decision; a reload
+  loses it). "Stop and keep the fractures" (enabled after the first
+  checkpoint) stops the worker, then makes the network of the checkpoint
+  (`RestartMode.Finish`: clusters, mesh, output); the fractures after the
+  checkpoint are lost. After such a network, a cancel or a stop,
+  "Continue" restarts from the checkpoint (`RestartMode.Continue`): the
+  network is that of a run with no stop. The view shows the fractures until
+  the checkpoint again. A restart with another input gives an error (the
+  checkpoint has a hash of the input texts).
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
   fractures (layer "Mesh", with its edges; color by a cell array, or by
   the point pressure of the flow: "Pressure", selected when the flow is
@@ -308,7 +321,12 @@ npm run dev & npm run e2e -- http://localhost:5173/
   output files of the binary (decimal numbers within 1e-9, with
   `scripts/compare_output.py`), except `dfn_mesh.vtu`: it must be a
   triangle mesh with the arrays of the mesh of the binary; errors and
-  progress.
+  progress; a restart from the checkpoint after 40 fractures gives the
+  files of a run with no stop (`base`, `mesh`: both in WebAssembly, thus
+  also the same mesh), `RestartMode.Finish` keeps 40 fractures, and another
+  input gives `dfngen.CheckpointInputChanged`.
+- `tests/generationClient.test.ts`: `firstFractures` (the fractures until a
+  checkpoint, from the batches of the progress).
 - `tests/examples.test.ts`: each example, workflow file → forms → workflow
   file, gives the same state, and in WebAssembly runs the full workflow: the
   mesh has a point on each in-flow and out-flow surface, the in-flow is
@@ -349,8 +367,10 @@ npm run dev & npm run e2e -- http://localhost:5173/
   network with no cluster which connects the in-flow and out-flow surfaces (Box, default forms, seed
   1837757520: the network, an amber warning and "Next" disabled), the default roles of a shape, no
   out-flow surface (the output is removed; "Generate" asks for one), the
-  fractures in the view during a large run (the view changes) and the
-  cancel; it saves screenshots.
+  fractures in the view during a large run (the view changes after 10 more
+  fractures), the cancel, and "Stop and keep the fractures" then "Continue"
+  (Box, 80 fractures: the final count of a run with no stop); it saves
+  screenshots.
 
 ## VTK.wasm notes
 

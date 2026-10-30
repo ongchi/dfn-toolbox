@@ -121,7 +121,13 @@ pub fn dfngen_report(error: &DfngenError) -> ErrorReport {
         DfngenError::MeshSlope => report("dfngen.MeshSlope"),
         DfngenError::NoFractureDefined => report("dfngen.NoFractureDefined"),
         DfngenError::Mesh(_) => report("dfngen.Mesh"),
-        DfngenError::NoIntersectingFractures => report("dfngen.NoIntersectingFractures"),    }
+        DfngenError::NoIntersectingFractures => report("dfngen.NoIntersectingFractures"),
+        DfngenError::CheckpointFormat(_) => report("dfngen.CheckpointFormat"),
+        DfngenError::CheckpointInputChanged => report("dfngen.CheckpointInputChanged"),
+        DfngenError::CheckpointRebuildFailed { fracture, .. } => {
+            report("dfngen.CheckpointRebuildFailed").with("fracture", fracture)
+        }
+    }
 }
 
 fn family_report(error: &DfngenError, family: usize, source: &FamilyError) -> ErrorReport {
