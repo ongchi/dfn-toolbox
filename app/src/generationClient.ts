@@ -73,8 +73,20 @@ export interface TransportOutput {
   outflowVolumeFlux: number;
 }
 
+/** The fractures which the generation accepted since the last progress message */
+export interface FractureBatch {
+  /** x, y, z of each vertex of each fracture, in the coordinates of the mesh file */
+  points: Float64Array;
+  /** Number of vertices of each fracture */
+  vertexCounts: Int32Array;
+  /** Family number of each fracture (from 1) */
+  families: Int32Array;
+}
+
+export type ProgressCallback = (acceptedCount: number, fraction: number, fractures: FractureBatch) => void;
+
 export type WorkerResponse =
-  | { type: "progress"; acceptedCount: number; fraction: number }
+  | { type: "progress"; acceptedCount: number; fraction: number; fractures: FractureBatch }
   /** The WebAssembly module failed (a panic); the worker must be replaced */
   | { type: "crashed"; message: string }
   | ({ type: "result" } & GenerationOutput)
@@ -98,7 +110,7 @@ export class GenerationClient {
 
   async run(
     input: GenerationInput,
-    onProgress: (acceptedCount: number, fraction: number) => void,
+    onProgress: ProgressCallback,
   ): Promise<GenerationOutput> {
     const seedIfZero = BigInt(1 + Math.floor(Math.random() * 2 ** 32));
     const response = await this.request({ type: "run", seedIfZero, ...input }, onProgress);
@@ -139,7 +151,7 @@ export class GenerationClient {
 
   private request(
     message: WorkerRequest,
-    onProgress?: (acceptedCount: number, fraction: number) => void,
+    onProgress?: ProgressCallback,
   ): Promise<WorkerResponse> {
     if (this.rejectPending) {
       return Promise.reject(new Error("the worker is busy"));
@@ -153,7 +165,7 @@ export class GenerationClient {
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const response = event.data;
         if (response.type === "progress") {
-          onProgress?.(response.acceptedCount, response.fraction);
+          onProgress?.(response.acceptedCount, response.fraction, response.fractures);
           return;
         }
         this.rejectPending = null;

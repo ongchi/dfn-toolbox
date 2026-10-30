@@ -13,13 +13,17 @@ import {
   type StandaloneSession,
   type VtkNamespace,
   type vtkActor,
+  type vtkCellArray,
   type vtkLookupTable,
+  type vtkPoints,
+  type vtkPolyData,
   type vtkPolyDataMapper,
   type vtkRenderer,
   type vtkScalarBarActor,
   type vtkWebAssemblyOpenGLRenderWindow,
   type vtkXMLPolyDataReader,
 } from "@kitware/vtk-wasm";
+import type { FractureBatch } from "./generationClient";
 
 const VTK_BUNDLE_URL = `${import.meta.env.BASE_URL}vtk/vtk-wasm32-emscripten.tar.gz`;
 
@@ -54,6 +58,16 @@ const BOUNDARY_OUTLINE_COLOR = [1.0, 0.85, 0.0] as const;
 // The x, y, z axes in the top-left corner (fractions of the view: x min, y min, x max, y max);
 // the results bezel is at the bottom-left, the scalar bar at the right
 const AXES_VIEWPORT = [0, 0.8, 0.2, 1] as const;
+// The fractures of a running generation: one color for each family (family
+// 1 has the first one; more families use the colors again). Not red: the
+// rejected fractures are red.
+const FAMILY_COLORS: readonly (readonly [number, number, number])[] = [
+  [0.95, 0.6, 0.15],
+  [0.2, 0.6, 0.85],
+  [0.35, 0.7, 0.3],
+  [0.6, 0.4, 0.8],
+  [0.55, 0.45, 0.3],
+];
 
 /** "user": the polygons of the user-defined fractures of the form, before the generation */
 export type FractureLayer = "final" | "removed" | "rejected" | "user";
@@ -97,6 +111,14 @@ interface PolyDataLayer {
   actor: vtkActor;
 }
 
+/** The fractures of one family of a running generation; each batch adds to them */
+interface GenerationFamily {
+  points: vtkPoints;
+  polygons: vtkCellArray;
+  polyData: vtkPolyData;
+  actor: vtkActor;
+}
+
 export class NetworkViewer {
   private readonly vtk: VtkNamespace;
   private readonly renderer: vtkRenderer;
@@ -104,6 +126,8 @@ export class NetworkViewer {
   private readonly lookupTable: vtkLookupTable;
   private readonly scalarBar: vtkScalarBarActor;
   private readonly layers = new Map<FractureLayer, PolyDataLayer>();
+  /** The fractures of a running generation, by family number */
+  private readonly generationFamilies = new Map<number, GenerationFamily>();
   /** Tubes and cones */
   private trajectoryActors: vtkActor[] = [];
   private domainActor: vtkActor | null = null;
@@ -274,6 +298,10 @@ export class NetworkViewer {
       this.layers.delete(layer);
     }
     if (vtpText === null) {
+      // The scalar bar belongs to the triangle mesh
+      if (layer === "final") {
+        this.updateScalarBar();
+      }
       return;
     }
     const reader = this.vtk.vtkXMLPolyDataReader();
@@ -306,6 +334,68 @@ export class NetworkViewer {
     if (layer === "final") {
       await this.colorBy(this.colorArray);
     }
+  }
+
+  /**
+   * Adds the fractures which a running generation accepted. They are not
+   * read from a file: the generation writes its files only at the end.
+   */
+  addGenerationFractures(batch: FractureBatch): void {
+    const changed = new Set<GenerationFamily>();
+    const polygonIds = this.vtk.vtkIdList();
+    let pointIndex = 0;
+    batch.vertexCounts.forEach((vertexCount, fractureIndex) => {
+      const family = this.generationFamily(batch.families[fractureIndex]);
+      polygonIds.reset();
+      for (let vertex = 0; vertex < vertexCount; vertex++) {
+        const start = 3 * (pointIndex + vertex);
+        polygonIds.insertNextId(
+          family.points.insertNextPoint([batch.points[start], batch.points[start + 1], batch.points[start + 2]]),
+        );
+      }
+      family.polygons.insertNextCell(polygonIds);
+      pointIndex += vertexCount;
+      changed.add(family);
+    });
+    for (const family of changed) {
+      family.points.modified();
+      family.polygons.modified();
+      family.polyData.modified();
+    }
+  }
+
+  /** Removes the fractures of a running generation */
+  clearGenerationFractures(): void {
+    for (const family of this.generationFamilies.values()) {
+      this.renderer.removeActor(family.actor);
+    }
+    this.generationFamilies.clear();
+  }
+
+  /** The fractures of a family of a running generation; a new family gets its actor */
+  private generationFamily(familyNumber: number): GenerationFamily {
+    const existing = this.generationFamilies.get(familyNumber);
+    if (existing) {
+      return existing;
+    }
+    const points = this.vtk.vtkPoints();
+    const polygons = this.vtk.vtkCellArray();
+    const polyData = this.vtk.vtkPolyData();
+    polyData.setPoints(points);
+    polyData.setPolys(polygons);
+    const mapper = this.vtk.vtkPolyDataMapper();
+    mapper.setInputData(polyData);
+    mapper.setScalarVisibility(0);
+    const actor = this.vtk.vtkActor({ mapper });
+    const property = actor.getProperty();
+    property.setRepresentationToSurface();
+    property.setColor(...FAMILY_COLORS[(familyNumber - 1) % FAMILY_COLORS.length]);
+    property.setEdgeVisibility(1);
+    property.setEdgeColor(0.2, 0.2, 0.2);
+    this.renderer.addActor(actor);
+    const family = { points, polygons, polyData, actor };
+    this.generationFamilies.set(familyNumber, family);
+    return family;
   }
 
   /** Names of the cell data arrays with one component of the triangle mesh of the final fractures. */

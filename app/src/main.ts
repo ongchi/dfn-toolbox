@@ -65,6 +65,8 @@ const TRAJECTORIES_FILE = "trajectories.vtp";
 const VELOCITIES_FILE = "velocities.vtp";
 const FLOW_VELOCITY_OPTION = colorOptionValue(FLOW_VELOCITY_ARRAY);
 const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
+// The view of the fractures of a running generation is drawn again at most this often
+const GENERATION_RENDER_INTERVAL_MS = 200;
 // The generation keeps all clusters when none connects an in-flow and an out-flow surface
 const NO_CONNECTING_CLUSTER =
   "No cluster connects an in-flow and an out-flow surface: all clusters stay. The particles need a path between them; increase the number of fractures or their size, try another seed, or change the roles of the surfaces (Domain tab).";
@@ -432,11 +434,28 @@ async function runGeneration(): Promise<void> {
   setBusy(true);
   ui.progress.value = 0;
   showStatus("Generating…");
+  // The view shows the new fractures during the run, not the old network
+  clearOutput();
+  viewer?.clearGenerationFractures();
+  let lastRenderTime = 0;
   const startTime = performance.now();
   try {
-    const result = await client.run(input, (acceptedCount, fraction) => {
+    const result = await client.run(input, (acceptedCount, fraction, fractures) => {
       ui.progress.value = fraction;
-      showStatus(`Generating… ${acceptedCount} fractures accepted`);
+      showStatus(
+        fraction >= 1
+          ? `Generating… ${acceptedCount} fractures accepted; making the clusters and the mesh`
+          : `Generating… ${acceptedCount} fractures accepted`,
+      );
+      if (!viewer) {
+        return;
+      }
+      viewer.addGenerationFractures(fractures);
+      const now = performance.now();
+      if (now - lastRenderTime >= GENERATION_RENDER_INTERVAL_MS || fraction >= 1) {
+        lastRenderTime = now;
+        void viewer.render();
+      }
     });
     if (result.error !== null) {
       showStatus(toolErrorText(result.error), true);
@@ -452,6 +471,11 @@ async function runGeneration(): Promise<void> {
   } catch (error) {
     showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
   } finally {
+    // The final layers replace the fractures of the run; after an error or a cancel, nothing does
+    if (viewer) {
+      viewer.clearGenerationFractures();
+      void viewer.render();
+    }
     setBusy(false);
   }
 }

@@ -1,7 +1,7 @@
 // Runs the generation, the flow and the transport (WebAssembly) in a Web
 // Worker, so the page stays responsive. Messages: see `generationClient.ts`.
 import { toToolError, type ToolError } from "./errors";
-import type { WorkerRequest, WorkerResponse } from "./generationClient";
+import type { FractureBatch, WorkerRequest, WorkerResponse } from "./generationClient";
 import init, {
   run_flow,
   run_generation,
@@ -13,8 +13,36 @@ const PROGRESS_INTERVAL_MS = 50;
 
 const ready = init();
 
-function post(message: WorkerResponse): void {
-  self.postMessage(message);
+function post(message: WorkerResponse, transfer: Transferable[] = []): void {
+  self.postMessage(message, { transfer });
+}
+
+/** Collects the accepted fractures between two progress messages */
+class FractureCollector {
+  private points: number[] = [];
+  private vertexCounts: number[] = [];
+  private families: number[] = [];
+
+  add(vertices: Float64Array, family: number): void {
+    for (const value of vertices) {
+      this.points.push(value);
+    }
+    this.vertexCounts.push(vertices.length / 3);
+    this.families.push(family);
+  }
+
+  /** The collected fractures; the collector is then empty */
+  take(): FractureBatch {
+    const batch = {
+      points: Float64Array.from(this.points),
+      vertexCounts: Int32Array.from(this.vertexCounts),
+      families: Int32Array.from(this.families),
+    };
+    this.points = [];
+    this.vertexCounts = [];
+    this.families = [];
+    return batch;
+  }
 }
 
 /** The error of a result as a plain object; the WebAssembly object is freed */
@@ -68,16 +96,23 @@ function handle(request: WorkerRequest): void {
   }
 
   let lastProgressTime = 0;
+  const fractures = new FractureCollector();
   const result = run_generation(
     request.toml,
     request.mesh,
     request.userFractures,
     request.seedIfZero,
-    (acceptedCount: number, fraction: number) => {
+    (acceptedCount: number, fraction: number, vertices: Float64Array, family: number) => {
+      fractures.add(vertices, family);
       const now = performance.now();
       if (now - lastProgressTime >= PROGRESS_INTERVAL_MS || fraction >= 1) {
         lastProgressTime = now;
-        post({ type: "progress", acceptedCount, fraction });
+        const batch = fractures.take();
+        post({ type: "progress", acceptedCount, fraction, fractures: batch }, [
+          batch.points.buffer,
+          batch.vertexCounts.buffer,
+          batch.families.buffer,
+        ]);
       }
     },
   );

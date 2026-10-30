@@ -92,6 +92,12 @@ There is no server: `npm run build` gives a folder of static files.
   one text for each kind of error; a kind which the user cannot cause,
   such as the format of a file, is "Internal error" with the text of the
   library).
+- During "Generate", the 3D view shows each accepted stochastic fracture
+  (one color for each family). The worker sends them with the progress
+  (at most each 50 ms), and the view is drawn again at most each 200 ms.
+  The start of a run removes the old network. At the end, the final
+  layers replace these fractures (the cluster analysis can remove some
+  of them); after an error or a cancel, the view has none of them.
 - Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
   fractures (layer "Mesh", with its edges; color by a cell array, or by
   the point pressure of the flow: "Pressure", selected when the flow is
@@ -342,8 +348,9 @@ npm run dev & npm run e2e -- http://localhost:5173/
   limits of the center of a new user-defined fracture, a bad input, a
   network with no cluster which connects the in-flow and out-flow surfaces (Box, default forms, seed
   1837757520: the network, an amber warning and "Next" disabled), the default roles of a shape, no
-  out-flow surface (the output is removed; "Generate" asks for one) and the cancel; it saves
-  screenshots.
+  out-flow surface (the output is removed; "Generate" asks for one), the
+  fractures in the view during a large run (the view changes) and the
+  cancel; it saves screenshots.
 
 ## VTK.wasm notes
 
@@ -358,6 +365,10 @@ npm run dev & npm run e2e -- http://localhost:5173/
   (`mapper.scalarVisibility = 1`) can set other properties back: it gave the
   mapper its old lookup table.
 - Add 2D actors (scalar bar) with `addViewProp`.
+- The fractures of a running generation are a `vtkPolyData` which grows
+  (`insertNextPoint`, then `insertNextCell` with a `vtkIdList`).
+  `insertCellPoint` with `updateCellCount` gives no cell: the bundle has
+  no `insertNextCell(npts)`.
 
 ## License
 

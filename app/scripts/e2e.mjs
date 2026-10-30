@@ -4,7 +4,8 @@
 // It checks the default example, runs the full workflow (network, flow,
 // transport) of each example, the flow and the transport without their
 // input, the choice of a predefined mesh, a new user-defined fracture, a bad
-// input and a cancel; it saves screenshots.
+// input, the fractures in the view during a run, and a cancel; it saves
+// screenshots.
 import puppeteer from "puppeteer-core";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
@@ -493,7 +494,7 @@ try {
     `${isNetworkCleared ? "cleared" : "not cleared"}; ${noOutflowStatus}`,
   );
 
-  // Cancel: a large run, cancelled at once
+  // A large run: the view shows the new fractures during the run; then a cancel
   await selectExample(page, "box_west_east");
   await page.evaluate(() => {
     const input = [...document.querySelectorAll("input[type=number]")].find((node) =>
@@ -503,7 +504,21 @@ try {
     input.dispatchEvent(new Event("input"));
   });
   await page.click("#run-button");
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.waitForFunction(() => document.querySelector("#status").textContent.includes("fractures accepted"), {
+    timeout: RUN_TIMEOUT,
+  });
+  const viewDuringRun = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
+  };
+  const firstView = await viewDuringRun();
+  const secondView = await viewDuringRun();
+  check(
+    !firstView.equals(secondView),
+    "fractures in the view during the run",
+    `view ${firstView.equals(secondView) ? "unchanged" : "changed"}`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_generation_live.png` });
   await page.click("#cancel-button");
   await waitIdle(page);
   const cancelStatus = await statusText(page);

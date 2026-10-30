@@ -1,5 +1,6 @@
 //! Bindings of dfngen: the generation of the network.
 
+use dfngen::io::output::to_output_coordinates;
 use dfngen::{build_input_from_text, generate, read_input_file_names, write_output};
 use wasm_bindgen::prelude::*;
 
@@ -116,8 +117,10 @@ impl GenerationResult {
 /// # Arguments
 ///
 /// * `seed_if_zero` - Seed for an input with `seed = 0` (the binary uses the clock)
-/// * `on_progress` - Called as `on_progress(accepted_count, fraction)` after
-///   each accepted stochastic fracture
+/// * `on_progress` - Called as `on_progress(accepted_count, fraction,
+///   vertices, family)` after each accepted stochastic fracture. `vertices`
+///   is a `Float64Array` (x, y, z of each vertex, in the coordinates of the
+///   mesh file), `family` the family number (from 1).
 #[wasm_bindgen]
 #[expect(
     clippy::needless_pass_by_value,
@@ -139,13 +142,25 @@ pub fn run_generation(
             input.seed = seed_if_zero;
         }
         seed = input.seed;
+        let mesh_center = input.domain_mesh.center();
 
         let network = generate(input, family_collection, &mut |update| {
+            let vertices: Vec<f64> = update
+                .fracture
+                .vertices
+                .iter()
+                .flat_map(|vertex| {
+                    let point = to_output_coordinates(vertex, &mesh_center);
+                    [point.x, point.y, point.z]
+                })
+                .collect();
             // A failed call of the JS callback does not stop the generation
-            let _ = on_progress.call2(
+            let _ = on_progress.call4(
                 &JsValue::NULL,
                 &JsValue::from(update.accepted_count as f64),
                 &JsValue::from(update.fraction),
+                &js_sys::Float64Array::from(vertices.as_slice()),
+                &JsValue::from(update.fracture.origin.output_number() as f64),
             );
         })
         .map_err(|error| dfngen_report(&error))?;
