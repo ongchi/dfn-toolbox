@@ -13,9 +13,9 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-dfngen-rs = { path = "../../dfngen-rs", default-features = false }
-dfntrans-rs = { path = "../../dfntrans-rs", default-features = false }
-fehm-rs = { path = "../../fehm-rs", default-features = false }
+dfngen-rs = { git = "https://github.com/ongchi/dfngen-rs", branch = "master", default-features = false }
+dfntrans-rs = { git = "https://github.com/ongchi/dfntrans-rs", branch = "master", default-features = false }
+fehm-rs = { git = "https://github.com/ongchi/fehm-rs", branch = "master", default-features = false }
 js-sys = "0.3.106"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }

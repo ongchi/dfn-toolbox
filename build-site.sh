@@ -2,7 +2,7 @@
 # Builds the static site into app/dist, after the tests. The GitHub Actions
 # workflow and a local check run it.
 #
-# Usage: ./build-site.sh <base path>   (for example /dfn-web/)
+# Usage: ./build-site.sh <base path>   (for example /dfn-toolbox/)
 #
 # Needs: ../dfngen-rs, ../fehm-rs and ../dfntrans-rs, Node, Python 3, the Rust target
 # wasm32-unknown-unknown, and wasm-bindgen-cli with the version of

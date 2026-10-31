@@ -58,7 +58,7 @@ export function readCase(caseName: string, toml?: string): CaseFiles {
   };
 }
 
-// The predefined domain meshes of dfn-web (../meshes): the `domain` of a workflow names one
+// The predefined domain meshes of dfn-toolbox (../meshes): the `domain` of a workflow names one
 const meshesDir = resolve(appDir, "../meshes");
 
 export function meshPath(name: string): string {
@@ -76,7 +76,7 @@ export function userFracturesFile(network: FormState): string | undefined {
     : userFracturesToVtp(network.userFractures, meshRegionNames(readMesh(network.domain)));
 }
 
-// The workflow examples of dfn-web (../examples)
+// The workflow examples of dfn-toolbox (../examples)
 const examplesDir = resolve(appDir, "../examples");
 
 export const exampleNames: string[] = readdirSync(examplesDir, { withFileTypes: true })

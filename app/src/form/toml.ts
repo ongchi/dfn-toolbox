@@ -218,13 +218,13 @@ export function networkTables(state: FormState): TomlTable[] {
 }
 
 /**
- * The boundary lines are always on in dfn-web and have no other key, thus
+ * The boundary lines are always on in dfn-toolbox and have no other key, thus
  * the workflow file has no section for them; the dfngen input needs it
  */
 const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray: false, lines: ["enable = true"] };
 
 /**
- * The dfngen input file of the network. The mesh is always on in dfn-web. The
+ * The dfngen input file of the network. The mesh is always on in dfn-toolbox. The
  * user-defined fractures are the polygons of `USER_FRACTURES_FILE` (made by
  * `userFracturesToVtp`), not tables. The isolated fractures and the clusters
  * which do not connect an in-flow and an out-flow surface are always removed

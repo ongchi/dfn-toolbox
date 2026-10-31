@@ -1,4 +1,4 @@
-// The workflow file of dfn-web: one TOML with `[boundaries]`, `[network]`,
+// The workflow file of dfn-toolbox: one TOML with `[boundaries]`, `[network]`,
 // `[flow]` and `[transport]` (see "Workflow file" of README.md). The comment
 // at the top is the description. The app makes the input files of dfngen,
 // fehm and dfntrans from it (`networkToLibraryToml`, `flowToLibraryToml`,

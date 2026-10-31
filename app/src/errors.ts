@@ -67,7 +67,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.UserFracture.Aperture": (f) => `${USER_FRACTURE(f)}: Aperture must be greater than 0.`,
   "dfngen.ClustersNeedBoundarySurfaces": () =>
     "The domain shape has no boundary surfaces: the network keeps only the clusters which connect an in-flow and an out-flow surface. Choose another domain shape (Domain tab).",
-  // dfn-web gives dfngen the in-flow surfaces as group 1, the out-flow surfaces as group 2
+  // dfn-toolbox gives dfngen the in-flow surfaces as group 1, the out-flow surfaces as group 2
   "dfngen.EmptyClusterSurfaceGroup": (f) =>
     `Set at least one ${f.group === "1" ? "in-flow" : "out-flow"} surface (Domain tab, Boundary surfaces).`,
   "dfngen.UnknownClusterSurface": (f) =>

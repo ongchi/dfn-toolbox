@@ -1,21 +1,28 @@
-# dfn-web
+# dfn-toolbox
 
 A static web app for dfngen (generation of a discrete fracture network),
 fehm (steady water flow in the network) and dfntrans (particle tracking in
-the flow): <https://ongchi.github.io/dfn-web/>.
+the flow): <https://ongchi.github.io/dfn-toolbox/>.
 This is a preliminary version.
 
 The project needs the repositories of the three libraries in sibling folders:
 
 - `../dfngen-rs` ([ongchi/dfngen-rs](https://github.com/ongchi/dfngen-rs)):
-  `dfn-wasm` uses it as a Cargo path dependency, and the tests use its test
+  `dfn-wasm` uses it as a Cargo git dependency (branch `master`), and the tests use its test
   cases (`tests/data`), its binary and its scripts.
 - `../fehm-rs` ([ongchi/fehm-rs](https://github.com/ongchi/fehm-rs)):
-  `dfn-wasm` uses it as a Cargo path dependency, and the tests use its
+  `dfn-wasm` uses it as a Cargo git dependency (branch `master`), and the tests use its
   binary.
 - `../dfntrans-rs` ([ongchi/dfntrans-rs](https://github.com/ongchi/dfntrans-rs)):
-  `dfn-wasm` uses it as a Cargo path dependency, and the tests use its
+  `dfn-wasm` uses it as a Cargo git dependency (branch `master`), and the tests use its
   binary.
+
+A local file `.cargo/config.toml` (not in git) can send these dependencies to
+the sibling folders with `[patch]`, to build the checked-out branches. Cargo
+then writes the local paths into `dfn-wasm/Cargo.lock`: do not commit
+`Cargo.lock` from such a build. After a library change, push the library, and
+update `Cargo.lock` with `cargo update` and no `[patch]`: the tests compare the
+WebAssembly module with the native binaries of the libraries.
 
 The generation, the flow and the transport run in the browser (WebAssembly), and the 3D
 view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
@@ -216,7 +223,7 @@ a boundary surface of the domain mesh is checked only by "Generate".
 ### User-defined fractures
 
 dfngen-rs reads user-defined fractures only as polygons (a `.vtp` file).
-dfn-web makes the polygon of each `[[network.user_fracture]]` in the same
+dfn-toolbox makes the polygon of each `[[network.user_fracture]]` in the same
 way as dfngen-rs makes a stochastic fracture (`app/src/userFractures.ts`):
 a regular polygon of `number_of_points` on the circle of `radius`, y scaled
 by `aspect_ratio`, turned by `beta` in its plane, rotated from the normal
@@ -310,14 +317,14 @@ TypeScript types are generated from the bundle.
 `.github/workflows/pages.yml` publishes the site on GitHub Pages at each
 push to `master` (or when it is started by hand). It checks out
 `dfngen-rs`, `fehm-rs` and `dfntrans-rs` (branch `master`) next to
-`dfn-web` and runs
+`web` and runs
 `build-site.sh <base path>`: install, VTK.wasm, WebAssembly module, native
 binaries, `npm test`, and `npm run build`. A failed test stops the
 workflow before the deploy. The same script makes the site locally
 (`npm ci` replaces `app/node_modules`):
 
 ```bash
-./build-site.sh /dfn-web/   # the site in app/dist, for the path /dfn-web/
+./build-site.sh /dfn-toolbox/   # the site in app/dist, for the path /dfn-toolbox/
 ```
 
 The Pages source of the repository must be "GitHub Actions".
@@ -405,7 +412,7 @@ npm run dev & npm run e2e -- http://localhost:5173/
 
 ## License
 
-dfn-web: LGPL-3.0 (`LICENSE.md`), as dfngen-rs. The site includes compiled
+dfn-toolbox: LGPL-3.0 (`LICENSE.md`), as dfngen-rs. The site includes compiled
 code of [dfngen-rs](https://github.com/ongchi/dfngen-rs) (LGPL-3.0; it is a
 port of dfnWorks, LANL), [fehm-rs](https://github.com/ongchi/fehm-rs)
 (BSD-3-Clause; based on FEHM, LANL),

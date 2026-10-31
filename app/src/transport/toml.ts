@@ -55,7 +55,7 @@ export function transportTables(state: TransportState): TomlTable[] {
 }
 
 /**
- * The trajectories and the velocities are always on in dfn-web (the 3D view
+ * The trajectories and the velocities are always on in dfn-toolbox (the 3D view
  * shows them), thus the workflow file has no section for the output; the
  * dfntrans input needs it
  */

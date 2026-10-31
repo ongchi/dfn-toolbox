@@ -1,6 +1,6 @@
 # Builds the site (after the tests of build-site.sh) and publishes it on
 # GitHub Pages. dfngen-rs, fehm-rs and dfntrans-rs are checked out as sibling folders of
-# dfn-web, as on a local computer.
+# web, as on a local computer.
 name: Pages
 
 on:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          path: dfn-web
+          path: web
       - uses: actions/checkout@v7
         with:
           repository: ongchi/dfngen-rs
@@ -48,12 +48,12 @@ jobs:
             dfngen-rs -> target
             fehm-rs -> target
             dfntrans-rs -> target
-            dfn-web/dfn-wasm -> target
+            web/dfn-wasm -> target
 
       # wasm-bindgen-cli must have the version of wasm-bindgen in dfn-wasm/Cargo.toml
       - name: Read the version of wasm-bindgen
         id: wasm-bindgen
-        run: echo "version=$(sed -n 's/^wasm-bindgen = "=\(.*\)"$/\1/p' dfn-web/dfn-wasm/Cargo.toml)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(sed -n 's/^wasm-bindgen = "=\(.*\)"$/\1/p' web/dfn-wasm/Cargo.toml)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v6
         id: wasm-bindgen-cache
         with:
@@ -67,20 +67,20 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: dfn-web/app/package-lock.json
+          cache-dependency-path: web/app/package-lock.json
       # fetch-vtk.sh downloads the bundle only if the cached file does not have its SHA-256
       - uses: actions/cache@v6
         with:
-          path: dfn-web/app/public/vtk/vtk-wasm32-emscripten.tar.gz
-          key: vtk-wasm-${{ hashFiles('dfn-web/fetch-vtk.sh') }}
+          path: web/app/public/vtk/vtk-wasm32-emscripten.tar.gz
+          key: vtk-wasm-${{ hashFiles('web/fetch-vtk.sh') }}
 
       - uses: actions/configure-pages@v6
         id: pages
       - name: Test and build the site
-        run: dfn-web/build-site.sh "${{ steps.pages.outputs.base_path }}/"
+        run: web/build-site.sh "${{ steps.pages.outputs.base_path }}/"
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: dfn-web/app/dist
+          path: web/app/dist
 
   deploy:
     needs: build
