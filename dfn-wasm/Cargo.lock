@@ -110,7 +110,7 @@ dependencies = [
 [[package]]
 name = "dfngen-rs"
 version = "0.13.0"
-source = "git+https://github.com/ongchi/dfngen-rs?branch=master#67dfbf4247425d55254fc2251fa5b2f3a25c321f"
+source = "git+https://github.com/ongchi/dfngen-rs?branch=master#4c452daf81be5d284fc6c01d3175b1ca49c34d89"
 dependencies = [
  "i_overlay",
  "parry3d-f64",
@@ -130,7 +130,7 @@ dependencies = [
 [[package]]
 name = "dfntrans-rs"
 version = "0.1.0"
-source = "git+https://github.com/ongchi/dfntrans-rs?branch=master#c64f04972ac947cc9da2990faf416f685a7eedbb"
+source = "git+https://github.com/ongchi/dfntrans-rs?branch=master#a9da5fb3cd7a97848466e8f8ffae52f86bd0afd7"
 dependencies = [
  "fehm-rs",
  "serde",

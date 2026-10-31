@@ -149,20 +149,16 @@ There is no server: `npm run build` gives a folder of static files.
   always shown); the mass flow of each boundary; the particle counts and the volume
   fluxes of the transport.
 
-The output is that of the `dfngen` binary for the same input and seed.
-The math functions of WebAssembly (`libm`) and of the native platform can
-round differently in the last digits, thus the decimal numbers can differ
-by about 1e-15 (relative). A FRAM decision can then also be different, and
-the network changes; the 27 cases of `tests/data` and the examples have no
-such difference. In the examples, the reason of a few rejected fractures is
-different (`rejections.dat`), not the network. The triangle mesh
-(`dfn_mesh.vtu`) is different: the mesh step makes a difference in the last
-digit large, thus the mesh of WebAssembly can have
-other points and triangles than the mesh of the binary. This is accepted.
+The output is that of the `dfngen` binary for the same input and seed, also
+the triangle mesh. The `dfngen` and `dfntrans` binaries define the C math
+functions with the `libm` crate (`src/libm_symbols.rs`), which WebAssembly also
+uses: the math functions of the platforms round differently, and such a
+difference can change a FRAM decision and thus the network. A Rust test that
+calls a library natively still uses the math functions of the platform.
 The flow on the same mesh is that of the `fehm` binary (within 1e-9). The
 transport on the same mesh has the particle paths of the `dfntrans` binary
-(the same time steps and fractures); the times add up the rounding
-differences over thousands of time steps (up to about 1e-6, relative).
+(the same time steps and fractures); the times add up the small differences
+of the flow over thousands of time steps.
 
 ## Workflow file
 

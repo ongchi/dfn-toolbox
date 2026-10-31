@@ -1,17 +1,10 @@
 // The network of the workflow file: the dfngen input made from `[network]`
 // of each example is valid and gives the output of the native binary, and
 // the reader of the workflow file refuses what the forms cannot show.
-//
-// As in wasm.test.ts, the triangle mesh (dfn_mesh.vtu) is not compared: the
-// mesh step makes a rounding difference of WebAssembly large. The counts of
-// the FRAM rejection reasons (rejections.dat) are not compared either: in
-// the examples, a rounding difference changes the reason of some rejected
-// fractures (by a few in thousands); the final network is the same.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
-import { FLOW_MESH_FILE } from "../src/flow/state";
 import { InputFormError, networkToLibraryToml } from "../src/form/toml";
 import { check_input, MeshStep, run_generation } from "../src/pkg/dfn_wasm.js";
 import { tomlToWorkflow } from "../src/workflow";
@@ -29,7 +22,6 @@ import { USER_FRACTURES_FILE } from "../src/userFractures";
 
 beforeAll(initWasm);
 
-const UNCOMPARED_FILES = [FLOW_MESH_FILE, "rejections.dat"];
 // Milliseconds: two generations of an example (WebAssembly and native)
 const GENERATION_TIMEOUT = 60000;
 
@@ -47,7 +39,7 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     const result = run_generation(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFractures, 1n, MeshStep.Make, () => {});
     expect(result.error).toBeUndefined();
     const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${exampleName}-`));
-    for (const name of result.file_names.filter((fileName: string) => !UNCOMPARED_FILES.includes(fileName))) {
+    for (const name of result.file_names) {
       writeFileSync(join(wasmDir, name), result.file(name) ?? "");
     }
 
@@ -59,9 +51,6 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     }
     writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network, boundaries));
     const nativeDir = runNativeDfngen(join(inputDir, "input.toml"));
-    for (const name of UNCOMPARED_FILES) {
-      rmSync(join(nativeDir, name), { force: true });
-    }
     expect(compareOutputFolders(nativeDir, wasmDir)).toBe("");
   }, GENERATION_TIMEOUT);
 });

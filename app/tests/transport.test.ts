@@ -62,9 +62,10 @@ test("the dfntrans input always has the trajectories and the velocities, and onl
   expect(transportToml()).toContain("[output]\ntrajectories = true\nall_particles = false\nvelocities = true\n");
 });
 
-// The times add up the rounding differences of wasm and native over
-// thousands of time steps (up to 6e-7 relative). The integers (particles,
-// time steps, fractures, points of each path) are equal: the paths are the same.
+// The math functions are the same, but the flow solution is not exactly the
+// same (within 1e-9 of flow.test.ts), and the times add up such differences
+// over thousands of time steps. The integers (particles, time steps, fractures,
+// points of each path) are equal: the paths are the same.
 const TRANSPORT_TOLERANCE = "1e-5";
 
 test("the output files agree with the native binary of dfntrans", () => {

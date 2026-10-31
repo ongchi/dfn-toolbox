@@ -1,12 +1,8 @@
 // The WebAssembly module gives the same output files as the native binary.
 //
-// The math functions of wasm32 (libm) and of the native platform can round
-// differently, thus the decimal numbers are compared with the tolerance of
-// the regression check (scripts/compare_output.py). The mesh step makes a
-// difference of the last digit large, thus the triangle mesh (dfn_mesh.vtu)
-// is not compared: the test checks that it is a valid mesh with the arrays
-// of the native file.
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// The native binaries have the math functions of wasm32 (libm), thus the
+// output is the same on each platform, also the triangle mesh (dfn_mesh.vtu).
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
@@ -63,12 +59,9 @@ describe.each(caseNames)("case %s", (caseName) => {
 
     const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${caseName}-`));
     for (const name of result.file_names) {
-      if (name !== MESH_FILE) {
-        writeFileSync(join(wasmDir, name), result.file(name) ?? "");
-      }
+      writeFileSync(join(wasmDir, name), result.file(name) ?? "");
     }
     const nativeDir = runNativeBinary(caseName);
-    rmSync(join(nativeDir, MESH_FILE), { force: true });
     expect(compareOutputFolders(nativeDir, wasmDir)).toBe("");
   });
 
