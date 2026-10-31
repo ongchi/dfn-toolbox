@@ -3,12 +3,15 @@
 import { toToolError, type ToolError } from "./errors";
 import type { FractureBatch, WorkerRequest, WorkerResponse } from "./generationClient";
 import init, {
+  mesh_generation,
   run_flow,
   resume_generation,
   run_generation,
   run_transport,
+  MeshStep,
   RestartMode,
   type ErrorReport,
+  type GenerationResult,
 } from "./pkg/dfn_wasm.js";
 
 const PROGRESS_INTERVAL_MS = 50;
@@ -69,7 +72,36 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   }
 };
 
+/** Posts the result of a generation; the WebAssembly object is freed */
+function postGenerationResult(result: GenerationResult): void {
+  post({
+    type: "result",
+    error: toolError(result.error),
+    seed: result.seed.toString(),
+    files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
+    acceptedCount: result.accepted_count,
+    finalCount: result.final_count,
+    rejectedCount: result.rejected_count,
+    isWithoutConnectingCluster: result.is_without_connecting_cluster,
+  });
+  result.free();
+}
+
 function handle(request: WorkerRequest): void {
+  if (request.type === "runMeshing") {
+    postGenerationResult(
+      mesh_generation(
+        request.network.toml,
+        request.current.toml,
+        request.network.mesh,
+        request.network.userFractures,
+        request.current.userFractures,
+        BigInt(request.seed),
+        request.checkpoint ?? undefined,
+      ),
+    );
+    return;
+  }
   if (request.type === "runFlow") {
     const result = run_flow(request.toml, request.mesh);
     const flows: Float64Array = result.boundary_flows;
@@ -126,27 +158,26 @@ function handle(request: WorkerRequest): void {
   const onCheckpoint = (checkpoint: Uint8Array, acceptedCount: number) => {
     post({ type: "checkpoint", checkpoint, acceptedCount }, [checkpoint.buffer]);
   };
-  const result =
+  postGenerationResult(
     request.restart === null
-      ? run_generation(request.toml, request.mesh, request.userFractures, request.seedIfZero, onProgress, onCheckpoint)
+      ? run_generation(
+          request.toml,
+          request.mesh,
+          request.userFractures,
+          request.seedIfZero,
+          MeshStep.Skip,
+          onProgress,
+          onCheckpoint,
+        )
       : resume_generation(
           request.toml,
           request.mesh,
           request.userFractures,
           request.restart.checkpoint,
           request.restart.mode === "continue" ? RestartMode.Continue : RestartMode.Finish,
+          MeshStep.Skip,
           onProgress,
           onCheckpoint,
-        );
-  post({
-    type: "result",
-    error: toolError(result.error),
-    seed: result.seed.toString(),
-    files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
-    acceptedCount: result.accepted_count,
-    finalCount: result.final_count,
-    rejectedCount: result.rejected_count,
-    isWithoutConnectingCluster: result.is_without_connecting_cluster,
-  });
-  result.free();
+        ),
+  );
 }

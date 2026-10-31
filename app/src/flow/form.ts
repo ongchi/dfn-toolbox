@@ -83,7 +83,7 @@ export function renderFlowForm(
       element(
         "p",
         "form-note",
-        "Generate a network (DFN tab) first. The flow uses the triangle mesh of the last generation.",
+        'Generate a network and click "Meshing" (DFN tab) first. The flow uses the triangle mesh of the network.',
       ),
     );
     return;

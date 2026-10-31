@@ -62,6 +62,7 @@ import {
 import type { Workflow } from "./workflow";
 
 const DEFAULT_COLOR_OPTION = "cell:fracture_id";
+const FRACTURES_FILE = "fractures.vtp";
 const PRESSURE_FILE = "pressure.vtu";
 // The example of the page at the start
 const DEFAULT_EXAMPLE = "box_west_east";
@@ -113,6 +114,7 @@ const ui = {
   cancelButton: byId<HTMLButtonElement>("cancel-button"),
   stopButton: byId<HTMLButtonElement>("stop-button"),
   continueButton: byId<HTMLButtonElement>("continue-button"),
+  meshingButton: byId<HTMLButtonElement>("meshing-button"),
   nextButton: byId<HTMLButtonElement>("next-button"),
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
@@ -168,6 +170,14 @@ let isBusy = false;
 let stoppedGeneration: { checkpoint: GenerationCheckpoint; fractures: FractureBatch } | null = null;
 /** "Stop and keep the fractures" was clicked: the cancel of the run starts the network of its checkpoint */
 let isKeepRequested = false;
+/** The last generation with no error, for "Meshing"; null without a network */
+let generatedNetwork: {
+  input: GenerationInput;
+  seed: string;
+  /** The checkpoint with all accepted fractures; null: "Meshing" runs the generation again from the seed */
+  checkpoint: Uint8Array | null;
+  isWithoutConnectingCluster: boolean;
+} | null = null;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
 
@@ -207,7 +217,7 @@ function setBusy(busy: boolean): void {
   // Only a generation shows it (`generate`)
   ui.stopButton.hidden = true;
   ui.progress.hidden = !busy;
-  updateNextButton();
+  updateStepButtons();
   updateContinueButton();
 }
 
@@ -220,15 +230,18 @@ function updateContinueButton(): void {
 /**
  * "Next" goes to the next tab; the Transport tab has none. On the DFN tab it
  * needs the fracture mesh of a generation with a cluster which connects an
- * in-flow and an out-flow surface, on the Flow tab a solved flow.
+ * in-flow and an out-flow surface, on the Flow tab a solved flow. "Meshing"
+ * shows on the DFN tab, and it needs a network with such a cluster.
  */
-function updateNextButton(): void {
+function updateStepButtons(): void {
   const isLastTab = activeSidebarTab === SIDEBAR_TABS[SIDEBAR_TABS.length - 1];
   const isNetworkMissing = flowMesh() === null || output?.isWithoutConnectingCluster === true;
   const isOutputMissing =
     (activeSidebarTab === "network" && isNetworkMissing) || (activeSidebarTab === "flow" && flowOutput === null);
   ui.nextButton.hidden = isLastTab;
   ui.nextButton.disabled = isBusy || isOutputMissing;
+  ui.meshingButton.hidden = activeSidebarTab !== "network";
+  ui.meshingButton.disabled = isBusy || generatedNetwork === null || generatedNetwork.isWithoutConnectingCluster;
 }
 
 // ---------------------------------------------------------------- form
@@ -324,7 +337,7 @@ function selectSidebarTab(name: SidebarTab): void {
   const runText = RUN_BUTTON_TEXT[name];
   ui.runButton.hidden = runText === null;
   ui.runButton.textContent = runText ?? "";
-  updateNextButton();
+  updateStepButtons();
   updateContinueButton();
   showStatus("");
 }
@@ -491,15 +504,17 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
     void viewer?.render();
   }
   let checkpoint: GenerationCheckpoint | null = stopped?.checkpoint ?? null;
+  let lastAcceptedCount = checkpoint?.acceptedCount ?? null;
   ui.stopButton.disabled = checkpoint === null;
   let lastRenderTime = 0;
   const startTime = performance.now();
   const callbacks: GenerationCallbacks = {
     onProgress: (acceptedCount, fraction, batch) => {
       ui.progress.value = fraction;
+      lastAcceptedCount = acceptedCount;
       showStatus(
         fraction >= 1
-          ? `Generating… ${acceptedCount} fractures accepted; making the clusters and the mesh`
+          ? `Generating… ${acceptedCount} fractures accepted; making the clusters`
           : `Generating… ${acceptedCount} fractures accepted`,
       );
       fractures.push(batch);
@@ -532,12 +547,13 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
       restartMode === "finish"
         ? `\nThe network has the ${stopped?.checkpoint.acceptedCount} fractures until the stop. "Continue" adds the others.`
         : "";
-    const doneText = `Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.${finishText}`;
-    if (result.isWithoutConnectingCluster) {
-      showWarningStatus(`${doneText}\n${NO_CONNECTING_CLUSTER}`);
-    } else {
-      showStatus(doneText);
-    }
+    showGenerationDone(result, startTime, finishText);
+    generatedNetwork = {
+      input,
+      seed: result.seed,
+      checkpoint: checkpoint?.acceptedCount === lastAcceptedCount ? (checkpoint?.checkpoint ?? null) : null,
+      isWithoutConnectingCluster: result.isWithoutConnectingCluster,
+    };
     await showOutput(result);
   } catch (error) {
     if (!(error instanceof CancelledError)) {
@@ -562,11 +578,56 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
   }
 }
 
+function showGenerationDone(result: GenerationOutput, startTime: number, finishText = ""): void {
+  const doneText = `Done in ${durationText(performance.now() - startTime)}: ${result.finalCount} final fractures.${finishText}`;
+  if (result.isWithoutConnectingCluster) {
+    showWarningStatus(`${doneText}\n${NO_CONNECTING_CLUSTER}`);
+  } else {
+    showStatus(doneText);
+  }
+}
+
+/** "Meshing": the fractures of the last generation, with the mesh values of the forms now */
+async function runMeshing(): Promise<void> {
+  const network = generatedNetwork;
+  const current = generationInput();
+  if (network === null) {
+    return;
+  }
+  if (typeof current === "string") {
+    showStatus(current, true);
+    return;
+  }
+  setBusy(true);
+  // dfngen reports no progress during the mesh: an indeterminate bar
+  ui.progress.removeAttribute("value");
+  showStatus("Meshing…");
+  const startTime = performance.now();
+  try {
+    const result = await client.runMeshing({
+      network: network.input,
+      current,
+      seed: network.seed,
+      checkpoint: network.checkpoint,
+    });
+    if (result.error !== null) {
+      showStatus(toolErrorText(result.error), true);
+      return;
+    }
+    showGenerationDone(result, startTime);
+    await showOutput(result);
+  } catch (error) {
+    showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
+  } finally {
+    setBusy(false);
+  }
+}
+
 /** The flow input for the worker, or an error message */
 function flowInput(): FlowInput | string {
   const mesh = flowMesh();
   if (mesh === null) {
-    return "Generate a network first: the flow needs its triangle mesh.";
+    return 'Generate a network and click "Meshing" first: the flow needs its triangle mesh.';
   }
   if (ui.flowForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
@@ -651,7 +712,8 @@ async function runTransport(): Promise<void> {
 
 function clearOutput(): void {
   output = null;
-  updateNextButton();
+  generatedNetwork = null;
+  updateStepButtons();
   ui.results.hidden = true;
   ui.resultsBezel.hidden = true;
   ui.colorSelect.disabled = true;
@@ -686,7 +748,7 @@ function removeColorOptions(optionValues: string[]): void {
 /** The flow output belongs to the mesh of one generation */
 function clearFlowOutput(): void {
   flowOutput = null;
-  updateNextButton();
+  updateStepButtons();
   flowOutputToml = null;
   ui.flowResults.hidden = true;
   removeColorOptions([PRESSURE_OPTION, FLOW_VELOCITY_OPTION]);
@@ -711,7 +773,7 @@ function outputFile(name: string): string | null {
   return output?.files.find(([fileName]) => fileName === name)?.[1] ?? null;
 }
 
-/** The triangle mesh of the last generation, the mesh of the flow */
+/** The triangle mesh of the last "Meshing", the mesh of the flow */
 function flowMesh(): string | null {
   return outputFile(FLOW_MESH_FILE);
 }
@@ -739,7 +801,7 @@ function showStats(list: HTMLDListElement, stats: [string, string][]): void {
 async function showOutput(result: GenerationOutput): Promise<void> {
   clearFlowOutput();
   output = result;
-  updateNextButton();
+  updateStepButtons();
   ui.resultsBezel.hidden = false;
   ui.results.hidden = false;
   renderFlow();
@@ -762,7 +824,7 @@ function massFlowText(massFlow: number): string {
 async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
   clearTransportOutput();
   flowOutput = result;
-  updateNextButton();
+  updateStepButtons();
   flowOutputToml = toml;
   renderTransport();
   ui.flowResults.hidden = false;
@@ -867,7 +929,8 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
     return;
   }
   const mesh = flowMesh();
-  await viewer.setLayer("final", mesh === null ? null : triangleGridToPolyData(meshWithFlowArrays(mesh)));
+  // Before "Meshing", the polygons of the final fractures
+  await viewer.setLayer("final", mesh === null ? outputFile(FRACTURES_FILE) : triangleGridToPolyData(meshWithFlowArrays(mesh)));
   await viewer.setLayer("removed", outputFile("fractures_removed.vtp"));
   await viewer.setLayer("rejected", outputFile("fractures_rejected.vtp"));
   applyLayerVisibility(viewer);
@@ -1006,6 +1069,7 @@ function bindEvents(): void {
   ui.cancelButton.addEventListener("click", () => client.cancel());
   ui.stopButton.addEventListener("click", stopAndKeepFractures);
   ui.continueButton.addEventListener("click", () => void generate("continue"));
+  ui.meshingButton.addEventListener("click", () => void runMeshing());
 
   ui.colorSelect.addEventListener("change", () =>
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),

@@ -92,6 +92,19 @@ There is no server: `npm run build` gives a folder of static files.
   one text for each kind of error; a kind which the user cannot cause,
   such as the format of a file, is "Internal error" with the text of the
   library).
+- The DFN tab has two steps. "Generate" makes the fractures
+  (`MeshStep.Skip`), and the layer "Mesh" shows their polygons
+  (`fractures.vtp`). "Meshing" makes the triangle mesh, and "Next" needs it.
+  `mesh_generation` keeps no state in the worker: it makes the network again
+  from the last checkpoint (`RestartMode.Finish`; from the seed when there is
+  no checkpoint: only user-defined fractures), thus a cancel keeps the
+  network, and "Meshing" can run again. It gives all output files again,
+  because the mesh can remove fractures. The mesh values and the apertures
+  come from the forms at the click, thus a new mesh needs no new generation.
+  The other values come from the last "Generate": a change of them has no
+  effect until the next "Generate" (user decision). Another number of
+  families is an error. "Meshing" is disabled when no cluster connects an
+  in-flow and an out-flow surface.
 - During "Generate", the 3D view shows each accepted stochastic fracture
   (one color for each family). The worker sends them with the progress
   (at most each 50 ms), and the view is drawn again at most each 200 ms.
@@ -105,7 +118,7 @@ There is no server: `npm run build` gives a folder of static files.
   page keeps the last checkpoint in memory only (user decision; a reload
   loses it). "Stop and keep the fractures" (enabled after the first
   checkpoint) stops the worker, then makes the network of the checkpoint
-  (`RestartMode.Finish`: clusters, mesh, output); the fractures after the
+  (`RestartMode.Finish`: clusters, output); the fractures after the
   checkpoint are lost. After such a network, a cancel or a stop,
   "Continue" restarts from the checkpoint (`RestartMode.Continue`): the
   network is that of a run with no stop. The view shows the fractures until

@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { networkToLibraryToml } from "../src/form/toml";
-import { initSync, input_file_names, run_generation } from "../src/pkg/dfn_wasm.js";
+import { initSync, input_file_names, MeshStep, run_generation } from "../src/pkg/dfn_wasm.js";
 import type { FormState } from "../src/form/state";
 import { meshRegionNames } from "../src/inputFiles";
 import { userFracturesToVtp } from "../src/userFractures";
@@ -103,6 +103,7 @@ export function generateExample(exampleName: string): { workflow: Workflow; mesh
     readMesh(network.domain),
     userFracturesFile(network),
     1n,
+    MeshStep.Make,
     () => {},
   );
   if (result.error !== undefined) {

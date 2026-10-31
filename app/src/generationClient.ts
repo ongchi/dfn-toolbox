@@ -32,8 +32,21 @@ export interface Restart {
   mode: "continue" | "finish";
 }
 
+/** The triangle mesh of a generated network */
+export interface MeshingInput {
+  /** The input of the generation: it gives the fractures */
+  network: GenerationInput;
+  /** The input of the forms now: it gives the mesh options and the apertures */
+  current: GenerationInput;
+  /** Seed of the generation (decimal digits) */
+  seed: string;
+  /** The checkpoint after the last fracture; null: the generation runs again from the seed */
+  checkpoint: Uint8Array | null;
+}
+
 export type WorkerRequest =
   | ({ type: "run"; seedIfZero: bigint; restart: Restart | null } & GenerationInput)
+  | ({ type: "runMeshing" } & MeshingInput)
   | ({ type: "runFlow" } & FlowInput)
   | ({ type: "runTransport"; seedIfZero: number } & TransportInput);
 
@@ -160,6 +173,14 @@ export class GenerationClient {
         callbacks.onCheckpoint({ checkpoint: notice.checkpoint, acceptedCount: notice.acceptedCount });
       }
     });
+    if (response.type !== "result") {
+      throw new Error(`unexpected answer of the worker: ${response.type}`);
+    }
+    return response;
+  }
+
+  async runMeshing(input: MeshingInput): Promise<GenerationOutput> {
+    const response = await this.request({ type: "runMeshing", ...input });
     if (response.type !== "result") {
       throw new Error(`unexpected answer of the worker: ${response.type}`);
     }

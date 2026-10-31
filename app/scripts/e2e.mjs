@@ -140,6 +140,14 @@ async function runStep(page, tab) {
   return statusText(page);
 }
 
+/** Runs "Meshing" of the DFN tab; returns the status text */
+async function runMeshing(page) {
+  await page.click('[data-sidebar-tab="network"]');
+  await page.click("#meshing-button");
+  await waitIdle(page);
+  return statusText(page);
+}
+
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
@@ -243,6 +251,8 @@ try {
   );
 
   // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
+  const lastSection = await page.$eval("#form", (node) => node.lastElementChild.textContent);
+  check(lastSection.startsWith("Triangle mesh for the flow"), "mesh section at the end of the DFN tab", lastSection.slice(0, 30));
   const tabWalk = [];
   for (let step = 0; step < 2; step++) {
     const isRunHidden = await page.$eval("#run-button", (node) => node.hidden);
@@ -259,18 +269,23 @@ try {
   for (const name of examples) {
     await page.click('[data-sidebar-tab="network"]');
     await selectExample(page, name);
-    // "Next" of the DFN tab needs the fracture mesh, "Next" of the Flow tab a solved flow
+    // "Meshing" needs a network; "Next" of the DFN tab needs the fracture mesh, "Next" of the Flow tab a solved flow
+    const isMeshingDisabled = () => page.$eval("#meshing-button", (node) => node.disabled);
+    const isMeshingDisabledBefore = await isMeshingDisabled();
     const isNextDisabled = () => page.$eval("#next-button", (node) => node.disabled);
     const isNetworkNextDisabled = await isNextDisabled();
     // The results bezel of the 3D view shows only with a result
     const isBezelShown = () => page.$eval("#results-bezel", (node) => !node.hidden);
     const isBezelShownBefore = await isBezelShown();
     const networkStatus = await runStep(page, "network");
+    const isNextDisabledBeforeMesh = await isNextDisabled();
     check(
-      networkStatus.startsWith("Done") && isNetworkNextDisabled && !(await isNextDisabled()),
+      networkStatus.startsWith("Done") && isNetworkNextDisabled && isNextDisabledBeforeMesh && isMeshingDisabledBefore,
       `${name}: network`,
       networkStatus,
     );
+    const meshStatus = await runMeshing(page);
+    check(meshStatus.startsWith("Done") && !(await isNextDisabled()), `${name}: meshing`, meshStatus);
     const isBezelShownAfter = await isBezelShown();
     check(!isBezelShownBefore && isBezelShownAfter, `${name}: results bezel`, `${isBezelShownBefore} → ${isBezelShownAfter}`);
 
@@ -371,6 +386,8 @@ try {
   );
   await page.select("#color-select", "point:pressure");
   const regenerateStatus = await runStep(page, "network");
+  const isMeshGone = await page.$eval("#next-button", (node) => node.disabled);
+  check(isMeshGone, "generate removes the mesh", isMeshGone ? "next disabled" : "next enabled");
   const regenerateOptions = await colorOptions(page);
   const regenerateColor = await page.$eval("#color-select", (node) => node.value);
   check(
@@ -542,6 +559,18 @@ try {
   await selectExample(page, "box_west_east");
   const afterCancel = await runStep(page, "network");
   check(afterCancel.startsWith("Done"), "run after cancel", afterCancel);
+  // A cancel of "Meshing" keeps the network; "Meshing" runs again
+  // In one step: the mesh of this small network is fast
+  await page.evaluate(() => {
+    document.querySelector("#meshing-button").click();
+    document.querySelector("#cancel-button").click();
+  });
+  await waitIdle(page);
+  const meshCancelStatus = await statusText(page);
+  const hasNetworkAfterCancel = await page.$eval("#results-bezel", (node) => !node.hidden);
+  check(meshCancelStatus === "Cancelled." && hasNetworkAfterCancel, "cancel of meshing", meshCancelStatus);
+  const meshAfterCancel = await runMeshing(page);
+  check(meshAfterCancel.startsWith("Done"), "meshing after its cancel", meshAfterCancel);
   await page.screenshot({ path: `${screenshotDir}/e2e_network.png` });
   await page.$eval(".family-card", (node) => node.scrollIntoView());
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });

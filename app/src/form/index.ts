@@ -33,8 +33,8 @@ export function renderForm(tabs: NetworkTabs, state: FormState, context: FormCon
     generalSection(state, context),
     generationSection(state, context),
     framSection(state, context),
-    meshSection(state, context),
     clustersSection(state, context),
     familiesSection(state, context),
+    meshSection(state, context),
   );
 }

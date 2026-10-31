@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { InputFormError, networkToLibraryToml } from "../src/form/toml";
-import { check_input, run_generation } from "../src/pkg/dfn_wasm.js";
+import { check_input, MeshStep, run_generation } from "../src/pkg/dfn_wasm.js";
 import { tomlToWorkflow } from "../src/workflow";
 import {
   compareOutputFolders,
@@ -44,7 +44,7 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     const example = readExample(exampleName);
     const { network, boundaries } = tomlToWorkflow(example.toml);
     const userFractures = userFracturesFile(network);
-    const result = run_generation(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFractures, 1n, () => {});
+    const result = run_generation(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFractures, 1n, MeshStep.Make, () => {});
     expect(result.error).toBeUndefined();
     const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${exampleName}-`));
     for (const name of result.file_names.filter((fileName: string) => !UNCOMPARED_FILES.includes(fileName))) {

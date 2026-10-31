@@ -6,7 +6,7 @@ import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { networkToLibraryToml } from "../src/form/toml";
-import { run_flow, run_generation, run_transport, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
+import { MeshStep, run_flow, run_generation, run_transport, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "../src/workflow";
 import { exampleNames, initWasm, meshPath, readExample, readMesh, userFracturesFile } from "./cases";
@@ -38,6 +38,7 @@ describe.each(exampleNames)("%s", (exampleName) => {
       readMesh(network.domain),
       userFracturesFile(network),
       1n,
+      MeshStep.Make,
       () => {},
     );
     expect(generation.error).toBeUndefined();

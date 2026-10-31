@@ -1,9 +1,11 @@
 //! Bindings of dfngen: the generation of the network.
 
+use dfngen::io::input::Input;
 use dfngen::io::output::to_output_coordinates;
+use dfngen::mesh::MeshOptions;
 use dfngen::{
     build_input_from_text, generate, read_input_file_names, resume, write_output, Checkpoint,
-    ProgressUpdate, Resume, ResumeMode,
+    DfngenError, ProgressUpdate, Resume, ResumeMode,
 };
 use tracing::warn;
 use wasm_bindgen::prelude::*;
@@ -135,6 +137,36 @@ impl From<RestartMode> for ResumeMode {
     }
 }
 
+/// Whether a generation makes the triangle mesh
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum MeshStep {
+    /// Only the fractures: `mesh_generation` makes the mesh later
+    Skip,
+    /// The fractures and the mesh
+    Make,
+}
+
+/// The mesh options of a run
+#[derive(Clone, Copy)]
+enum MeshSource<'a> {
+    /// No mesh
+    Skip,
+    /// The options of the input of the run
+    Input,
+    /// The options of other input texts: the fractures stay those of the run
+    Texts(&'a InputTexts<'a>),
+}
+
+impl From<MeshStep> for MeshSource<'_> {
+    fn from(step: MeshStep) -> Self {
+        match step {
+            MeshStep::Skip => Self::Skip,
+            MeshStep::Make => Self::Input,
+        }
+    }
+}
+
 /// The texts of the input files
 struct InputTexts<'a> {
     toml: &'a str,
@@ -144,7 +176,7 @@ struct InputTexts<'a> {
 
 /// The JS callbacks of a generation
 struct Callbacks<'a> {
-    on_progress: &'a js_sys::Function,
+    on_progress: Option<&'a js_sys::Function>,
     on_checkpoint: Option<&'a js_sys::Function>,
 }
 
@@ -153,6 +185,7 @@ struct Callbacks<'a> {
 /// # Arguments
 ///
 /// * `seed_if_zero` - Seed for an input with `seed = 0` (the binary uses the clock)
+/// * `mesh_step` - Whether the run makes the triangle mesh
 /// * `on_progress` - Called as `on_progress(accepted_count, fraction,
 ///   vertices, family)` after each accepted stochastic fracture. `vertices`
 ///   is a `Float64Array` (x, y, z of each vertex, in the coordinates of the
@@ -170,6 +203,7 @@ pub fn run_generation(
     domain_mesh_text: &str,
     user_fractures_text: Option<String>,
     seed_if_zero: u64,
+    mesh_step: MeshStep,
     on_progress: &js_sys::Function,
     on_checkpoint: Option<js_sys::Function>,
 ) -> GenerationResult {
@@ -179,10 +213,10 @@ pub fn run_generation(
         user_fractures: user_fractures_text.as_deref(),
     };
     let callbacks = Callbacks {
-        on_progress,
+        on_progress: Some(on_progress),
         on_checkpoint: on_checkpoint.as_ref(),
     };
-    run(&texts, seed_if_zero, None, &callbacks)
+    run(&texts, seed_if_zero, None, mesh_step.into(), &callbacks)
 }
 
 /// Generates a network from the checkpoint of a stopped generation, as
@@ -193,10 +227,15 @@ pub fn run_generation(
 ///
 /// * `checkpoint` - Bytes of the checkpoint (of `on_checkpoint`)
 /// * `mode` - What to do after the checkpoint
+/// * `mesh_step` - Whether the run makes the triangle mesh
 #[wasm_bindgen]
 #[expect(
     clippy::needless_pass_by_value,
     reason = "wasm-bindgen does not take Option<&str> and Option<&Function>"
+)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments of a wasm-bindgen function are the JS interface"
 )]
 pub fn resume_generation(
     toml_text: &str,
@@ -204,6 +243,7 @@ pub fn resume_generation(
     user_fractures_text: Option<String>,
     checkpoint: &[u8],
     mode: RestartMode,
+    mesh_step: MeshStep,
     on_progress: &js_sys::Function,
     on_checkpoint: Option<js_sys::Function>,
 ) -> GenerationResult {
@@ -213,17 +253,99 @@ pub fn resume_generation(
         user_fractures: user_fractures_text.as_deref(),
     };
     let callbacks = Callbacks {
-        on_progress,
+        on_progress: Some(on_progress),
         on_checkpoint: on_checkpoint.as_ref(),
     };
     // The seed of the checkpoint replaces the seed of the input
-    run(&texts, 0, Some((checkpoint, mode)), &callbacks)
+    run(
+        &texts,
+        0,
+        Some((checkpoint, mode)),
+        mesh_step.into(),
+        &callbacks,
+    )
+}
+
+/// Makes the triangle mesh of a network of `MeshStep::Skip`, and all output
+/// files again (the mesh can remove fractures). The fractures come from the
+/// input of the generation, the mesh options and the apertures from the
+/// current input.
+///
+/// # Arguments
+///
+/// * `network_toml_text`, `network_user_fractures_text` - The input of the generation
+/// * `current_toml_text`, `current_user_fractures_text` - The current input
+/// * `seed` - The seed of the generation
+/// * `checkpoint` - The checkpoint after the last accepted fracture. `None`
+///   runs the generation again from the seed: a network with only
+///   user-defined fractures has no checkpoint.
+#[wasm_bindgen]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "wasm-bindgen does not take Option<&str> and Option<&[u8]>"
+)]
+pub fn mesh_generation(
+    network_toml_text: &str,
+    current_toml_text: &str,
+    domain_mesh_text: &str,
+    network_user_fractures_text: Option<String>,
+    current_user_fractures_text: Option<String>,
+    seed: u64,
+    checkpoint: Option<Vec<u8>>,
+) -> GenerationResult {
+    let network_texts = InputTexts {
+        toml: network_toml_text,
+        domain_mesh: domain_mesh_text,
+        user_fractures: network_user_fractures_text.as_deref(),
+    };
+    let current_texts = InputTexts {
+        toml: current_toml_text,
+        domain_mesh: domain_mesh_text,
+        user_fractures: current_user_fractures_text.as_deref(),
+    };
+    // The fractures of the checkpoint are all of the network
+    let restart = checkpoint
+        .as_deref()
+        .map(|bytes| (bytes, RestartMode::Finish));
+    let callbacks = Callbacks {
+        on_progress: None,
+        on_checkpoint: None,
+    };
+    run(
+        &network_texts,
+        seed,
+        restart,
+        MeshSource::Texts(&current_texts),
+        &callbacks,
+    )
+}
+
+/// The mesh options of the current input. The number of families must be
+/// that of the network: each family has an aperture.
+fn current_mesh_options(
+    current: &InputTexts,
+    network: &Input,
+) -> Result<Option<MeshOptions>, ErrorReport> {
+    let (current_input, _) =
+        build_input_from_text(current.toml, current.domain_mesh, current.user_fractures)
+            .map_err(|error| dfngen_report(&error))?;
+    let family_count = |input: &Input| {
+        input
+            .mesh
+            .as_ref()
+            .map(|options| options.family_apertures.len())
+    };
+    if family_count(&current_input) != family_count(network) {
+        return Err(dfngen_report(&DfngenError::CheckpointInputChanged));
+    }
+    Ok(current_input.mesh)
 }
 
 fn run(
     texts: &InputTexts,
     seed_if_zero: u64,
     restart: Option<(&[u8], RestartMode)>,
+    mesh_source: MeshSource,
     callbacks: &Callbacks,
 ) -> GenerationResult {
     let mut seed = 0;
@@ -235,9 +357,17 @@ fn run(
             input.seed = seed_if_zero;
         }
         seed = input.seed;
+        match mesh_source {
+            MeshSource::Skip => input.mesh = None,
+            MeshSource::Input => {}
+            MeshSource::Texts(current) => input.mesh = current_mesh_options(current, &input)?,
+        }
         let mesh_center = input.domain_mesh.center();
 
         let mut on_progress = |update: &ProgressUpdate| {
+            let Some(on_progress) = callbacks.on_progress else {
+                return;
+            };
             let vertices: Vec<f64> = update
                 .fracture
                 .vertices
@@ -248,8 +378,7 @@ fn run(
                 })
                 .collect();
             // A failed call of the JS callback does not stop the generation
-            let is_checkpoint_asked = callbacks
-                .on_progress
+            let is_checkpoint_asked = on_progress
                 .call4(
                     &JsValue::NULL,
                     &JsValue::from(update.accepted_count as f64),
