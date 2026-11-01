@@ -1,203 +1,70 @@
 # dfn-toolbox
 
-A static web app for dfngen (generation of a discrete fracture network),
-fehm (steady water flow in the network) and dfntrans (particle tracking in
-the flow): <https://ongchi.github.io/dfn-toolbox/>.
-This is a preliminary version.
+A static web app for discrete fracture networks:
+<https://ongchi.github.io/dfn-toolbox/>. This is a preliminary version.
 
-The project needs the repositories of the three libraries in sibling folders:
+It runs three libraries in the browser (WebAssembly), and there is no server:
 
-- `../dfngen-rs` ([ongchi/dfngen-rs](https://github.com/ongchi/dfngen-rs)):
-  `dfn-wasm` uses it as a Cargo git dependency (branch `master`), and the tests use its test
-  cases (`tests/data`), its binary and its scripts.
-- `../fehm-rs` ([ongchi/fehm-rs](https://github.com/ongchi/fehm-rs)):
-  `dfn-wasm` uses it as a Cargo git dependency (branch `master`), and the tests use its
-  binary.
-- `../dfntrans-rs` ([ongchi/dfntrans-rs](https://github.com/ongchi/dfntrans-rs)):
-  `dfn-wasm` uses it as a Cargo git dependency (branch `master`), and the tests use its
-  binary.
+- [dfngen-rs](https://github.com/ongchi/dfngen-rs): generation of the network
+  and its triangle mesh.
+- [fehm-rs](https://github.com/ongchi/fehm-rs): steady water flow in the network.
+- [dfntrans-rs](https://github.com/ongchi/dfntrans-rs): particle tracking in the flow.
 
-A local file `.cargo/config.toml` (not in git) can send these dependencies to
-the sibling folders with `[patch]`, to build the checked-out branches. Cargo
-then writes the local paths into `dfn-wasm/Cargo.lock`: do not commit
-`Cargo.lock` from such a build. After a library change, push the library, and
-update `Cargo.lock` with `cargo update` and no `[patch]`: the tests compare the
-WebAssembly module with the native binaries of the libraries.
+The 3D view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
 
-The generation, the flow and the transport run in the browser (WebAssembly), and the 3D
-view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
-There is no server: `npm run build` gives a folder of static files.
+## Use
 
-- Phone layout (up to 900 px wide): one view at a time. The step tabs stay at
-  the top: a tap changes the step and its run button, not the view. The bottom bar has
-  the switch Settings (the forms), 3D, Log, the ⚙ button and the run buttons. A
-  run from a form opens the 3D view. The controls of the 3D view are in a sheet
-  (⚙ button), one finger turns the model and two fingers zoom it, and a tap on a boundary
-  surface keeps its outline on until a second tap. On a low landscape screen
-  (up to 500 px high), the two panels stay side by side.
-- The input of the three tabs is one workflow file (see "Workflow file").
-  The four workflow examples of `examples/` run the full workflow; the
-  page opens `box_west_east` at the start. The app does not save the
-  workflow file or the output files, and it does not write the input files
-  of the `dfngen`, `fehm` and `dfntrans` binaries.
-- The input of `[network]` is in three tabs: Domain, User fractures and
-  DFN; "Generate" is on the DFN tab. The page opens on the Domain tab.
-  "Next" goes to the next tab (each tab but Transport); on the DFN tab it
-  needs the fracture mesh of a generation with a cluster which connects all
-  boundary surfaces, on the Flow tab a solved flow.
-  - Domain tab: two radio buttons. "Example" shows the example (a dropdown
-    of `examples/`) and its description; an example loads the full
-    workflow. "Predefined domain shape" shows the domain mesh: one of the
-    predefined meshes of `meshes/` (a dropdown) and its description; a new
-    shape replaces only the mesh. A switch of the radio buttons resets all the input: "Example"
-    loads the example of its dropdown again (the default example if none),
-    and "Predefined domain shape" gives the default values of all the forms
-    on the last shape (the first mesh at the start). In both modes, the
-    section "Boundary surfaces" has a role and a color chooser for each
-    boundary surface of the domain mesh (cell array `boundary__<name>`).
-    The role is in-flow, out-flow or no-flow (`[boundaries]` of the
-    workflow file): the network keeps only the clusters which connect an
-    in-flow and an out-flow surface, the flow has a pressure on each of
-    them, and the particles go from the in-flow to the out-flow surfaces.
-    A predefined shape starts with its first surface in-flow, its second
-    out-flow and the others no-flow; a new shape gives these roles again.
-    A change of a role removes the output. The pointer over the row of a
-    surface shows its outline in the 3D view (the boundary edges of its
-    cells, `vtkFeatureEdges`, as yellow tubes 15 pixels wide). The color is for the 3D view only: the workflow file does not
-    have the colors. A chosen color stays
-    with its surface name while the page is open.
-  - User fractures tab: each user-defined fracture is a card (region,
-    center, shape, aperture and orientation; see "User-defined fractures").
-  - DFN tab: a form with one field for each other key of `[network]`.
-    The boundary lines of the regions and the triangle mesh are always on
-    (the flow needs them), thus each family needs an aperture. The dfngen
-    input always has `keep_isolated_fractures = false` and
-    `keep_only_connected_to = [[in-flow surfaces], [out-flow surfaces]]`
-    (the particles need a path between them); the workflow file has no
-    keys for them, and the section "Clusters" tells it in a note. If no
-    cluster connects an in-flow and an out-flow surface, dfngen keeps all
-    clusters: the network shows, the status line gives a warning (amber),
-    and "Next" stays disabled.
-- Flow tab: a form with one field for each key of `[flow]`. The mesh is the
-  `dfn_mesh.vtu` of the last generation; the pressure boundaries are the
-  in-flow and out-flow surfaces of the Domain tab, each with the color of
-  its surface and a pressure; the pointer over a pressure field shows the
-  outline of its surface, as in the Domain tab. A surface with no point in the mesh (its
-  point array `boundary__<name>` has no value above 0; possible with two
-  or more in-flow or out-flow surfaces) is shown disabled and is not in the
-  fehm input. A surface which loses its role keeps its pressure while the
-  page is open. A new generation removes the flow output.
-- Transport tab: a form with one field for each key of `[transport]`,
-  except `inflow` and `outflow`: they are the in-flow and out-flow surfaces
-  of the Domain tab, without the surfaces with no point in the mesh. It
-  uses the flow of the last "Solve flow": dfntrans solves the flow input of
-  that run again. A new flow removes the transport output. The form has no
-  output section: dfntrans always writes the trajectories and the
-  velocities (`trajectories = true`, `velocities = true`), and only the
-  particles which exit (`all_particles = false`).
-  `trajectories.vtp` has a point for each time step: with many particles
-  it is very large (about 1 MB for each particle in the examples), thus the
-  default seeding has few particles (method "uniform per in-flow line",
-  3 per line; 50 for the methods with a particle count), and the help of
-  the particle fields tells the size. The app does not keep that file: only
-  the 3D view uses the paths, thus `run_transport` (`TrajectoryDetail.View`)
-  reduces each path to the points which the view needs (Douglas-Peucker,
-  tolerance 0.0003 × the diagonal of the bounds of the paths) before it writes
-  the file; `TrajectoryDetail.Full`, for the tests, writes all points. After
-  the transport the page replaces the worker, which gives back its memory (a
-  WebAssembly memory never shrinks).
-- "Generate", "Solve flow" and "Track particles" run in a Web Worker;
-  "Cancel" stops them. An error of the library shows in the status line,
-  as a text of the app with the words of the forms (`app/src/errors.ts`:
-  one text for each kind of error; a kind which the user cannot cause,
-  such as the format of a file, is "Internal error" with the text of the
-  library).
-- The DFN tab has two steps. "Generate" makes the fractures
-  (`MeshStep.Skip`), and the layer "Mesh" shows their polygons
-  (`fractures.vtp`). "Meshing" makes the triangle mesh, and "Next" needs it.
-  `mesh_generation` keeps no state in the worker: it makes the network again
-  from the last checkpoint (`RestartMode.Finish`; from the seed when there is
-  no checkpoint: only user-defined fractures), thus a cancel keeps the
-  network, and "Meshing" can run again. It gives all output files again,
-  because the mesh can remove fractures. The mesh values and the apertures
-  come from the forms at the click, thus a new mesh needs no new generation.
-  The other values come from the last "Generate": a change of them has no
-  effect until the next "Generate" (user decision). Another number of
-  families is an error. "Meshing" is disabled when no cluster connects an
-  in-flow and an out-flow surface.
-- During "Generate", the 3D view shows each accepted stochastic fracture
-  (one color for each family). The worker sends them with the progress
-  (at most each 50 ms), and the view is drawn again at most each 200 ms.
-  The start of a run removes the old network. At the end, the final
-  layers replace these fractures (the cluster analysis can remove some
-  of them); after an error or a cancel, the view has none of them.
-- Checkpoints of the generation: the worker asks for a checkpoint
-  (`on_progress` returns `true`; `run_generation` and `resume_generation`
-  give its bytes to `on_checkpoint`) each 5 s and after the last accepted
-  fracture, and it sends the fractures until the checkpoint before it. The
-  page keeps the last checkpoint in memory only (user decision; a reload
-  loses it). "Stop and keep the fractures" (enabled after the first
-  checkpoint) stops the worker, then makes the network of the checkpoint
-  (`RestartMode.Finish`: clusters, output); the fractures after the
-  checkpoint are lost. After such a network, a cancel or a stop,
-  "Continue" restarts from the checkpoint (`RestartMode.Continue`): the
-  network is that of a run with no stop. The view shows the fractures until
-  the checkpoint again. A restart with another input gives an error (the
-  checkpoint has a hash of the input texts).
-- Output: the 3D view of the triangle mesh `dfn_mesh.vtu` of the final
-  fractures (layer "Mesh", with its edges; color by a cell array, or by
-  the point pressure of the flow: "Pressure", selected when the flow is
-  done; "Flow velocity": the magnitude of the `darcy_velocity` of each
-  triangle of `pressure.vtu`, m/s; "Transport velocity", with the output
-  `velocities` of the transport: the mean speed of the sectors of each
-  point in `velocities.vtp`, in m/s; a new generation removes the flow and
-  transport options, a new flow the transport option, and a removed
-  selected option gives `fracture_id`), `fractures_removed.vtp`, `fractures_rejected.vtp`, the domain mesh
-  (layer "Domain", a wireframe, and each boundary surface in its color
-  with an opacity of 0.5), the polygons of the user-defined
-  fractures of the form (layer "User fractures", blue; updated at each
-  change of the form, also before "Generate"), the particle paths (layer "Trajectories": tubes, with cones in the direction
-  of the velocity at every n-th point, about 20 for each path and at most
-  500), the x, y, z axes in the top-left corner (they turn with the camera;
-  always shown); the mass flow of each boundary; the particle counts and the volume
-  fluxes of the transport.
+The tabs follow the steps of the workflow. "Next" goes to the next tab. All
+input is in the page: the app does not save the input or the output.
 
-The output is that of the `dfngen` binary for the same input and seed, also
-the triangle mesh. The `dfngen` and `dfntrans` binaries define the C math
-functions with the `libm` crate (`src/libm_symbols.rs`), which WebAssembly also
-uses: the math functions of the platforms round differently, and such a
-difference can change a FRAM decision and thus the network. A Rust test that
-calls a library natively still uses the math functions of the platform.
-The flow on the same mesh is that of the `fehm` binary (within 1e-9). The
-transport on the same mesh has the particle paths of the `dfntrans` binary
-(the same time steps and fractures); the times add up the small differences
-of the flow over thousands of time steps.
+- **Domain**: select an example, or a predefined domain shape. Give each
+  boundary surface a role (in-flow, out-flow or no-flow) and a color for the 3D view.
+- **User fractures**: add fractures, each with a region, center, shape,
+  aperture and orientation.
+- **DFN**: set the fracture families. "Generate" makes the fractures, and
+  "Meshing" makes their triangle mesh. A generation can stop and keep its
+  fractures, then continue later. The network keeps only the clusters which
+  connect an in-flow and an out-flow surface. If there is no such cluster, a
+  warning shows, and you cannot go to the next step.
+- **Flow**: set the temperature, the gravity and a pressure for each in-flow
+  and out-flow surface, then "Solve flow".
+- **Transport**: set the seeding and the routing of the particles, then
+  "Track particles".
+
+The 3D view shows the fractures during a generation. Color the mesh by a
+property, the pressure or a velocity, and show or hide the layers: mesh, domain,
+user fractures, removed and rejected fractures, and particle paths.
+
+On a phone, the app shows one view at a time. One finger turns the model, two
+fingers zoom it, and a tap on a boundary surface shows its outline.
+
+For the same input and seed, the network and the mesh are those of the `dfngen`
+binary. The flow agrees with the `fehm` binary within 1e-9. The particles of
+the `dfntrans` binary have the same paths, and their times differ a little.
 
 ## Workflow file
 
-One TOML file with four sections. The comment at the top is the
-description of the input. The app makes the input files of the libraries
-from it: `[boundaries]` and `[network]` → the dfngen input with
-`[region_boundaries]` and `[mesh]` on, `[flow]` → the fehm input on
-`dfn_mesh.vtu`, `[transport]` → the dfntrans input on that flow.
+Each example is one TOML file with four sections. The comment at the top is
+the description of the input. The app makes the input of each library from it.
+An unknown key or a missing key is an error.
 
 ```toml
 # Description of the input.
 
-[boundaries]                       # the roles of the boundary surfaces of the domain mesh (Domain tab)
-inflow = ["west"]                  # dfngen keep_only_connected_to, fehm [[boundary]], dfntrans inflow
+[boundaries]                       # the roles of the boundary surfaces of the domain mesh
+inflow = ["west"]
 outflow = ["east"]                 # a surface in no list is a no-flow surface
 
-[network]                          # the dfngen input (see "Input file" in ../dfngen-rs/README.md)
+[network]                          # the dfngen-rs input (see below)
 seed = 12345
 min_feature_size = 0.4
-domain = "Box.vtu"                 # the name of a predefined mesh (`meshes/`); no `user_fractures`
+domain = "Box.vtu"                 # the name of a predefined mesh; no `user_fractures`
 [network.generation]               # as [generation]
 [network.fram]                     # as [fram]; optional
-[network.mesh]                     # optional; no [network.region_boundaries]: the boundary lines are always on
-max_size_factor = 5.0              # no `enable`: always on
+[network.mesh]                     # optional; no `enable` and no [network.region_boundaries]: always on
+max_size_factor = 5.0
 slope = 0.5
-[network.clusters]                 # as [clusters]; only keep_only_largest (no keep_isolated_fractures, no keep_only_connected_to)
+[network.clusters]                 # only keep_only_largest
 [[network.family]]                 # as [[family]]; `aperture` is necessary
 [[network.user_fracture]]          # optional; one table for each user-defined fracture, all keys necessary
 region = "box"                     # one region of the mesh
@@ -206,15 +73,15 @@ number_of_points = 4               # as a family: 3 or more, 4 = rectangle
 radius = 7.78                      # m; of the circle of the points
 aspect_ratio = 0.545               # y radius / x radius
 beta = 0.0                         # degrees; rotation in the plane of the fracture
-aperture = 3e-4                    # m; above 0; the cell array `aperture` of the dfngen fracture file
+aperture = 3e-4                    # m; above 0
 orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without kappa
 
-[flow]                             # the fehm input (see "Input file" in ../fehm-rs/README.md), without `mesh`
+[flow]                             # the fehm-rs input (see below), without `mesh`
 temperature = 20.0
 gravity = false
 pressure = { west = 10.1, east = 10.0 }   # MPa; each in-flow and out-flow surface, in place of [[boundary]]; no [solver]
 
-[transport]                        # the dfntrans input (see "Input file" in ../dfntrans-rs/README.md), without `flow`
+[transport]                        # the dfntrans-rs input (see below), without `flow`
 seed = 12345
 time_unit = "days"
 porosity = 1.0
@@ -223,82 +90,49 @@ routing = "complete_mixing"        # no inflow, no outflow: [boundaries] gives t
 [transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
 ```
 
-The reader is strict: an unknown key and a missing key are errors, so the
-forms never lose a value. `pressure` of `[flow]` must have each in-flow
-and out-flow surface of `[boundaries]` and no other name, and a surface
-cannot be in `inflow` and `outflow`. A name of `[boundaries]` which is not
-a boundary surface of the domain mesh is checked only by "Generate".
+The keys are those of the input files of
+[dfngen-rs](https://github.com/ongchi/dfngen-rs#input-file),
+[fehm-rs](https://github.com/ongchi/fehm-rs#input-file) and
+[dfntrans-rs](https://github.com/ongchi/dfntrans-rs#input-file).
 
-### User-defined fractures
-
-dfngen-rs reads user-defined fractures only as polygons (a `.vtp` file).
-dfn-toolbox makes the polygon of each `[[network.user_fracture]]` in the same
-way as dfngen-rs makes a stochastic fracture (`app/src/userFractures.ts`):
-a regular polygon of `number_of_points` on the circle of `radius`, y scaled
-by `aspect_ratio`, turned by `beta` in its plane, rotated from the normal
-+z to the normal of `orientation`, and moved to `center`. The polygon file
-`user_fractures.vtp` of the dfngen input has the cell array `aperture` (the
-`aperture` of each fracture) and a cell array
-`region__<name>` for each region of the mesh, with 1 for the region of the
-fracture. The form limits the center to the bounding box of the cells of
-the region; a center in that box but outside the cells (possible in a
-region which is not a box) is not checked.
+A user-defined fracture is a regular polygon, made in the same way as a
+stochastic fracture of dfngen-rs.
 
 ## Examples
 
-`examples/` has one folder for each example, with its workflow file
-`<name>.toml` (written by hand). Its domain mesh is a predefined mesh of
-`meshes/` (`Box.vtu`, `L-shape.vtu`; ASCII files written by hand); a new
-`.vtu` file there is a new item of the dropdown, with its file name
-without `.vtu` ("Box", "L-shape"). The comment `<!-- Description: ... -->`
-at the top of a mesh file is its description on the Domain tab (in the
-words of the forms; the other comment is for the developer). The in-flow and out-flow boundaries are
-boundary surfaces of the domain mesh: surface cells (quads) with the cell
-data arrays `boundary__<name>` (see "Domain mesh" in
-../dfngen-rs/README.md). Where a fracture crosses such a face, its boundary
-line gets the name, thus it is a boundary of the flow. `Box.vtu` has the
-region `box` (its hexahedron) for the user-defined fracture of
-`user_fractures_stochastic`; `L-shape.vtu` has the regions `west_box`,
-`east_box` and `other_boxes`, and only the families of
-`l_shape_north_east` have a `region`.
-
 | Example | Content |
 |---|---|
-| `box_west_east` | A cube of 10 m (`Box.vtu`: one hexahedron and its 6 faces as quads, each a boundary surface: west at x = 0, east at x = 10, south, north, bottom and top). One family; flow and particles from west to east (the other surfaces no-flow). |
-| `two_families` | The same cube, a family perpendicular and a family parallel to the flow, with a correlated aperture. |
-| `l_shape_north_east` | An L-shaped domain of 4 boxes (`L-shape.vtu`: the west, middle and east boxes along x, and the north box at +y of the west box) with the regions `west_box`, `east_box` and `other_boxes` (the middle and the north box); each plane of the outer faces is one boundary surface (16 quads): north (the end face of the north box), east (the end face of the east box), west, south, inner_east and inner_north (the two faces of the inner corner), bottom and top. One family in each region (the region gives only the fracture centers, thus the fractures connect the regions); flow with gravity and particles from north to east. |
-| `user_fractures_stochastic` | The same cube, a large user-defined fracture in the region `box` (a rectangle in the plane y = 5) from west to east with a larger aperture, and a stochastic family. |
+| `box_west_east` | A cube of 10 m with one family. Flow and particles go from west to east. |
+| `two_families` | The same cube, with a family perpendicular and a family parallel to the flow, and a correlated aperture. |
+| `l_shape_north_east` | An L-shaped domain of 4 boxes, with one family in each of 3 regions. Flow with gravity and particles go from north to east. |
+| `user_fractures_stochastic` | The same cube, with a large user-defined fracture from west to east and a stochastic family. |
 
-The seeds of the examples give a network which connects the in-flow and
-the out-flow boundaries. Many other seeds do not: then no fracture reaches
-a boundary, or a part of the network has no connection to a boundary (the
-mesh cuts each fracture at the mesh surface, thus two fractures can lose an
-intersection outside the mesh), and "Solve flow" reports it.
+The domain meshes are in `meshes/`. Each has boundary surfaces: surface cells
+with the cell data arrays `boundary__<name>` (see
+[Domain mesh](https://github.com/ongchi/dfngen-rs#domain-mesh)).
+
+The seeds of the examples give a network which connects the in-flow and the
+out-flow boundaries. Many other seeds do not, and then "Solve flow" reports it.
 
 ## Folders
 
 | Folder | Content |
 |---|---|
-| `dfn-wasm` | Rust crate: `wasm-bindgen` functions of the libraries: `generation.rs` (`input_file_names`, `check_input`, `run_generation`), `flow.rs` (`check_flow_input`, `run_flow`) and `transport.rs` (`check_transport_input`, `run_transport`). `errors.rs`: `ErrorReport`, the kind (`<library>.<variant>`), the values and the text of each library error. Not a member of a workspace. |
-| `examples` | The workflow examples (see "Examples"); `build-wasm.sh` copies them into `app/public/examples`. |
-| `meshes` | The predefined domain meshes (see "Examples"); `build-wasm.sh` copies them into `app/public/meshes`, with `index.json`. |
-| `app` | Vite + TypeScript front end. |
-| `app/src/workflow.ts` | The workflow file: reading (strict) and writing of the three sections. |
-| `app/src/form` | The network form. `state.ts` has the form state, `toml.ts` the conversion between `[network]` and the state, the dfngen input, and the TOML helpers; one file for each section. |
-| `app/src/userFractures.ts` | The polygon file of the user-defined fractures (see "User-defined fractures"). |
-| `app/src/flow` | The flow form (`state.ts`, `toml.ts`: `[flow]` and the fehm input, `form.ts`), and `polyData.ts`: the pressure and the flow velocity of `pressure.vtu` in the data of `dfn_mesh.vtu`, and a triangle mesh as PolyData for the view. |
-| `app/src/transport` | The transport form (`state.ts`, `toml.ts`: `[transport]` and the dfntrans input, `form.ts`), `trajectories.ts`: `velocity` as the active vectors of `trajectories.vtp`, for the cones of the view, and `velocities.ts`: the speed at each mesh point from `velocities.vtp`. |
-| `app/src/viewer.ts` | The 3D view (VTK.wasm). |
-| `app/src/errors.ts` | The text for the user of each kind of library error. |
-| `app/src/worker.ts`, `app/src/generationClient.ts` | The Web Worker of the generation, the flow and the transport, and its interface for the page. |
-| `app/tests` | `vitest` tests (Node). |
-| `app/scripts/e2e.mjs` | End-to-end check in the local Chrome. |
+| `app` | Vite + TypeScript front end, and its tests. |
+| `dfn-wasm` | Rust crate: the `wasm-bindgen` functions of the libraries. |
+| `examples` | The workflow examples. |
+| `meshes` | The predefined domain meshes. |
 
 ## Build
 
+Clone [dfngen-rs](https://github.com/ongchi/dfngen-rs),
+[fehm-rs](https://github.com/ongchi/fehm-rs) and
+[dfntrans-rs](https://github.com/ongchi/dfntrans-rs) in folders next to this
+repository. `dfn-wasm` uses them as Cargo git dependencies (branch `master`),
+and the tests use their binaries, test data and scripts.
+
 Necessary: Node, the Rust target `wasm32-unknown-unknown`, and
-`wasm-bindgen-cli` with the version of `wasm-bindgen` in
-`dfn-wasm/Cargo.toml`:
+`wasm-bindgen-cli` with the version of `wasm-bindgen` in `dfn-wasm/Cargo.toml`:
 
 ```bash
 rustup target add wasm32-unknown-unknown
@@ -309,127 +143,41 @@ Then, in `app`:
 
 ```bash
 npm ci
-npm run setup     # VTK.wasm bundle and its types (fetch-vtk.sh), WebAssembly module and examples (build-wasm.sh)
+npm run setup     # VTK.wasm bundle and its types, WebAssembly module and examples
 npm run dev       # development server
 npm run build     # static files in dist/
 ```
 
 After a change of a library or of `dfn-wasm`: `npm run wasm`.
 
-`fetch-vtk.sh` downloads a fixed weekly build of VTK.wasm (13 MB, with a
-SHA-256 check) into `public/vtk`. The app loads it from there, not from a
-CDN. To use another build, change `VERSION` and `SHA256` in the script; the
-TypeScript types are generated from the bundle.
+To build the checked-out library branches, a local `.cargo/config.toml` (not in
+git) can send the dependencies to those folders with `[patch]`. Do not commit
+`dfn-wasm/Cargo.lock` from such a build: it has local paths. After a library
+change, push the library, and run `cargo update` with no `[patch]`.
 
 ## Publication
 
-`.github/workflows/pages.yml` publishes the site on GitHub Pages at each
-push to `master` (or when it is started by hand). It checks out
-`dfngen-rs`, `fehm-rs` and `dfntrans-rs` (branch `master`) next to
-`web` and runs
-`build-site.sh <base path>`: install, VTK.wasm, WebAssembly module, native
-binaries, `npm test`, and `npm run build`. A failed test stops the
-workflow before the deploy. The same script makes the site locally
-(`npm ci` replaces `app/node_modules`):
+`.github/workflows/pages.yml` publishes the site on GitHub Pages at each push
+to `master`, or when it is started by hand. A failed test stops the deploy.
+The Pages source of the repository must be "GitHub Actions". The same script
+makes the site locally (`npm ci` replaces `app/node_modules`):
 
 ```bash
 ./build-site.sh /dfn-toolbox/   # the site in app/dist, for the path /dfn-toolbox/
 ```
 
-The Pages source of the repository must be "GitHub Actions".
-
 ## Tests
 
+Build the binaries first: the tests compare the WebAssembly module with them.
+
 ```bash
-cargo build --release   # in ../dfngen-rs, ../fehm-rs and ../dfntrans-rs: the tests compare with the binaries
+cargo build --release   # in each of dfngen-rs, fehm-rs and dfntrans-rs
 npm test                # in app
 npm run dev & npm run e2e -- http://localhost:5173/
 ```
 
-- `tests/wasm.test.ts`: each case of `tests/data` gives, in WebAssembly, the
-  output files of the binary (decimal numbers within 1e-9, with
-  `scripts/compare_output.py`), except `dfn_mesh.vtu`: it must be a
-  triangle mesh with the arrays of the mesh of the binary; errors and
-  progress; a restart from the checkpoint after 40 fractures gives the
-  files of a run with no stop (`base`, `mesh`: both in WebAssembly, thus
-  also the same mesh), `RestartMode.Finish` keeps 40 fractures, and another
-  input gives `dfngen.CheckpointInputChanged`.
-- `tests/generationClient.test.ts`: `firstFractures` (the fractures until a
-  checkpoint, from the batches of the progress).
-- `tests/examples.test.ts`: each example, workflow file → forms → workflow
-  file, gives the same state, and in WebAssembly runs the full workflow: the
-  mesh has a point on each in-flow and out-flow surface, the in-flow is
-  equal to the out-flow, and particles exit.
-- `tests/form.test.ts`: the dfngen input of each example is valid and gives
-  the output files of the binary, except `dfn_mesh.vtu` and
-  `rejections.dat` (a rounding difference changes the reason of some FRAM
-  rejections; the final network is the same); the errors of the reader of
-  the workflow file (an unknown key, a missing key or section, `enable` in
-  `[network.mesh]`, a family without aperture, a user fracture without
-  region or with a bad center, a surface in `inflow` and `outflow`, a
-  pressure of a surface with no role or a missing one, and others); the
-  dfngen cluster key from `[boundaries]`.
-- `tests/userFractures.test.ts`: the polygons of the user-defined fractures
-  against the steps of dfngen-rs (the rectangle of `Poly::new`, `beta`, the
-  normals of the three conventions, the half turn for the normal -z), the
-  region arrays, and the region boxes of the predefined meshes.
-- `tests/flow.test.ts`: on the mesh of the example `l_shape_north_east`
-  (generated in WebAssembly), the surfaces with a point in the mesh, the
-  pressures of the workflow file (only the in-flow and out-flow surfaces),
-  the fehm input of the flow form is a valid
-  input, the output files agree with the `fehm` binary (within 1e-9), the
-  in-flow is equal to the out-flow, and a boundary array with no point and
-  no boundary are errors.
-- `tests/transport.test.ts`: on the flow of that example (from north to
-  east), the dfntrans input of the transport form is a valid input with
-  the in-flow and out-flow surfaces of the roles (not in the workflow file),
-  the output files agree with the `dfntrans` binary (the integers exactly,
-  the decimal numbers within 1e-5), some particles exit, and no in-flow
-  boundary and an unknown boundary are errors.
-- `scripts/e2e.mjs`: in Chrome (headless), the default example and tab,
-  the color choosers, the roles and the outline on hover of the boundary surfaces, the "Next" button, the full workflow of each example (the
-  boundaries of the Flow tab are the in-flow and out-flow surfaces, with their colors and the outline on hover; the Transport tab has no
-  boundaries), the flow again
-  after the transport and the generation again after the flow (no error of a removed "Color by" array), the flow without a
-  mesh, the transport without a flow, the choice of a predefined mesh and its description, the
-  limits of the center of a new user-defined fracture, a bad input, a
-  network with no cluster which connects the in-flow and out-flow surfaces (Box, default forms, seed
-  1837757520: the network, an amber warning and "Next" disabled), the default roles of a shape, no
-  out-flow surface (the output is removed; "Generate" asks for one), the
-  fractures in the view during a large run (the view changes after 10 more
-  fractures), the cancel, and "Stop and keep the fractures" then "Continue"
-  (Box, 80 fractures: the final count of a run with no stop); it saves
-  screenshots.
-
-## VTK.wasm notes
-
-- The published site loads the bundle from jsDelivr (`app/src/vtkBundle.ts`):
-  a commit of the `dist` branch of `Kitware/vtk-wasm`, and the page checks
-  its SHA-256. If the CDN fails, it loads the copy in the site. The
-  development server uses the copy. To update VTK, change the version and
-  the SHA-256 in `fetch-vtk.sh`, and the commit and the SHA-256 in
-  `vtkBundle.ts`. The `dist` branch has only the last weekly build, and
-  jsDelivr does not serve files above 20 MB (the release bundles). Check with
-  `npm run build`, `npm run preview` and `node scripts/e2e-bundle.mjs`.
-- The bundle has no `vtkDataSetMapper` and no geometry filter: the domain
-  mesh is shown as its cell edges (`vtkExtractEdges`), each boundary
-  surface as PolyData text of its surface cells (`app/src/boundarySurfaces.ts`), and `dfn_mesh.vtu`
-  (only triangles; with the pressure after the flow) is changed into
-  PolyData text before it is read.
-- The XML readers read from a string (`readFromInputStringOn`,
-  `setInputString`), thus the app has no VTK file parser.
-- Change VTK objects with their setter methods. An assignment to a property
-  (`mapper.scalarVisibility = 1`) can set other properties back: it gave the
-  mapper its old lookup table.
-- Add 2D actors (scalar bar) with `addViewProp`.
-- The renderer has `setUseOIT(false)`: the default pass of the translucent
-  shapes needs float color buffers in WebGL, and devices without them (iOS)
-  do not show the shapes. Thus the colors of overlapping translucent shapes
-  depend on the drawing order.
-- The fractures of a running generation are a `vtkPolyData` which grows
-  (`insertNextPoint`, then `insertNextCell` with a `vtkIdList`).
-  `insertCellPoint` with `updateCellCount` gives no cell: the bundle has
-  no `insertNextCell(npts)`.
+`npm test` runs the `vitest` tests of `app/tests`. `npm run e2e` runs
+`app/scripts/e2e.mjs` in the local Chrome (headless) and saves screenshots.
 
 ## License
 
