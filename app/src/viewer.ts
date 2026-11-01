@@ -23,8 +23,7 @@ import {
   type vtkXMLPolyDataReader,
 } from "@kitware/vtk-wasm";
 import type { FractureBatch } from "./generationClient";
-
-const VTK_BUNDLE_URL = `${import.meta.env.BASE_URL}vtk/vtk-wasm32-emscripten.tar.gz`;
+import { vtkBundleUrl } from "./vtkBundle";
 
 // VTK_GET_ARRAY_BY_NAME of vtkMapper
 const ARRAY_ACCESS_BY_NAME = 1;
@@ -212,7 +211,9 @@ export class NetworkViewer {
   }
 
   static async create(canvas: HTMLCanvasElement): Promise<NetworkViewer> {
-    const runtime = await loadAsync({ url: VTK_BUNDLE_URL, rendering: "webgl" });
+    const bundleUrl = await vtkBundleUrl();
+    const runtime = await loadAsync({ url: bundleUrl, rendering: "webgl" });
+    URL.revokeObjectURL(bundleUrl);
     const session = runtime.createStandaloneSession();
     const vtk = session.vtk;
 

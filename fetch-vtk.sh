@@ -4,8 +4,8 @@
 # type manifests which `vtk-wasm gen-types` needs).
 set -euo pipefail
 
-VERSION="9.7.20260927"
-SHA256="63252b799e8c44dfb149f329c94f9f6715c78b654292f18cce067c9d080a2e92"
+VERSION="9.7.20261025"
+SHA256="9fea066b3887f25b4bc82b0d19601511b8f5ddd752b8a033aa574454ccd78f3b"
 URL="https://gitlab.kitware.com/api/v4/projects/13/packages/generic/vtk-wasm32-emscripten/${VERSION}/vtk-${VERSION}-wasm32-emscripten.tar.gz"
 
 app_dir="$(cd "$(dirname "$0")/app" && pwd)"

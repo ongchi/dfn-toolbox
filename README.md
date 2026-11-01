@@ -403,6 +403,14 @@ npm run dev & npm run e2e -- http://localhost:5173/
 
 ## VTK.wasm notes
 
+- The published site loads the bundle from jsDelivr (`app/src/vtkBundle.ts`):
+  a commit of the `dist` branch of `Kitware/vtk-wasm`, and the page checks
+  its SHA-256. If the CDN fails, it loads the copy in the site. The
+  development server uses the copy. To update VTK, change the version and
+  the SHA-256 in `fetch-vtk.sh`, and the commit and the SHA-256 in
+  `vtkBundle.ts`. The `dist` branch has only the last weekly build, and
+  jsDelivr does not serve files above 20 MB (the release bundles). Check with
+  `npm run build`, `npm run preview` and `node scripts/e2e-bundle.mjs`.
 - The bundle has no `vtkDataSetMapper` and no geometry filter: the domain
   mesh is shown as its cell edges (`vtkExtractEdges`), each boundary
   surface as PolyData text of its surface cells (`app/src/boundarySurfaces.ts`), and `dfn_mesh.vtu`
