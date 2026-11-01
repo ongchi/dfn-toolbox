@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>dfn-toolbox</title>
     <link rel="icon" href="data:," />
   </head>
@@ -11,15 +11,16 @@
       <h1>dfn-toolbox <span class="subtitle">Discrete fracture network: generation, flow and transport</span></h1>
     </header>
 
-    <main class="layout">
+    <main id="layout" class="layout" data-phone-view="form">
+      <div class="tabs sidebar-tabs" role="tablist">
+        <button class="tab is-active" type="button" data-sidebar-tab="domain">Domain</button>
+        <button class="tab" type="button" data-sidebar-tab="fractures"><span class="label-long">User fractures</span><span class="label-short">Fractures</span></button>
+        <button class="tab" type="button" data-sidebar-tab="network">DFN</button>
+        <button class="tab" type="button" data-sidebar-tab="flow">Flow</button>
+        <button class="tab" type="button" data-sidebar-tab="transport">Transport</button>
+      </div>
+
       <aside class="sidebar">
-        <div class="tabs sidebar-tabs" role="tablist">
-          <button class="tab is-active" type="button" data-sidebar-tab="domain">Domain</button>
-          <button class="tab" type="button" data-sidebar-tab="fractures">User fractures</button>
-          <button class="tab" type="button" data-sidebar-tab="network">DFN</button>
-          <button class="tab" type="button" data-sidebar-tab="flow">Flow</button>
-          <button class="tab" type="button" data-sidebar-tab="transport">Transport</button>
-        </div>
         <fieldset id="domain-source" class="domain-source">
           <label><input type="radio" name="domain-source" value="example" checked /> Example</label>
           <label><input type="radio" name="domain-source" value="shape" /> Predefined domain shape</label>
@@ -38,54 +39,67 @@
         <div id="form" class="form" hidden></div>
         <div id="flow-form" class="form" hidden></div>
         <div id="transport-form" class="form" hidden></div>
-        <div class="run-panel">
-          <div class="run-buttons">
-            <button id="run-button" class="button button-primary" type="button">Generate</button>
-            <button id="continue-button" class="button" type="button" hidden>Continue</button>
-            <button id="stop-button" class="button" type="button" hidden>Stop and keep the fractures</button>
-            <button id="cancel-button" class="button" type="button" hidden>Cancel</button>
-            <button id="meshing-button" class="button" type="button" hidden>Meshing</button>
-            <button id="next-button" class="button" type="button">Next</button>
-          </div>
-          <progress id="progress" max="1" value="0" hidden></progress>
-          <pre id="status" class="status" hidden></pre>
-        </div>
       </aside>
 
+      <div class="run-panel">
+        <div class="phone-switch" role="tablist">
+          <button class="button is-active" type="button" data-phone-view="form">Settings</button>
+          <button class="button" type="button" data-phone-view="view">3D</button>
+          <button class="button" type="button" data-phone-view="log">Log</button>
+          <button id="toolbar-toggle" class="button viewer-settings" type="button" aria-label="View settings" aria-expanded="false">⚙</button>
+        </div>
+        <div class="run-buttons">
+          <button id="run-button" class="button button-primary" type="button">Generate</button>
+          <button id="continue-button" class="button" type="button" hidden>Continue</button>
+          <button id="stop-button" class="button" type="button" hidden><span class="label-long">Stop and keep the fractures</span><span class="label-short">Stop</span></button>
+          <button id="cancel-button" class="button" type="button" hidden>Cancel</button>
+          <button id="meshing-button" class="button" type="button" hidden>Meshing</button>
+          <button id="next-button" class="button" type="button">Next</button>
+        </div>
+        <progress id="progress" max="1" value="0" hidden></progress>
+        <pre id="status" class="status" hidden></pre>
+      </div>
+
       <section class="workspace">
-        <div class="viewer">
-          <div class="viewer-toolbar">
-            <label class="toolbar-field">
-              Color by
-              <select id="color-select" disabled>
-                <option value="">One color</option>
-              </select>
-            </label>
-            <label class="toolbar-check"><input id="show-domain" type="checkbox" checked /> Domain</label>
-            <label class="toolbar-check"><input id="show-mesh" type="checkbox" checked /> Mesh</label>
-            <label class="toolbar-check"><input id="show-user-fractures" type="checkbox" checked /> User fractures</label>
-            <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
-            <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
-            <label class="toolbar-check"><input id="show-trajectories" type="checkbox" disabled /> Trajectories</label>
-            <button id="reset-camera" class="button-small" type="button">Reset view</button>
-          </div>
-          <div class="viewer-canvas">
-            <canvas id="viewer-canvas"></canvas>
-            <div id="viewer-message" class="viewer-message">Loading the 3D viewer…</div>
-            <div id="results-bezel" class="results-bezel" hidden>
-              <details id="results" class="results-section" open hidden>
-                <summary>Fractures</summary>
-                <dl id="results-stats" class="stats"></dl>
-              </details>
-              <details id="flow-results" class="results-section" open hidden>
-                <summary>Flow</summary>
-                <dl id="flow-stats" class="stats"></dl>
-              </details>
-              <details id="transport-results" class="results-section" open hidden>
-                <summary>Transport</summary>
-                <dl id="transport-stats" class="stats"></dl>
-              </details>
+        <div class="tabs workspace-tabs" role="tablist">
+          <button class="tab is-active" type="button" data-workspace-tab="view">3D view</button>
+          <button class="tab" type="button" data-workspace-tab="log">Log</button>
+        </div>
+        <div class="workspace-views">
+          <div id="viewer" class="viewer">
+            <div id="viewer-toolbar" class="viewer-toolbar">
+              <label class="toolbar-field">
+                Color by
+                <select id="color-select" disabled>
+                  <option value="">One color</option>
+                </select>
+              </label>
+              <label class="toolbar-check"><input id="show-domain" type="checkbox" checked /> Domain</label>
+              <label class="toolbar-check"><input id="show-mesh" type="checkbox" checked /> Mesh</label>
+              <label class="toolbar-check"><input id="show-user-fractures" type="checkbox" checked /> User fractures</label>
+              <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
+              <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
+              <label class="toolbar-check"><input id="show-trajectories" type="checkbox" disabled /> Trajectories</label>
+              <button id="reset-camera" class="button-small" type="button">Reset view</button>
             </div>
+            <div class="viewer-canvas">
+              <canvas id="viewer-canvas"></canvas>
+              <div id="viewer-message" class="viewer-message">Loading the 3D viewer…</div>            </div>
+          </div>
+          <div id="log-view" class="log-view" hidden>
+            <p id="log-empty" class="form-note">No results yet.</p>
+            <details id="results" class="results-section" open hidden>
+              <summary>Fractures</summary>
+              <dl id="results-stats" class="stats"></dl>
+            </details>
+            <details id="flow-results" class="results-section" open hidden>
+              <summary>Flow</summary>
+              <dl id="flow-stats" class="stats"></dl>
+            </details>
+            <details id="transport-results" class="results-section" open hidden>
+              <summary>Transport</summary>
+              <dl id="transport-stats" class="stats"></dl>
+            </details>
           </div>
         </div>
       </section>

@@ -28,6 +28,13 @@ The generation, the flow and the transport run in the browser (WebAssembly), and
 view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
 There is no server: `npm run build` gives a folder of static files.
 
+- Phone layout (up to 900 px wide): one view at a time. The step tabs stay at
+  the top: a tap changes the step and its run button, not the view. The bottom bar has
+  the switch Settings (the forms), 3D, Log, the ⚙ button and the run buttons. A
+  run from a form opens the 3D view. The controls of the 3D view are in a sheet
+  (⚙ button), one finger turns the model and two fingers zoom it, and a tap on a boundary
+  surface keeps its outline on until a second tap. On a low landscape screen
+  (up to 500 px high), the two panels stay side by side.
 - The input of the three tabs is one workflow file (see "Workflow file").
   The four workflow examples of `examples/` run the full workflow; the
   page opens `box_west_east` at the start. The app does not save the

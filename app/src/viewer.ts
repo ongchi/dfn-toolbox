@@ -55,8 +55,13 @@ const BOUNDARY_OUTLINE_WIDTH = 15;
 /** Yellow: one color for the outline of each surface, which stands out from the surface colors */
 const BOUNDARY_OUTLINE_COLOR = [1.0, 0.85, 0.0] as const;
 // The x, y, z axes in the top-left corner (fractions of the view: x min, y min, x max, y max);
-// the results bezel is at the bottom-left, the scalar bar at the right
+// the scalar bar is at the right
 const AXES_VIEWPORT = [0, 0.8, 0.2, 1] as const;
+// vtkScalarBarActor: its default position (fractions of the view)
+const DEFAULT_SCALAR_BAR_LEFT = 0.82;
+const DEFAULT_SCALAR_BAR_BOTTOM = 0.1;
+/** The CSS pixels at the right of the left edge of the scalar bar, for its title and labels */
+const SCALAR_BAR_MINIMUM_ROOM = 100;
 // The fractures of a running generation: one color for each family (family
 // 1 has the first one; more families use the colors again). Not red: the
 // rejected fractures are red.
@@ -175,6 +180,35 @@ export class NetworkViewer {
     this.scalarBar.getTitleTextProperty().setBold(1);
     this.scalarBar.setVisibility(0);
     this.renderer.addViewProp(this.scalarBar);
+    this.bindPinchZoom();
+  }
+
+  /**
+   * Two fingers zoom the view: the interactor of VTK.wasm does nothing with
+   * them. The listener is on the parent, thus the interactor does not get the move.
+   */
+  private bindPinchZoom(): void {
+    let lastDistance: number | null = null;
+    const container = this.canvas.parentElement;
+    container?.addEventListener("touchstart", () => (lastDistance = null), { capture: true, passive: true });
+    container?.addEventListener(
+      "touchmove",
+      (event) => {
+        const [first, second] = Array.from(event.touches);
+        if (first === undefined || second === undefined) {
+          return;
+        }
+        event.stopPropagation();
+        const distance = Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+        if (lastDistance !== null && lastDistance > 0 && distance > 0) {
+          this.renderer.getActiveCamera().dolly(distance / lastDistance);
+          this.renderer.resetCameraClippingRange();
+          void this.render();
+        }
+        lastDistance = distance;
+      },
+      { capture: true, passive: true },
+    );
   }
 
   static async create(canvas: HTMLCanvasElement): Promise<NetworkViewer> {
@@ -433,6 +467,9 @@ export class NetworkViewer {
     this.scalarBar.getLabelTextProperty().setFontSize(Math.round(SCALAR_BAR_FONT_SIZE * pixelRatio));
     this.scalarBar.setMaximumWidthInPixels(Math.round(SCALAR_BAR_WIDTH * pixelRatio));
     this.scalarBar.setVerticalTitleSeparation(Math.round(SCALAR_BAR_TITLE_SPACE * pixelRatio));
+    // The default place, but a narrow view (a phone) keeps the room of the title
+    const left = this.canvas.clientWidth > 0 ? 1 - SCALAR_BAR_MINIMUM_ROOM / this.canvas.clientWidth : DEFAULT_SCALAR_BAR_LEFT;
+    this.scalarBar.setPosition([Math.min(DEFAULT_SCALAR_BAR_LEFT, left), DEFAULT_SCALAR_BAR_BOTTOM]);
     const isColored = this.colorArray !== null && this.layers.has("final");
     const style = this.colorArray === null ? undefined : SCALAR_BARS.get(this.colorArray.name);
     this.scalarBar.setTitle(style?.title ?? this.colorArray?.name ?? "");
@@ -563,6 +600,12 @@ export class NetworkViewer {
     camera.setPosition(1, -1.6, 1.1);
     camera.setViewUp(0, 0, 1);
     this.renderer.resetCamera();
+    // The view angle is vertical: a tall view (a phone) must move back to show the width
+    const aspectRatio = this.canvas.clientHeight > 0 ? this.canvas.clientWidth / this.canvas.clientHeight : 1;
+    if (aspectRatio < 1) {
+      camera.dolly(aspectRatio);
+      this.renderer.resetCameraClippingRange();
+    }
   }
 
   async render(): Promise<void> {

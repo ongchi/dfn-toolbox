@@ -60,6 +60,27 @@ function fieldLabel(options: FieldOptions): HTMLElement {
 }
 
 /** Help text: the key and the help, with `code` in backticks; null without both */
+/** The surface whose outline a tap turned on; a touch screen has no pointer which leaves a row */
+let tappedSurface: string | null = null;
+
+/**
+ * Shows the outline of a surface while the pointer is over `target`. On a
+ * touch screen, a tap turns it on and a second tap turns it off: the mouse
+ * events which a browser makes from a tap must not be used, and the form
+ * covers the 3D view, thus the outline must stay.
+ */
+export function bindSurfaceOutline(target: HTMLElement, name: string, showOutline: (name: string | null) => void): void {
+  if (globalThis.matchMedia?.("(hover: none)").matches) {
+    target.addEventListener("pointerup", () => {
+      tappedSurface = tappedSurface === name ? null : name;
+      showOutline(tappedSurface);
+    });
+    return;
+  }
+  target.addEventListener("mouseenter", () => showOutline(name));
+  target.addEventListener("mouseleave", () => showOutline(null));
+}
+
 export function helpText(key: string | undefined, text: string | undefined): HTMLElement | null {
   const parts = [key ? `\`${key}\`` : "", text ?? ""].filter((part) => part !== "");
   if (parts.length === 0) {

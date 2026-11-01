@@ -1,7 +1,7 @@
 import type { SurfaceRole } from "../boundaryRoles";
 import { meshDisplayName } from "../meshes";
 import type { FormContext } from "./context";
-import { element, helpText, section } from "./fields";
+import { bindSurfaceOutline, element, helpText, section } from "./fields";
 import type { FormState } from "./state";
 
 export interface FileHandlers {
@@ -45,7 +45,7 @@ export interface BoundarySurfaceHandlers {
   onColor(name: string, color: string): void;
   roleOf(name: string): SurfaceRole;
   onRole(name: string, role: SurfaceRole): void;
-  /** The pointer is over the row of a surface; null = it left the row */
+  /** The outline of a surface shows (`bindSurfaceOutline`); null = it no longer shows */
   onHover(name: string | null): void;
 }
 
@@ -67,13 +67,12 @@ export function boundarySurfaceSection(names: string[], handlers: BoundarySurfac
     color.addEventListener("input", () => handlers.onColor(name, color.value));
     const label = element("label", "file-row-header");
     label.append(element("span", "field-label", name), role, color);
-    label.addEventListener("mouseenter", () => handlers.onHover(name));
-    label.addEventListener("mouseleave", () => handlers.onHover(null));
+    bindSurfaceOutline(label, name, handlers.onHover);
     return label;
   });
   const help = helpText(
     undefined,
-    "The role of each boundary surface and its color in the 3D view; the pointer over a row shows the outline of the surface. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
+    "The role of each boundary surface and its color in the 3D view; the pointer over a row, or a tap on it, shows the outline of the surface. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
   );
   return section("Boundary surfaces", ...rows, ...(help ? [help] : []));
 }

@@ -5,7 +5,7 @@
 // transport) of each example, the flow and the transport without their
 // input, the choice of a predefined mesh, a new user-defined fracture, a bad
 // input, the fractures in the view during a run, a cancel, and a stop with
-// the fractures kept and a continue; it saves screenshots.
+// the fractures kept and a continue, and the phone layout; it saves screenshots.
 import puppeteer from "puppeteer-core";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
@@ -170,6 +170,209 @@ async function runMeshing(page) {
   return statusText(page);
 }
 
+/** The controls of the shown view which are too small for a finger, and the width of the page */
+async function touchProblems(page) {
+  return page.evaluate(() => {
+    const isShown = (node) => {
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && getComputedStyle(node).visibility === "visible";
+    };
+    const controls = document.querySelectorAll(
+      "button, select, input:not([type=checkbox], [type=radio]), label:has(> input[type=checkbox], > input[type=radio])",
+    );
+    const small = [...controls]
+      .filter((node) => isShown(node) && node.getBoundingClientRect().height < 44)
+      .map((node) => `${node.id || node.textContent.trim().slice(0, 20)} ${node.getBoundingClientRect().height}`);
+    const smallText = [...document.querySelectorAll("select, input[type=number], input[type=text]")]
+      .filter((node) => isShown(node) && Number.parseFloat(getComputedStyle(node).fontSize) < 16)
+      .map((node) => node.id || node.name);
+    const isPageWide = document.documentElement.scrollWidth > window.innerWidth;
+    return [...small, ...smallText.map((name) => `text ${name}`), ...(isPageWide ? ["page wider than the screen"] : [])];
+  });
+}
+
+/** The phone layout: the views, the bottom bar, the gestures and the touch sizes */
+async function checkPhone() {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await page.goto(url);
+  await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
+  await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+
+  const visibleViews = () =>
+    page.evaluate(() =>
+      [
+        ["form", ".sidebar"],
+        ["3D", "#viewer"],
+        ["log", "#log-view"],
+      ]
+        .filter(([, selector]) => {
+          const node = document.querySelector(selector);
+          return !node.hidden && getComputedStyle(node).visibility === "visible";
+        })
+        .map(([name]) => name)
+        .join(" ")
+        .replace("3D log", "log"),
+    );
+  const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
+  const sizeAtStart = await canvasSize();
+  const viewNames = [await visibleViews()];
+  await page.tap('button[data-phone-view="view"]');
+  viewNames.push(await visibleViews());
+  await page.tap('button[data-phone-view="log"]');
+  viewNames.push(await visibleViews());
+  await page.tap('button[data-phone-view="form"]');
+  viewNames.push(await visibleViews());
+  check(viewNames.join(", ") === "form, 3D, log, form", "phone: one view at a time", viewNames.join(", "));
+  check((await canvasSize()) === sizeAtStart, "phone: the canvas keeps its size", `${sizeAtStart} → ${await canvasSize()}`);
+
+  // The outline of a surface stays after a tap in the form, until a second tap
+  const phoneView = async () => {
+    await page.tap('button[data-phone-view="view"]');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const box = await page.$eval("#viewer-canvas", (node) => {
+      const { x, y, width, height } = node.getBoundingClientRect();
+      return { x, y, width, height };
+    });
+    const image = Buffer.from(await page.screenshot({ clip: box }));
+    await page.tap('button[data-phone-view="form"]');
+    return image;
+  };
+  const viewBeforeTap = await phoneView();
+  await page.tap("#boundary-surfaces .file-row-header .field-label");
+  const viewAfterTap = await phoneView();
+  await page.tap("#boundary-surfaces .file-row-header .field-label");
+  const viewAfterSecondTap = await phoneView();
+  check(
+    !viewAfterTap.equals(viewBeforeTap) && viewAfterSecondTap.equals(viewBeforeTap),
+    "phone: a tap shows the outline, a second tap removes it",
+    `tap ${viewAfterTap.equals(viewBeforeTap) ? "unchanged" : "changed"}, second tap ${viewAfterSecondTap.equals(viewBeforeTap) ? "same" : "different"}`,
+  );
+
+  for (const tab of ["domain", "fractures", "network", "flow", "transport"]) {
+    await page.tap(`[data-sidebar-tab="${tab}"]`);
+    const problems = await touchProblems(page);
+    check(problems.length === 0, `phone: touch sizes of the ${tab} tab`, problems.join(", ") || "none");
+    await page.screenshot({ path: `${screenshotDir}/e2e_phone_${tab}.png` });
+  }
+
+  // A run from a form opens the 3D view; a run from the Log view stays there
+  await page.tap('[data-sidebar-tab="network"]');
+  await page.tap("#run-button");
+  await page.waitForFunction(() => !document.querySelector("#results").hidden, { timeout: RUN_TIMEOUT });
+  await waitIdle(page);
+  const viewAfterRun = await visibleViews();
+  await page.tap('button[data-phone-view="log"]');
+  await page.tap("#run-button");
+  await waitIdle(page);
+  const viewAfterLogRun = await visibleViews();
+  check(viewAfterRun === "3D" && viewAfterLogRun === "log", "phone: view after a run", `${viewAfterRun}, ${viewAfterLogRun}`);
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_log.png` });
+  await page.tap('button[data-phone-view="view"]');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_view.png` });
+
+  // The step tabs also show with the 3D view: a tap changes the step and its run button, not the view
+  await page.tap('[data-sidebar-tab="flow"]');
+  const runTextOnView = await page.$eval("#run-button", (node) => node.textContent);
+  const viewAfterStepTab = await visibleViews();
+  check(runTextOnView === "Solve flow" && viewAfterStepTab === "3D", "phone: step tabs on the 3D view", `${runTextOnView}, ${viewAfterStepTab}`);
+  await page.tap('[data-sidebar-tab="network"]');
+
+  // The sheet of the view controls
+  const isSheetShown = () => page.$eval("#viewer-toolbar", (node) => getComputedStyle(node).display !== "none");
+  const isSheetShownBefore = await isSheetShown();
+  await page.tap("#toolbar-toggle");
+  const isSheetShownAfter = await isSheetShown();
+  const sheetProblems = await touchProblems(page);
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
+  const box = await page.$eval("#viewer-canvas", (node) => {
+    const { x, y, width, height } = node.getBoundingClientRect();
+    return { x, y, width, height };
+  });
+  const viewShot = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return Buffer.from(await page.screenshot({ clip: box }));
+  };
+  const colorOption = await page.$$eval("#color-select option", (nodes) => nodes.at(-1).value);
+  const viewBeforeColor = await viewShot();
+  await page.select("#color-select", colorOption);
+  const viewAfterColor = await viewShot();
+  await page.tap("#toolbar-toggle");
+  check(
+    !isSheetShownBefore && isSheetShownAfter && !(await isSheetShown()) && sheetProblems.length === 0 && !viewAfterColor.equals(viewBeforeColor),
+    "phone: the sheet of the view controls",
+    sheetProblems.join(", ") || `${isSheetShownBefore} → ${isSheetShownAfter}`,
+  );
+  // The settings button is at the right of the switch; from another view it opens the 3D view with the sheet
+  const isSettingsLast = await page.$eval("#toolbar-toggle", (node) => node.parentElement.lastElementChild === node);
+  await page.tap('button[data-phone-view="log"]');
+  await page.tap("#toolbar-toggle");
+  const viewFromLog = await visibleViews();
+  const isSheetShownFromLog = await isSheetShown();
+  await page.tap('button[data-phone-view="form"]');
+  await page.tap("#toolbar-toggle");
+  const viewFromForm = await visibleViews();
+  const isSheetShownFromForm = await isSheetShown();
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
+  await page.tap("#toolbar-toggle");
+  check(
+    isSettingsLast && viewFromLog === "3D" && isSheetShownFromLog && viewFromForm === "3D" && isSheetShownFromForm && !(await isSheetShown()),
+    "phone: the settings button in the bottom bar",
+    `${viewFromLog} ${isSheetShownFromLog}, ${viewFromForm} ${isSheetShownFromForm}`,
+  );
+
+  // One finger turns the model, two fingers zoom it
+  const client = await page.createCDPSession();
+  const touch = (type, touchPoints) => client.send("Input.dispatchTouchEvent", { type, touchPoints });
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 3;
+  const viewBeforeDrag = await viewShot();
+  await touch("touchStart", [{ x: centerX, y: centerY }]);
+  for (let step = 1; step <= 10; step += 1) {
+    await touch("touchMove", [{ x: centerX + step * 8, y: centerY + step * 3 }]);
+  }
+  await touch("touchEnd", []);
+  const viewAfterDrag = await viewShot();
+  check(!viewAfterDrag.equals(viewBeforeDrag), "phone: one finger turns the model", "changed");
+  await touch("touchStart", [
+    { x: centerX - 30, y: centerY, id: 0 },
+    { x: centerX + 30, y: centerY, id: 1 },
+  ]);
+  for (let step = 1; step <= 10; step += 1) {
+    await touch("touchMove", [
+      { x: centerX - 30 - step * 6, y: centerY, id: 0 },
+      { x: centerX + 30 + step * 6, y: centerY, id: 1 },
+    ]);
+  }
+  await touch("touchEnd", []);
+  const viewAfterPinch = await viewShot();
+  check(!viewAfterPinch.equals(viewAfterDrag), "phone: two fingers zoom", viewAfterPinch.equals(viewAfterDrag) ? "unchanged" : "changed");
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_pinch.png` });
+
+  // Landscape: the two panels side by side
+  await page.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, isLandscape: true, deviceScaleFactor: 2 });
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const landscape = await page.evaluate(() => ({
+    isSwitchShown: getComputedStyle(document.querySelector("button[data-phone-view]")).display !== "none",
+    isSettingsShown: getComputedStyle(document.querySelector("#toolbar-toggle")).display !== "none",
+    sidebarWidth: document.querySelector(".sidebar").getBoundingClientRect().width,
+    isCanvasShown: getComputedStyle(document.querySelector("#viewer")).visibility === "visible",
+    isSidebarShown: getComputedStyle(document.querySelector(".sidebar")).visibility === "visible",
+  }));
+  check(
+    !landscape.isSwitchShown &&
+      landscape.isSettingsShown &&
+      landscape.sidebarWidth === 320 &&
+      landscape.isCanvasShown &&
+      landscape.isSidebarShown,
+    "phone: landscape",
+    JSON.stringify(landscape),
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_landscape.png` });
+  await page.close();
+}
+
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
@@ -194,6 +397,19 @@ try {
   const startTab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
+
+  // The 3D view is the default; with no run, the Log view tells that it has no results
+  const isLogShown = () => page.$eval("#log-view", (node) => !node.hidden);
+  const isLogShownAtStart = await isLogShown();
+  await page.click('[data-workspace-tab="log"]');
+  const startLogText = await page.$eval("#log-view", (node) => node.innerText.trim());
+  await page.click('[data-workspace-tab="view"]');
+  const isLogShownAfterReturn = await isLogShown();
+  check(
+    !isLogShownAtStart && startLogText === "No results yet." && !isLogShownAfterReturn,
+    "log view without results",
+    `${isLogShownAtStart} → "${startLogText}" → ${isLogShownAfterReturn}`,
+  );
 
   // A color chooser for each boundary surface of the domain mesh; a new color changes the 3D view
   const surfaceNames = await page.$$eval("#boundary-surfaces:not([hidden]) .field-label", (nodes) =>
@@ -297,9 +513,9 @@ try {
     const isMeshingDisabledBefore = await isMeshingDisabled();
     const isNextDisabled = () => page.$eval("#next-button", (node) => node.disabled);
     const isNetworkNextDisabled = await isNextDisabled();
-    // The results bezel of the 3D view shows only with a result
-    const isBezelShown = () => page.$eval("#results-bezel", (node) => !node.hidden);
-    const isBezelShownBefore = await isBezelShown();
+    // The results of the Log view show only with a result
+    const hasResults = () => page.$eval("#results", (node) => !node.hidden);
+    const hasResultsBefore = await hasResults();
     const networkStatus = await runStep(page, "network");
     const isNextDisabledBeforeMesh = await isNextDisabled();
     check(
@@ -309,8 +525,8 @@ try {
     );
     const meshStatus = await runMeshing(page);
     check(meshStatus.startsWith("Done") && !(await isNextDisabled()), `${name}: meshing`, meshStatus);
-    const isBezelShownAfter = await isBezelShown();
-    check(!isBezelShownBefore && isBezelShownAfter, `${name}: results bezel`, `${isBezelShownBefore} → ${isBezelShownAfter}`);
+    const hasResultsAfter = await hasResults();
+    check(!hasResultsBefore && hasResultsAfter, `${name}: results in the log view`, `${hasResultsBefore} → ${hasResultsAfter}`);
 
     await page.click('[data-sidebar-tab="flow"]');
     // The boundaries of the flow are the in-flow and out-flow surfaces, each with its color
@@ -390,6 +606,27 @@ try {
   const heapAfter = await viewHeapSize(page);
   check(heapBefore > 0 && heapAfter === heapBefore, "view memory of repeated transports", `${heapBefore} → ${heapAfter} bytes`);
 
+  // The Log view has the three sections and does not change the 3D view
+  await page.mouse.move(0, 0);
+  const viewBeforeLog = await viewerScreenshot();
+  const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
+  const canvasSizeBeforeLog = await canvasSize();
+  await page.click('[data-workspace-tab="log"]');
+  const canvasSizeOnLog = await canvasSize();
+  check(canvasSizeOnLog === canvasSizeBeforeLog, "canvas size on the log tab", `${canvasSizeBeforeLog} → ${canvasSizeOnLog}`);
+  const logSections = await page.$$eval(".log-view .results-section:not([hidden]) summary", (nodes) =>
+    nodes.map((node) => node.textContent).join(", "),
+  );
+  const logValueCount = await page.$$eval("#log-view dd", (nodes) => nodes.filter((node) => node.textContent !== "").length);
+  const isLogEmptyTextHidden = await page.$eval("#log-empty", (node) => node.hidden);
+  const isViewerInert = await page.$eval("#viewer", (node) => node.inert);
+  check(
+    logSections === "Fractures, Flow, Transport" && logValueCount > 0 && isLogEmptyTextHidden && isViewerInert,
+    "log view with results",
+    `${logSections}; ${logValueCount} values`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_log.png` });
+
   // The accordion of each result section: a click on the title of the flow
   // closes only the flow, a second click opens it again
   const openSections = () =>
@@ -405,6 +642,11 @@ try {
     "results sections accordion",
     sectionStates.join(" | "),
   );
+
+  await page.click('[data-workspace-tab="view"]');
+  await page.mouse.move(0, 0);
+  const viewAfterLog = await viewerScreenshot();
+  check(viewAfterLog.equals(viewBeforeLog), "3D view after the log view", viewAfterLog.equals(viewBeforeLog) ? "same" : "different");
 
   // A new run of an earlier step removes the "Color by" options of the later
   // outputs; the new mesh is not colored by an array which it does not have
@@ -526,7 +768,7 @@ try {
   });
   const noClusterStatus = await runStep(page, "network");
   const isStatusWarning = await page.$eval("#status", (node) => node.classList.contains("is-warning"));
-  const hasNetwork = await page.$eval("#results-bezel", (node) => !node.hidden);
+  const hasNetwork = await page.$eval("#results", (node) => !node.hidden);
   // "Next" of the DFN tab needs a cluster which connects an in-flow and an out-flow surface
   const isNoClusterNextDisabled = await page.$eval("#next-button", (node) => node.disabled);
   check(
@@ -546,7 +788,7 @@ try {
 
   // A change of a role clears the network; with no out-flow surface, the generation asks for one
   await setRole(page, "east", "noflow");
-  const isNetworkCleared = await page.$eval("#results-bezel", (node) => node.hidden);
+  const isNetworkCleared = await page.$eval("#results", (node) => node.hidden);
   const noOutflowStatus = await runStep(page, "network");
   check(
     isNetworkCleared && noOutflowStatus === "Set at least one out-flow surface (Domain tab, Boundary surfaces).",
@@ -599,7 +841,7 @@ try {
   });
   await waitIdle(page);
   const meshCancelStatus = await statusText(page);
-  const hasNetworkAfterCancel = await page.$eval("#results-bezel", (node) => !node.hidden);
+  const hasNetworkAfterCancel = await page.$eval("#results", (node) => !node.hidden);
   check(meshCancelStatus === "Cancelled." && hasNetworkAfterCancel, "cancel of meshing", meshCancelStatus);
   const meshAfterCancel = await runMeshing(page);
   check(meshAfterCancel.startsWith("Done"), "meshing after its cancel", meshAfterCancel);
@@ -634,6 +876,13 @@ try {
     "continue gives the network of a run with no stop",
     `${continuedStatus}; with no stop: ${fullRun}`,
   );
+
+  // A computer stays on the Log tab during a run
+  await page.click('[data-workspace-tab="log"]');
+  await runStep(page, "network");
+  check(await isLogShown(), "computer: a run does not change the tab", String(await isLogShown()));
+
+  await checkPhone();
 } finally {
   await browser.close();
 }

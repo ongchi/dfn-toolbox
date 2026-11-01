@@ -1,7 +1,7 @@
 // The flow form: one field for each key of the fehm input file. The pressure
 // boundaries are the in-flow and out-flow surfaces of the Domain tab.
 import type { FormContext } from "../form/context";
-import { checkboxField, element, numberField, row, section } from "../form/fields";
+import { bindSurfaceOutline, checkboxField, element, numberField, row, section } from "../form/fields";
 import { pressureOf, type FlowState } from "./state";
 
 function fluidSection(state: FlowState, context: FormContext): HTMLElement {
@@ -63,8 +63,7 @@ function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context
         context.changed();
       },
     });
-    field.addEventListener("mouseenter", () => context.highlightBoundarySurface(boundary.name));
-    field.addEventListener("mouseleave", () => context.highlightBoundarySurface(null));
+    bindSurfaceOutline(field, boundary.name, context.highlightBoundarySurface);
     container.append(field);
   }
   return container;

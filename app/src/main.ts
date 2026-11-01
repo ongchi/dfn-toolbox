@@ -90,6 +90,11 @@ const RUN_BUTTON_TEXT: Record<SidebarTab, string | null> = {
   transport: "Track particles",
 };
 
+/** The screens with one view at a time: the condition of this layout in `style.css` */
+const ONE_VIEW_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
+type WorkspaceView = "view" | "log";
+type PhoneView = "form" | WorkspaceView;
+
 function byId<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
   if (!node) {
@@ -128,7 +133,12 @@ const ui = {
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
-  resultsBezel: byId<HTMLDivElement>("results-bezel"),
+  layout: byId<HTMLElement>("layout"),
+  viewer: byId<HTMLDivElement>("viewer"),
+  viewerToolbar: byId<HTMLDivElement>("viewer-toolbar"),
+  toolbarToggle: byId<HTMLButtonElement>("toolbar-toggle"),
+  logView: byId<HTMLDivElement>("log-view"),
+  logEmpty: byId<HTMLParagraphElement>("log-empty"),
   results: byId<HTMLDetailsElement>("results"),
   resultsStats: byId<HTMLDListElement>("results-stats"),
   flowResults: byId<HTMLDetailsElement>("flow-results"),
@@ -210,6 +220,10 @@ function durationText(milliseconds: number): string {
 /** A run in the worker: the buttons are disabled, and "Cancel" and the progress bar show */
 function setBusy(busy: boolean): void {
   isBusy = busy;
+  // On a phone, a run from a form shows its fractures at once
+  if (busy && ui.layout.dataset.phoneView === "form" && window.matchMedia(ONE_VIEW_QUERY).matches) {
+    selectView("view");
+  }
   ui.runButton.disabled = busy;
   ui.exampleSelect.disabled = busy;
   ui.domainSource.disabled = busy;
@@ -328,6 +342,9 @@ function selectSidebarTab(name: SidebarTab): void {
   activeSidebarTab = name;
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
     tab.classList.toggle("is-active", tab.dataset.sidebarTab === name);
+    if (tab.dataset.sidebarTab === name) {
+      tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
   }
   updateDomainSource();
   ui.fracturesForm.hidden = name !== "fractures";
@@ -715,7 +732,7 @@ function clearOutput(): void {
   generatedNetwork = null;
   updateStepButtons();
   ui.results.hidden = true;
-  ui.resultsBezel.hidden = true;
+  ui.logEmpty.hidden = false;
   ui.colorSelect.disabled = true;
   if (viewer) {
     for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
@@ -802,7 +819,7 @@ async function showOutput(result: GenerationOutput): Promise<void> {
   clearFlowOutput();
   output = result;
   updateStepButtons();
-  ui.resultsBezel.hidden = false;
+  ui.logEmpty.hidden = true;
   ui.results.hidden = false;
   renderFlow();
 
@@ -1054,6 +1071,37 @@ function switchDomainSource(): void {
   }
 }
 
+/** Shows the 3D view or the Log view; the 3D view stays in the layout and only takes no input */
+function selectWorkspaceView(name: WorkspaceView): void {
+  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workspace-tab]")) {
+    tab.classList.toggle("is-active", tab.dataset.workspaceTab === name);
+  }
+  ui.logView.hidden = name !== "log";
+  ui.viewer.inert = name === "log";
+}
+
+/** The view of a phone; `style.css` uses it only on a screen with one view at a time */
+function selectView(name: PhoneView): void {
+  ui.layout.dataset.phoneView = name;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-phone-view]")) {
+    button.classList.toggle("is-active", button.dataset.phoneView === name);
+  }
+  if (name !== "form") {
+    selectWorkspaceView(name);
+  }
+}
+
+/** The settings button: with another view shown, it opens the 3D view with the sheet */
+function toggleViewerToolbar(): void {
+  const isFormOnly = ui.layout.dataset.phoneView === "form" && window.matchMedia(ONE_VIEW_QUERY).matches;
+  const isViewShown = ui.logView.hidden && !isFormOnly;
+  if (!isViewShown) {
+    selectView("view");
+  }
+  const isOpen = ui.viewerToolbar.classList.toggle("is-open", !isViewShown || !ui.viewerToolbar.classList.contains("is-open"));
+  ui.toolbarToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
 function bindEvents(): void {
   ui.exampleSelect.addEventListener("change", () => void openExample(ui.exampleSelect.value));
   ui.domainSource.addEventListener("change", () => switchDomainSource());
@@ -1086,6 +1134,16 @@ function bindEvents(): void {
       selectSidebarTab(name ?? "network");
     });
   }
+  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workspace-tab]")) {
+    tab.addEventListener("click", () => selectView(tab.dataset.workspaceTab === "log" ? "log" : "view"));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-phone-view]")) {
+    const name = button.dataset.phoneView;
+    if (name === "form" || name === "view" || name === "log") {
+      button.addEventListener("click", () => selectView(name));
+    }
+  }
+  ui.toolbarToggle.addEventListener("click", toggleViewerToolbar);
 }
 
 /** Fills the list of the examples, and opens the default example */
