@@ -84,7 +84,7 @@ export interface TransportOutput {
   error: ToolError | null;
   /** Seed which the run used */
   seed: number;
-  /** (name, text) of each output file */
+  /** (name, text) of each output file; the trajectories have only the points of the 3D view */
   files: [string, string][];
   particleCount: number;
   exitCount: number;
@@ -199,6 +199,8 @@ export class GenerationClient {
     // dfntrans has a u32 seed
     const seedIfZero = 1 + Math.floor(Math.random() * (2 ** 32 - 1));
     const response = await this.request({ type: "runTransport", seedIfZero, ...input });
+    // A WebAssembly memory never shrinks: only a new worker gives it back
+    this.restartWorker();
     if (response.type !== "transportResult") {
       throw new Error(`unexpected answer of the worker: ${response.type}`);
     }
