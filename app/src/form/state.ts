@@ -1,5 +1,5 @@
 // State of the network form: one field for each key of `[network]` of the
-// workflow file (see "Workflow file" of README.md). It follows the input
+// workflow file (see `workflow.ts`). It follows the input
 // format of `../dfngen-rs/src/io/input.rs`, with the boundary lines and the
 // mesh always on: a change of a key there needs a change here, in `toml.ts`
 // and in the form files.

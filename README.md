@@ -42,62 +42,6 @@ For the same input and seed, the network and the mesh are those of the `dfngen`
 binary. The flow agrees with the `fehm` binary within 1e-9. The particles of
 the `dfntrans` binary have the same paths, and their times differ a little.
 
-## Workflow file
-
-Each example is one TOML file with four sections. The comment at the top is
-the description of the input. The app makes the input of each library from it.
-An unknown key or a missing key is an error.
-
-```toml
-# Description of the input.
-
-[boundaries]                       # the roles of the boundary surfaces of the domain mesh
-inflow = ["west"]
-outflow = ["east"]                 # a surface in no list is a no-flow surface
-
-[network]                          # the dfngen-rs input (see below)
-seed = 12345
-min_feature_size = 0.4
-domain = "Box.vtu"                 # the name of a predefined mesh; no `user_fractures`
-[network.generation]               # as [generation]
-[network.fram]                     # as [fram]; optional
-[network.mesh]                     # optional; no `enable` and no [network.region_boundaries]: always on
-max_size_factor = 5.0
-slope = 0.5
-[network.clusters]                 # only keep_only_largest
-[[network.family]]                 # as [[family]]; `aperture` is necessary
-[[network.user_fracture]]          # optional; one table for each user-defined fracture, all keys necessary
-region = "box"                     # one region of the mesh
-center = [5.0, 5.0, 5.0]           # m; in the bounding box of the cells of the region
-number_of_points = 4               # as a family: 3 or more, 4 = rectangle
-radius = 7.78                      # m; of the circle of the points
-aspect_ratio = 0.545               # y radius / x radius
-beta = 0.0                         # degrees; rotation in the plane of the fracture
-aperture = 3e-4                    # m; above 0
-orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without kappa
-
-[flow]                             # the fehm-rs input (see below), without `mesh`
-temperature = 20.0
-gravity = false
-pressure = { west = 10.1, east = 10.0 }   # MPa; each in-flow and out-flow surface, in place of [[boundary]]; no [solver]
-
-[transport]                        # the dfntrans-rs input (see below), without `flow`
-seed = 12345
-time_unit = "days"
-porosity = 1.0
-max_time_steps = 1000000
-routing = "complete_mixing"        # no inflow, no outflow: [boundaries] gives them
-[transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
-```
-
-The keys are those of the input files of
-[dfngen-rs](https://github.com/ongchi/dfngen-rs#input-file),
-[fehm-rs](https://github.com/ongchi/fehm-rs#input-file) and
-[dfntrans-rs](https://github.com/ongchi/dfntrans-rs#input-file).
-
-A user-defined fracture is a regular polygon, made in the same way as a
-stochastic fracture of dfngen-rs.
-
 ## Examples
 
 | Example | Content |

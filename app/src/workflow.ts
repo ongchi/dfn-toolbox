@@ -1,8 +1,49 @@
 // The workflow file of dfn-toolbox: one TOML with `[boundaries]`, `[network]`,
-// `[flow]` and `[transport]` (see "Workflow file" of README.md). The comment
-// at the top is the description. The app makes the input files of dfngen,
-// fehm and dfntrans from it (`networkToLibraryToml`, `flowToLibraryToml`,
-// `transportToLibraryToml`).
+// `[flow]` and `[transport]`. The comment at the top is the description. The
+// app makes the input files of dfngen, fehm and dfntrans from it
+// (`networkToLibraryToml`, `flowToLibraryToml`, `transportToLibraryToml`). An
+// unknown key or a missing key is an error. The keys are those of "Input file"
+// in the README of each library, with these changes:
+//
+//   # Description of the input.
+//
+//   [boundaries]                       # the roles of the boundary surfaces of the domain mesh
+//   inflow = ["west"]
+//   outflow = ["east"]                 # a surface in no list is a no-flow surface
+//
+//   [network]                          # the dfngen input
+//   seed = 12345
+//   min_feature_size = 0.4
+//   domain = "Box.vtu"                 # the name of a predefined mesh; no `user_fractures`
+//   [network.generation]               # as [generation]
+//   [network.fram]                     # as [fram]; optional
+//   [network.mesh]                     # optional; no `enable` and no [network.region_boundaries]: always on
+//   max_size_factor = 5.0
+//   slope = 0.5
+//   [network.clusters]                 # only keep_only_largest
+//   [[network.family]]                 # as [[family]]; `aperture` is necessary
+//   [[network.user_fracture]]          # optional; a regular polygon, all keys necessary
+//   region = "box"                     # one region of the mesh
+//   center = [5.0, 5.0, 5.0]           # m; in the bounding box of the cells of the region
+//   number_of_points = 4               # as a family: 3 or more, 4 = rectangle
+//   radius = 7.78                      # m; of the circle of the points
+//   aspect_ratio = 0.545               # y radius / x radius
+//   beta = 0.0                         # degrees; rotation in the plane of the fracture
+//   aperture = 3e-4                    # m; above 0
+//   orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without kappa
+//
+//   [flow]                             # the fehm input, without `mesh`
+//   temperature = 20.0
+//   gravity = false
+//   pressure = { west = 10.1, east = 10.0 }   # MPa; each in-flow and out-flow surface, in place of [[boundary]]; no [solver]
+//
+//   [transport]                        # the dfntrans input, without `flow`
+//   seed = 12345
+//   time_unit = "days"
+//   porosity = 1.0
+//   max_time_steps = 1000000
+//   routing = "complete_mixing"        # no inflow, no outflow: [boundaries] gives them
+//   [transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
 import { boundariesTables, readBoundaries, type BoundaryRoles } from "./boundaryRoles";
 import { flowTables, readFlow } from "./flow/toml";
 import type { FlowState } from "./flow/state";
