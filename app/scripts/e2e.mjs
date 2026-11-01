@@ -12,6 +12,7 @@ const url = process.argv[2] ?? "http://localhost:5173/";
 const screenshotDir = process.argv[3] ?? ".";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const RUN_TIMEOUT = 300000;
+const TRANSPORT_REPEATS = 5;
 // The roles of the surfaces of the Box shape (example box_west_east, and a new shape)
 const BOX_ROLES = "west: inflow, east: outflow, south: noflow, north: noflow, bottom: noflow, top: noflow";
 
@@ -132,6 +133,27 @@ async function boundaryLabels(page, formSelector, sectionTitle) {
   );
 }
 
+/** Keeps the WebAssembly memories of the page thread: only VTK.wasm runs there */
+async function rememberPageMemories(page) {
+  await page.evaluateOnNewDocument(() => {
+    globalThis.pageMemories = [];
+    for (const name of ["instantiate", "instantiateStreaming"]) {
+      const original = WebAssembly[name];
+      WebAssembly[name] = async (...args) => {
+        const output = await original.apply(WebAssembly, args);
+        const memories = Object.values((output.instance ?? output).exports).filter((value) => value instanceof WebAssembly.Memory);
+        globalThis.pageMemories.push(...memories);
+        return output;
+      };
+    }
+  });
+}
+
+/** The size (bytes) of the VTK.wasm heap */
+async function viewHeapSize(page) {
+  return page.evaluate(() => globalThis.pageMemories.reduce((sum, memory) => sum + memory.buffer.byteLength, 0));
+}
+
 /** Runs the step of a sidebar tab; returns the status text */
 async function runStep(page, tab) {
   await page.click(`[data-sidebar-tab="${tab}"]`);
@@ -151,6 +173,7 @@ async function runMeshing(page) {
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
+  await rememberPageMemories(page);
   page.on("pageerror", (error) => failures.push(`page error: ${error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -357,6 +380,15 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_transport.png` });
   }
+
+  // More runs of the transport use the memory of the old views: the heap of the view does not grow
+  await runStep(page, "transport");
+  const heapBefore = await viewHeapSize(page);
+  for (let run = 0; run < TRANSPORT_REPEATS; run += 1) {
+    await runStep(page, "transport");
+  }
+  const heapAfter = await viewHeapSize(page);
+  check(heapBefore > 0 && heapAfter === heapBefore, "view memory of repeated transports", `${heapBefore} → ${heapAfter} bytes`);
 
   // The accordion of each result section: a click on the title of the flow
   // closes only the flow, a second click opens it again

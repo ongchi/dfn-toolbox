@@ -5,8 +5,7 @@
 // (it gave the mapper its old lookup table).
 //
 // The viewer reads the output files of the generation, the flow and the transport (and
-// the domain mesh) with the XML readers of VTK from their text. Thus it shows
-// exactly the files which the user downloads.
+// the domain mesh) with the XML readers of VTK from their text.
 
 import {
   loadAsync,
@@ -105,6 +104,11 @@ function colorComponents(color: string): [number, number, number] {
   return [1, 3, 5].map((start) => parseInt(color.slice(start, start + 2), 16) / 255) as [number, number, number];
 }
 
+/** A VTK object which the app created */
+interface VtkObject {
+  $delete(): boolean;
+}
+
 interface PolyDataLayer {
   reader: vtkXMLPolyDataReader;
   mapper: vtkPolyDataMapper;
@@ -130,6 +134,10 @@ export class NetworkViewer {
   private readonly generationFamilies = new Map<number, GenerationFamily>();
   /** Tubes and cones */
   private trajectoryActors: vtkActor[] = [];
+  /** All VTK objects of the tubes and the cones */
+  private trajectoryObjects: VtkObject[] = [];
+  /** Objects out of the scene: `render` deletes them, as the old view can use them until then */
+  private retiredObjects: VtkObject[] = [];
   private domainActor: vtkActor | null = null;
   /** The boundary surfaces of the domain mesh, by name; part of the layer "domain" */
   private boundarySurfaceActors = new Map<string, vtkActor>();
@@ -295,6 +303,7 @@ export class NetworkViewer {
     const old = this.layers.get(layer);
     if (old) {
       this.renderer.removeActor(old.actor);
+      this.retiredObjects.push(old.actor, old.mapper, old.reader);
       this.layers.delete(layer);
     }
     if (vtpText === null) {
@@ -480,6 +489,8 @@ export class NetworkViewer {
       this.renderer.removeActor(actor);
     }
     this.trajectoryActors = [];
+    this.retiredObjects.push(...this.trajectoryObjects);
+    this.trajectoryObjects = [];
     if (vtpText === null) {
       return;
     }
@@ -523,6 +534,7 @@ export class NetworkViewer {
       this.renderer.addActor(actor);
       this.trajectoryActors.push(actor);
     }
+    this.trajectoryObjects = [...this.trajectoryActors, tubeMapper, coneMapper, tubes, cones, cone, points, reader];
   }
 
   setVisible(layer: FractureLayer | "domain" | "trajectories", isVisible: boolean): void {
@@ -555,5 +567,9 @@ export class NetworkViewer {
 
   async render(): Promise<void> {
     await this.window.render();
+    for (const object of this.retiredObjects) {
+      object.$delete();
+    }
+    this.retiredObjects = [];
   }
 }
