@@ -15,6 +15,11 @@ const RUN_TIMEOUT = 300000;
 const TRANSPORT_REPEATS = 5;
 // The roles of the surfaces of the Box shape (example box_west_east, and a new shape)
 const BOX_ROLES = "west: inflow, east: outflow, south: noflow, north: noflow, bottom: noflow, top: noflow";
+const FLOAT_BUFFER_EXTENSIONS = ["EXT_color_buffer_float", "EXT_color_buffer_half_float", "EXT_float_blend"];
+// Largest minus smallest of red, green and blue (0 to 255)
+const COLORED_PIXEL_CONTRAST = 30;
+// The boundary surfaces of the default example fill a large part of the view
+const MINIMUM_SURFACE_PIXEL_SHARE = 0.1;
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -377,7 +382,52 @@ async function checkPhone() {
   await page.close();
 }
 
+/** The part of the pixels of a PNG image with a color (not white, gray or black) */
+async function coloredPixelShare(page, pngImage) {
+  return page.evaluate(async (base64Image, minimumContrast) => {
+    const response = await fetch(`data:image/png;base64,${base64Image}`);
+    const bitmap = await createImageBitmap(await response.blob());
+    const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext("2d");
+    context.drawImage(bitmap, 0, 0);
+    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    let coloredCount = 0;
+    for (let start = 0; start < data.length; start += 4) {
+      const channels = [data[start], data[start + 1], data[start + 2]];
+      if (Math.max(...channels) - Math.min(...channels) > minimumContrast) {
+        coloredCount++;
+      }
+    }
+    return coloredCount / (bitmap.width * bitmap.height);
+  }, Buffer.from(pngImage).toString("base64"), COLORED_PIXEL_CONTRAST);
+}
+
+/** A device without float color buffers in WebGL (iOS) shows the translucent boundary surfaces */
+async function checkTranslucentShapesWithoutFloatBuffers() {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1400, height: 900 });
+  await page.evaluateOnNewDocument((hiddenExtensions) => {
+    const prototype = WebGL2RenderingContext.prototype;
+    const { getExtension, getSupportedExtensions } = prototype;
+    prototype.getExtension = function (name) {
+      return hiddenExtensions.includes(name) ? null : getExtension.call(this, name);
+    };
+    prototype.getSupportedExtensions = function () {
+      return getSupportedExtensions.call(this).filter((name) => !hiddenExtensions.includes(name));
+    };
+  }, FLOAT_BUFFER_EXTENSIONS);
+  await page.goto(url);
+  await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
+  await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const canvas = await page.$("#viewer-canvas");
+  const share = await coloredPixelShare(page, await canvas.screenshot());
+  check(share > MINIMUM_SURFACE_PIXEL_SHARE, "translucent shapes without float color buffers", share.toFixed(3));
+  await page.close();
+}
+
 try {
+  await checkTranslucentShapesWithoutFloatBuffers();
+
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
   await rememberPageMemories(page);

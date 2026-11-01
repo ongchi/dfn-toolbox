@@ -422,6 +422,10 @@ npm run dev & npm run e2e -- http://localhost:5173/
   (`mapper.scalarVisibility = 1`) can set other properties back: it gave the
   mapper its old lookup table.
 - Add 2D actors (scalar bar) with `addViewProp`.
+- The renderer has `setUseOIT(false)`: the default pass of the translucent
+  shapes needs float color buffers in WebGL, and devices without them (iOS)
+  do not show the shapes. Thus the colors of overlapping translucent shapes
+  depend on the drawing order.
 - The fractures of a running generation are a `vtkPolyData` which grows
   (`insertNextPoint`, then `insertNextCell` with a `vtkIdList`).
   `insertCellPoint` with `updateCellCount` gives no cell: the bundle has

@@ -220,6 +220,9 @@ export class NetworkViewer {
 
     const renderer = vtk.vtkRenderer();
     renderer.setBackground(1.0, 1.0, 1.0);
+    // The default pass of the translucent shapes needs float color buffers,
+    // which WebGL does not have on each device (no shapes on iOS)
+    renderer.setUseOIT(false);
 
     const canvasSelector = session.registerCanvas("!dfngen-canvas", canvas);
     const interactor = vtk.vtkWebAssemblyRenderWindowInteractor({ canvasSelector });
