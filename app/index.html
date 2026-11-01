@@ -9,6 +9,11 @@
   <body>
     <header class="toolbar">
       <h1>dfn-toolbox <span class="subtitle">Discrete fracture network: generation, flow and transport</span></h1>
+      <a class="repository-link" href="https://github.com/ongchi/dfn-toolbox" target="_blank" rel="noopener noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub">
+        <svg viewBox="0 0 16 16" width="24" height="24" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+        </svg>
+      </a>
     </header>
 
     <main id="layout" class="layout" data-phone-view="form">
@@ -74,13 +79,61 @@
                   <option value="">One color</option>
                 </select>
               </label>
-              <label class="toolbar-check"><input id="show-domain" type="checkbox" checked /> Domain</label>
-              <label class="toolbar-check"><input id="show-mesh" type="checkbox" checked /> Mesh</label>
-              <label class="toolbar-check"><input id="show-user-fractures" type="checkbox" checked /> User fractures</label>
-              <label class="toolbar-check"><input id="show-removed" type="checkbox" /> Removed</label>
-              <label class="toolbar-check"><input id="show-rejected" type="checkbox" /> Rejected</label>
-              <label class="toolbar-check"><input id="show-trajectories" type="checkbox" disabled /> Trajectories</label>
-              <button id="reset-camera" class="button-small" type="button">Reset view</button>
+              <div class="toolbar-group">
+                <label class="icon-toggle" title="Domain">
+                  <input id="show-domain" type="checkbox" checked aria-label="Domain" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5L12 12l8-4.5M12 12v9" /></svg>
+                  <span class="icon-label">Domain</span>
+                </label>
+                <label class="icon-toggle" title="Mesh">
+                  <input id="show-mesh" type="checkbox" checked aria-label="Mesh" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 17H2zM7 11.5h10L12 20z" /></svg>
+                  <span class="icon-label">Mesh</span>
+                </label>
+                <label class="icon-toggle" title="User fractures">
+                  <input id="show-user-fractures" type="checkbox" checked aria-label="User fractures" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19H7l-4-8 4-7h9l4 7-1 1.7M13.5 21l.7-2.8 5.3-5.3 2.1 2.1-5.3 5.3z" /></svg>
+                  <span class="icon-label">User fractures</span>
+                </label>
+              </div>
+              <div class="toolbar-group">
+                <label class="icon-toggle" title="Removed">
+                  <input id="show-removed" type="checkbox" aria-label="Removed" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path stroke-dasharray="3 3" d="M7 4h10l4 8-4 8H7l-4-8z" /></svg>
+                  <span class="icon-label">Removed</span>
+                </label>
+                <label class="icon-toggle" title="Rejected">
+                  <input id="show-rejected" type="checkbox" aria-label="Rejected" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19H7l-4-8 4-7h9l4 7" /><path class="icon-reject" d="M15 15l6 6M21 15l-6 6" /></svg>
+                  <span class="icon-label">Rejected</span>
+                </label>
+              </div>
+              <div class="toolbar-group">
+                <label class="icon-toggle" title="Trajectories">
+                  <input id="show-trajectories" type="checkbox" disabled aria-label="Trajectories" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path stroke-dasharray="0.5 3.5" d="M3 20C9 20 7 6 14 6h4" /><path d="M16 3l4 3-4 3" /></svg>
+                  <span class="icon-label">Trajectories</span>
+                </label>
+                <label class="icon-toggle" title="Color bar">
+                  <input id="show-color-bar" type="checkbox" checked aria-label="Color bar" />
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <linearGradient id="color-bar-gradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stop-color="#ff0000" />
+                      <stop offset="0.33" stop-color="#ffff00" />
+                      <stop offset="0.67" stop-color="#00ffff" />
+                      <stop offset="1" stop-color="#0000ff" />
+                    </linearGradient>
+                    <rect x="8" y="3" width="7" height="18" rx="1" fill="url(#color-bar-gradient)" />
+                    <path d="M17.5 7H20M17.5 12H20M17.5 17H20" />
+                  </svg>
+                  <span class="icon-label">Color bar</span>
+                </label>
+              </div>
+              <span class="toolbar-separator"></span>
+              <button id="reset-camera" class="icon-toggle" type="button" title="Reset view" aria-label="Reset view">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M12 8l4 2.2v4.6L12 17l-4-2.2v-4.6z" /></svg>
+                <span class="icon-label">Reset view</span>
+              </button>
             </div>
             <div class="viewer-canvas">
               <canvas id="viewer-canvas"></canvas>

@@ -285,6 +285,10 @@ async function checkPhone() {
   await page.tap("#toolbar-toggle");
   const isSheetShownAfter = await isSheetShown();
   const sheetProblems = await touchProblems(page);
+  const phoneLabels = await page.$$eval(".viewer-toolbar .icon-label", (nodes) =>
+    nodes.filter((node) => getComputedStyle(node).display !== "none").length,
+  );
+  check(phoneLabels === 8, "phone: the labels of the icons", String(phoneLabels));
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
   const box = await page.$eval("#viewer-canvas", (node) => {
     const { x, y, width, height } = node.getBoundingClientRect();
@@ -397,6 +401,18 @@ try {
   const startTab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
+
+  // The link to the repository is at the right of the title bar
+  const repositoryLink = await page.$eval(".repository-link", (node) => ({
+    href: node.href,
+    right: node.getBoundingClientRect().right,
+    barRight: node.parentElement.getBoundingClientRect().right,
+  }));
+  check(
+    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.barRight - repositoryLink.right <= 16,
+    "repository link",
+    JSON.stringify(repositoryLink),
+  );
 
   // The 3D view is the default; with no run, the Log view tells that it has no results
   const isLogShown = () => page.$eval("#log-view", (node) => !node.hidden);
@@ -875,6 +891,41 @@ try {
     finalCount(continuedStatus) !== undefined && finalCount(continuedStatus) === finalCount(fullRun) && isContinueHidden,
     "continue gives the network of a run with no stop",
     `${continuedStatus}; with no stop: ${fullRun}`,
+  );
+
+  // The icons of the 3D view: each has a name, and a computer shows no label
+  const iconControls = await page.$$eval(".viewer-toolbar .icon-toggle", (nodes) =>
+    nodes.map((node) => ({
+      name: node.querySelector("input")?.getAttribute("aria-label") ?? node.getAttribute("aria-label"),
+      hasTitle: node.title !== "",
+      isLabelShown: getComputedStyle(node.querySelector(".icon-label")).display !== "none",
+    })),
+  );
+  check(
+    iconControls.length === 8 && iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
+    "icons of the 3D view",
+    iconControls.map(({ name }) => name).join(", "),
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_icons.png` });
+
+  // The color bar goes off and comes back; the choice stays through a new color
+  await page.mouse.move(0, 0);
+  const viewWithColorBar = await viewerScreenshot();
+  await page.click("#show-color-bar");
+  const viewWithoutColorBar = await viewerScreenshot();
+  await page.select("#color-select", "cell:area");
+  const viewWithoutColorBarNewColor = await viewerScreenshot();
+  await page.click("#show-color-bar");
+  const viewNewColor = await viewerScreenshot();
+  await page.click("#show-color-bar");
+  const viewAgainWithoutColorBar = await viewerScreenshot();
+  await page.click("#show-color-bar");
+  check(
+    !viewWithoutColorBar.equals(viewWithColorBar) &&
+      !viewNewColor.equals(viewWithoutColorBarNewColor) &&
+      viewAgainWithoutColorBar.equals(viewWithoutColorBarNewColor),
+    "color bar toggle",
+    "changed",
   );
 
   // A computer stays on the Log tab during a run

@@ -148,6 +148,7 @@ export class NetworkViewer {
   /** The outline of each boundary surface, by name; visible only while highlighted */
   private boundaryOutlineActors = new Map<string, vtkActor>();
   private colorArray: ColorArray | null = null;
+  private isScalarBarShown = true;
   private readonly canvas: HTMLCanvasElement;
 
   private constructor(
@@ -460,6 +461,12 @@ export class NetworkViewer {
     return names;
   }
 
+  /** The user's choice; a view with one color has no scalar bar in any case */
+  setScalarBarShown(isShown: boolean): void {
+    this.isScalarBarShown = isShown;
+    this.updateScalarBar();
+  }
+
   /** The scalar bar of the color array; the arrays of `SCALAR_BARS` have their title and label format */
   private updateScalarBar(): void {
     // The canvas can have more pixels than CSS pixels (a high-resolution screen)
@@ -471,7 +478,7 @@ export class NetworkViewer {
     // The default place, but a narrow view (a phone) keeps the room of the title
     const left = this.canvas.clientWidth > 0 ? 1 - SCALAR_BAR_MINIMUM_ROOM / this.canvas.clientWidth : DEFAULT_SCALAR_BAR_LEFT;
     this.scalarBar.setPosition([Math.min(DEFAULT_SCALAR_BAR_LEFT, left), DEFAULT_SCALAR_BAR_BOTTOM]);
-    const isColored = this.colorArray !== null && this.layers.has("final");
+    const isColored = this.colorArray !== null && this.layers.has("final") && this.isScalarBarShown;
     const style = this.colorArray === null ? undefined : SCALAR_BARS.get(this.colorArray.name);
     this.scalarBar.setTitle(style?.title ?? this.colorArray?.name ?? "");
     this.scalarBar.setLabelFormat(style?.labelFormat ?? DEFAULT_LABEL_FORMAT);

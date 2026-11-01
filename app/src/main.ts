@@ -130,6 +130,7 @@ const ui = {
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
+  showColorBar: byId<HTMLInputElement>("show-color-bar"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
@@ -1126,6 +1127,7 @@ function bindEvents(): void {
   for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
+  ui.showColorBar.addEventListener("change", () => updateViewer((view) => view.setScalarBarShown(ui.showColorBar.checked)));
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
 
   for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
