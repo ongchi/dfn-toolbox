@@ -10,6 +10,7 @@ import init, {
   run_transport,
   MeshStep,
   RestartMode,
+  TrajectoryDetail,
   type ErrorReport,
   type GenerationResult,
 } from "./pkg/dfn_wasm.js";
@@ -116,7 +117,7 @@ function handle(request: WorkerRequest): void {
     return;
   }
   if (request.type === "runTransport") {
-    const result = run_transport(request.toml, request.flowToml, request.mesh, request.seedIfZero);
+    const result = run_transport(request.toml, request.flowToml, request.mesh, request.seedIfZero, TrajectoryDetail.View);
     post({
       type: "transportResult",
       error: toolError(result.error),

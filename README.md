@@ -92,7 +92,13 @@ There is no server: `npm run build` gives a folder of static files.
   it is very large (about 1 MB for each particle in the examples), thus the
   default seeding has few particles (method "uniform per in-flow line",
   3 per line; 50 for the methods with a particle count), and the help of
-  the particle fields tells the size.
+  the particle fields tells the size. The app does not keep that file: only
+  the 3D view uses the paths, thus `run_transport` (`TrajectoryDetail.View`)
+  reduces each path to the points which the view needs (Douglas-Peucker,
+  tolerance 0.0003 × the diagonal of the bounds of the paths) before it writes
+  the file; `TrajectoryDetail.Full`, for the tests, writes all points. After
+  the transport the page replaces the worker, which gives back its memory (a
+  WebAssembly memory never shrinks).
 - "Generate", "Solve flow" and "Track particles" run in a Web Worker;
   "Cancel" stops them. An error of the library shows in the status line,
   as a text of the app with the words of the forms (`app/src/errors.ts`:
