@@ -1,5 +1,6 @@
 //! Bindings of fehm: the steady flow on the triangle mesh of the network.
 
+use fehm::velocity::calculate_darcy_velocities;
 use fehm::{build_input_from_text, solve, write_output};
 use wasm_bindgen::prelude::*;
 
@@ -23,6 +24,8 @@ pub struct FlowResult {
     boundary_names: Vec<String>,
     boundary_flows: Vec<f64>,
     newton_iterations: usize,
+    pressures: Vec<f64>,
+    darcy_velocities: Vec<f64>,
 }
 
 #[wasm_bindgen]
@@ -66,6 +69,18 @@ impl FlowResult {
     pub fn newton_iterations(&self) -> usize {
         self.newton_iterations
     }
+
+    /// Pressure of each mesh point (MPa)
+    #[wasm_bindgen(getter)]
+    pub fn pressures(&self) -> Vec<f64> {
+        self.pressures.clone()
+    }
+
+    /// x, y, z of the Darcy velocity of each triangle (m/s)
+    #[wasm_bindgen(getter)]
+    pub fn darcy_velocities(&self) -> Vec<f64> {
+        self.darcy_velocities.clone()
+    }
 }
 
 /// Solves the flow and writes its output files into memory
@@ -87,10 +102,16 @@ pub fn run_flow(toml_text: &str, mesh_text: &str) -> FlowResult {
         boundary_names: Vec::new(),
         boundary_flows: Vec::new(),
         newton_iterations: 0,
+        pressures: Vec::new(),
+        darcy_velocities: Vec::new(),
     };
     match outcome {
         Ok((input, solution, files)) => {
             result.files = files;
+            result.darcy_velocities = calculate_darcy_velocities(&input, &solution.pressures)
+                .into_iter()
+                .flatten()
+                .collect();
             result.boundary_names = input
                 .boundaries
                 .into_iter()
@@ -98,6 +119,7 @@ pub fn run_flow(toml_text: &str, mesh_text: &str) -> FlowResult {
                 .collect();
             result.boundary_flows = solution.boundary_flows;
             result.newton_iterations = solution.newton_iterations;
+            result.pressures = solution.pressures;
         }
         Err(report) => result.error = Some(report),
     }

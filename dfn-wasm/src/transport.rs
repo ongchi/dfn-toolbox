@@ -4,6 +4,7 @@ use dfntrans::{build_input_from_text, track_particles, write_output, Transport};
 use wasm_bindgen::prelude::*;
 
 use crate::errors::{dfntrans_report, fehm_report, ErrorReport};
+use crate::view::TransportArrays;
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// Largest distance of a path of the 3D view from the path of the particle,
@@ -47,6 +48,7 @@ pub struct TransportResult {
     exit_count: usize,
     inflow_volume_flux: f64,
     outflow_volume_flux: f64,
+    arrays: TransportArrays,
 }
 
 #[wasm_bindgen]
@@ -103,6 +105,36 @@ impl TransportResult {
     pub fn outflow_volume_flux(&self) -> f64 {
         self.outflow_volume_flux
     }
+
+    /// x, y, z of each point of all paths
+    #[wasm_bindgen(getter)]
+    pub fn path_points(&self) -> Vec<f64> {
+        self.arrays.path_points.clone()
+    }
+
+    /// x, y, z of the velocity at each point of all paths
+    #[wasm_bindgen(getter)]
+    pub fn path_velocities(&self) -> Vec<f64> {
+        self.arrays.path_velocities.clone()
+    }
+
+    /// Number of points of each path
+    #[wasm_bindgen(getter)]
+    pub fn path_point_counts(&self) -> Vec<u32> {
+        self.arrays.path_point_counts.clone()
+    }
+
+    /// The mesh point of each sector
+    #[wasm_bindgen(getter)]
+    pub fn sector_nodes(&self) -> Vec<u32> {
+        self.arrays.sector_nodes.clone()
+    }
+
+    /// x, y, z of the velocity of each sector (m per time unit)
+    #[wasm_bindgen(getter)]
+    pub fn sector_velocities(&self) -> Vec<f64> {
+        self.arrays.sector_velocities.clone()
+    }
 }
 
 /// Solves the flow, tracks the particles and writes the output files into memory
@@ -151,10 +183,12 @@ pub fn run_transport(
         exit_count: 0,
         inflow_volume_flux: 0.0,
         outflow_volume_flux: 0.0,
+        arrays: TransportArrays::default(),
     };
     match outcome {
         Ok((transport, files)) => {
             result.files = files;
+            result.arrays = TransportArrays::new(&transport);
             result.particle_count = transport.particle_count;
             result.exit_count = transport.exit_count;
             result.inflow_volume_flux = transport.inflow_volume_flux;

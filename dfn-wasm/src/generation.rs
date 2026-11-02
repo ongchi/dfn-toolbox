@@ -11,6 +11,7 @@ use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 use crate::errors::{dfngen_report, ErrorReport};
+use crate::view::{NetworkShapes, ViewShapes};
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// The files which an input file needs, from its text
@@ -60,6 +61,7 @@ pub struct GenerationResult {
     final_count: usize,
     rejected_count: usize,
     is_without_connecting_cluster: bool,
+    shapes: Option<NetworkShapes>,
 }
 
 #[wasm_bindgen]
@@ -115,6 +117,34 @@ impl GenerationResult {
     #[wasm_bindgen(getter)]
     pub fn is_without_connecting_cluster(&self) -> bool {
         self.is_without_connecting_cluster
+    }
+
+    /// Polygons of the final fractures
+    #[wasm_bindgen(getter)]
+    pub fn fracture_shapes(&self) -> Option<ViewShapes> {
+        self.shapes.as_ref().map(|shapes| shapes.fractures.clone())
+    }
+
+    /// Polygons of the fractures which the cluster analysis removed
+    #[wasm_bindgen(getter)]
+    pub fn removed_shapes(&self) -> Option<ViewShapes> {
+        self.shapes
+            .as_ref()
+            .and_then(|shapes| shapes.removed.clone())
+    }
+
+    /// Polygons of the rejected fractures, if the input asks for them
+    #[wasm_bindgen(getter)]
+    pub fn rejected_shapes(&self) -> Option<ViewShapes> {
+        self.shapes
+            .as_ref()
+            .and_then(|shapes| shapes.rejected.clone())
+    }
+
+    /// The triangle mesh of the final fractures
+    #[wasm_bindgen(getter)]
+    pub fn mesh_shapes(&self) -> Option<ViewShapes> {
+        self.shapes.as_ref().and_then(|shapes| shapes.mesh.clone())
     }
 }
 
@@ -420,10 +450,12 @@ fn run(
         final_count: 0,
         rejected_count: 0,
         is_without_connecting_cluster: false,
+        shapes: None,
     };
     match outcome {
         Ok((network, files)) => {
             result.files = files;
+            result.shapes = Some(NetworkShapes::new(&network));
             result.accepted_count = network.dfn.accepted_polys.len();
             result.final_count = network.final_fractures.len();
             result.rejected_count = network.dfn.rejected_polys.len();

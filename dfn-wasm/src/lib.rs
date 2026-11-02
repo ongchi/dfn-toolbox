@@ -1,13 +1,14 @@
 //! WebAssembly bindings of dfngen, fehm and dfntrans for the web app.
 //!
 //! The web app runs these functions in a Web Worker. Each function takes the
-//! text of the input files and gives the text of the output files: there is
-//! no file system.
+//! text of the input files and gives the text of the output files and the
+//! arrays of the 3D view: there is no file system.
 
 mod errors;
 mod flow;
 mod generation;
 mod transport;
+mod view;
 
 use std::cell::RefCell;
 use std::io::{self, Write};

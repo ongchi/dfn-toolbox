@@ -50,6 +50,29 @@ export type WorkerRequest =
   | ({ type: "runFlow" } & FlowInput)
   | ({ type: "runTransport"; seedIfZero: number } & TransportInput);
 
+/** Polygons or triangles of one layer of the view, in the coordinates of the mesh file */
+export interface ShapeArrays {
+  /** x, y, z of each point */
+  points: Float64Array;
+  /** Number of points of each cell */
+  vertexCounts: Uint32Array;
+  /** The point numbers of all cells, one cell after the other */
+  connectivity: Uint32Array;
+  /** (name, one number for each cell) of each array */
+  cellArrays: [string, Float64Array][];
+}
+
+/** The layers of the view of a generation */
+export interface NetworkShapes {
+  fractures: ShapeArrays;
+  /** null without removed fractures */
+  removed: ShapeArrays | null;
+  /** null unless the input asks for the rejected fractures */
+  rejected: ShapeArrays | null;
+  /** null without the triangle mesh */
+  mesh: ShapeArrays | null;
+}
+
 export interface GenerationOutput {
   /** The error of the library; then there are no files */
   error: ToolError | null;
@@ -62,6 +85,8 @@ export interface GenerationOutput {
   rejectedCount: number;
   /** No cluster connects an in-flow and an out-flow surface: the generation kept all clusters */
   isWithoutConnectingCluster: boolean;
+  /** null with an error */
+  shapes: NetworkShapes | null;
 }
 
 export interface BoundaryFlow {
@@ -77,6 +102,10 @@ export interface FlowOutput {
   files: [string, string][];
   boundaryFlows: BoundaryFlow[];
   newtonIterations: number;
+  /** Pressure of each mesh point (MPa) */
+  pressures: Float64Array;
+  /** x, y, z of the Darcy velocity of each triangle (m/s) */
+  darcyVelocities: Float64Array;
 }
 
 export interface TransportOutput {
@@ -92,6 +121,16 @@ export interface TransportOutput {
   inflowVolumeFlux: number;
   /** m³/s */
   outflowVolumeFlux: number;
+  /** x, y, z of each point of all paths */
+  pathPoints: Float64Array;
+  /** x, y, z of the velocity at each point of all paths */
+  pathVelocities: Float64Array;
+  /** Number of points of each path */
+  pathPointCounts: Uint32Array;
+  /** The mesh point of each sector */
+  sectorNodes: Uint32Array;
+  /** x, y, z of the velocity of each sector (m per time unit) */
+  sectorVelocities: Float64Array;
 }
 
 /** The fractures which the generation accepted since the last progress message */
