@@ -121,6 +121,7 @@ const ui = {
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
   colorSelect: byId<HTMLSelectElement>("color-select"),
+  logScale: byId<HTMLInputElement>("log-scale"),
   showDomain: byId<HTMLInputElement>("show-domain"),
   showMesh: byId<HTMLInputElement>("show-mesh"),
   showUserFractures: byId<HTMLInputElement>("show-user-fractures"),
@@ -733,6 +734,7 @@ function clearOutput(): void {
   ui.results.hidden = true;
   ui.logEmpty.hidden = false;
   ui.colorSelect.disabled = true;
+  ui.logScale.disabled = true;
   if (viewer) {
     for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
       viewer.setLayer(layer, null);
@@ -757,7 +759,9 @@ function removeColorOptions(optionValues: string[]): void {
   }
   if (isSelected) {
     ui.colorSelect.value = DEFAULT_COLOR_OPTION;
-    viewer?.colorBy(colorArrayOf(ui.colorSelect.value));
+    if (viewer) {
+      applyColorChoice(viewer);
+    }
   }
 }
 
@@ -917,6 +921,13 @@ function applyLayerVisibility(view: NetworkViewer): void {
   view.setVisible("particles", ui.showParticles.checked);
 }
 
+/** Colors the mesh with the choices of the toolbar; a log scale needs a positive value of the array */
+function applyColorChoice(view: NetworkViewer): void {
+  view.setLogScale(ui.logScale.checked);
+  view.colorBy(colorArrayOf(ui.colorSelect.value));
+  ui.logScale.disabled = !view.canUseLogScale();
+}
+
 /** The value of a "Color by" option: `<association>:<name>`, "" = one color */
 function colorOptionValue(colorArray: ColorArray): string {
   return `${colorArray.association}:${colorArray.name}`;
@@ -994,7 +1005,7 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
   ui.colorSelect.value =
     [selected, previous, DEFAULT_COLOR_OPTION].find((value) => value !== null && values.includes(value)) ?? "";
   ui.colorSelect.disabled = false;
-  viewer.colorBy(colorArrayOf(ui.colorSelect.value));
+  applyColorChoice(viewer);
   viewer.render();
 }
 
@@ -1159,9 +1170,9 @@ function bindEvents(): void {
   ui.continueButton.addEventListener("click", () => void generate("continue"));
   ui.meshingButton.addEventListener("click", () => void runMeshing());
 
-  ui.colorSelect.addEventListener("change", () =>
-    updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
-  );
+  for (const control of [ui.colorSelect, ui.logScale]) {
+    control.addEventListener("change", () => updateViewer(applyColorChoice));
+  }
   ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
   for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories, ui.showParticles]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));

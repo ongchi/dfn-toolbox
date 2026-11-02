@@ -5,12 +5,13 @@ import {
   boundsDiagonal,
   cellEdges,
   cellTriangles,
+  colorFraction,
+  colorRange,
   domainEdges,
   localPositions,
   pathTubes,
   scalarBarValues,
   tableColor,
-  valueRange,
 } from "../src/viewerGeometry";
 
 test("the positions are relative to the center of their bounds", () => {
@@ -85,7 +86,36 @@ test("the colors stay in the range 0 to 1", () => {
 });
 
 test("the scalar bar has evenly spaced values from the largest value", () => {
-  expect(scalarBarValues(valueRange([0, 4, 2]), 5)).toEqual([4, 3, 2, 1, 0]);
+  expect(scalarBarValues(colorRange([0, 4, 2], false), 5)).toEqual([4, 3, 2, 1, 0]);
+});
+
+test("the labels of a log scale have equal ratios", () => {
+  const labels = scalarBarValues(colorRange([1, 10, 10000], true), 5);
+  [10000, 1000, 100, 10, 1].forEach((label, index) => expect(labels[index]).toBeCloseTo(label, 6));
+});
+
+test("a linear scale places a value in proportion", () => {
+  expect(colorFraction(3, colorRange([2, 3, 4], false))).toBe(0.5);
+});
+
+test("a log scale places a value by its order of magnitude", () => {
+  expect(colorFraction(10, colorRange([1, 100], true))).toBeCloseTo(0.5);
+});
+
+test("a log scale starts at the smallest positive value", () => {
+  expect(colorRange([-1, 0, 2, 8], true)).toEqual({ min: 2, max: 8, isLog: true });
+});
+
+test.each([0, -3])("the value %d has the lowest color on a log scale", (value) => {
+  expect(colorFraction(value, colorRange([value, 1, 10], true))).toBe(0);
+});
+
+test("equal values have the lowest color", () => {
+  expect(colorFraction(5, colorRange([5, 5], true))).toBe(0);
+});
+
+test("an array with no positive value has a linear scale", () => {
+  expect(colorRange([-2, 0], true)).toEqual({ min: -2, max: 0, isLog: false });
 });
 
 test("a tube has a ring of points at each path point", () => {

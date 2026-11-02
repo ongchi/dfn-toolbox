@@ -189,9 +189,45 @@ export function valueRange(values: ArrayLike<number>): [number, number] {
   return [min, max];
 }
 
-/** The evenly spaced values of the labels of a scalar bar, from the largest to the smallest */
-export function scalarBarValues([min, max]: [number, number], count: number): number[] {
-  return Array.from({ length: count }, (_, index) => max - ((max - min) * index) / (count - 1));
+/** The values of the lowest and the highest color */
+export interface ColorRange {
+  min: number;
+  max: number;
+  isLog: boolean;
+}
+
+/** The range of the values. A log scale uses the positive values; without one the scale is linear. */
+export function colorRange(values: ArrayLike<number>, isLogRequested: boolean): ColorRange {
+  const [min, max] = valueRange(values);
+  const smallestPositive = isLogRequested ? smallestPositiveValue(values) : null;
+  return smallestPositive === null ? { min, max, isLog: false } : { min: smallestPositive, max, isLog: true };
+}
+
+/** The smallest value above 0; null if there is none */
+export function smallestPositiveValue(values: ArrayLike<number>): number | null {
+  let smallest = Infinity;
+  for (let index = 0; index < values.length; index++) {
+    if (values[index] > 0) {
+      smallest = Math.min(smallest, values[index]);
+    }
+  }
+  return smallest === Infinity ? null : smallest;
+}
+
+/** The place (0 to 1) of a value in the color table; a value at or below the range has the lowest color */
+export function colorFraction(value: number, { min, max, isLog }: ColorRange): number {
+  if (value <= min || max <= min) {
+    return 0;
+  }
+  return isLog ? Math.log(value / min) / Math.log(max / min) : (value - min) / (max - min);
+}
+
+/** The values of the labels of a scalar bar, in equal steps of the scale, from the largest to the smallest */
+export function scalarBarValues({ min, max, isLog }: ColorRange, count: number): number[] {
+  return Array.from({ length: count }, (_, index) => {
+    const part = index / (count - 1);
+    return isLog ? max * (min / max) ** part : max - (max - min) * part;
+  });
 }
 
 /** A merged tube around each path */

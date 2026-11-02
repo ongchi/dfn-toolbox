@@ -628,6 +628,22 @@ try {
     const hasFlowVelocity = (await colorOptions(page)).includes("cell:flow_velocity");
     check(hasFlowVelocity, `${name}: flow velocity in Color by`, String(hasFlowVelocity));
     await page.select("#color-select", "cell:flow_velocity");
+    // The log scale changes the colors and the labels of the scalar bar;
+    await page.mouse.move(0, 0);
+    const scalarBarLabels = () => page.$eval(".scalar-bar-labels", (node) => node.textContent);
+    const linearLabels = await scalarBarLabels();
+    const linearView = await viewerScreenshot();
+    await page.click("#log-scale");
+    const logLabels = await scalarBarLabels();
+    const logView = await viewerScreenshot();
+    check(logLabels !== linearLabels && !logView.equals(linearView), `${name}: log scale`, `${linearLabels} → ${logLabels}`);
+    if (name === "two_families") {
+      await page.screenshot({ path: `${screenshotDir}/e2e_log_scale.png` });
+    }
+    await page.select("#color-select", "");
+    check(await page.$eval("#log-scale", (node) => node.disabled), `${name}: no log scale with one color`, "disabled");
+    await page.select("#color-select", "cell:flow_velocity");
+    await page.click("#log-scale");
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow_velocity.png` });
 

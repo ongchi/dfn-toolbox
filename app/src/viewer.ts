@@ -53,11 +53,13 @@ import {
   boundsDiagonal,
   cellEdges,
   cellTriangles,
+  colorFraction,
+  colorRange,
   localPositions,
   pathTubes,
   scalarBarValues,
+  smallestPositiveValue,
   tableColor,
-  valueRange,
   type CellShapes,
   type CellTriangles,
 } from "./viewerGeometry";
@@ -520,6 +522,7 @@ export class NetworkViewer {
   private particleLines: ParticleLines | null = null;
   private lastFrameTime: number | null = null;
   private colorArray: ColorArray | null = null;
+  private isLogScale = false;
   private isScalarBarShown = true;
   /** The camera moved: the next animation frame draws */
   private isDrawPending = false;
@@ -784,8 +787,22 @@ export class NetworkViewer {
     const style = SCALAR_BARS.get(this.colorArray.name);
     this.scalarBar.show(
       style?.title ?? this.colorArray.name,
-      scalarBarValues(valueRange(this.colorValues(this.colorArray)), SCALAR_BAR_LABEL_COUNT),
+      scalarBarValues(colorRange(this.colorValues(this.colorArray), this.isLogScale), SCALAR_BAR_LABEL_COUNT),
       style?.label ?? defaultLabel,
+    );
+  }
+
+  /** The next `colorBy` uses a log scale of the values */
+  setLogScale(isLogScale: boolean): void {
+    this.isLogScale = isLogScale;
+  }
+
+  /** True if the color array has a positive value: a log scale needs one */
+  canUseLogScale(): boolean {
+    return (
+      this.colorArray !== null &&
+      this.layers.has("final") &&
+      smallestPositiveValue(this.colorValues(this.colorArray)) !== null
     );
   }
 
@@ -803,12 +820,11 @@ export class NetworkViewer {
       mesh.material.vertexColors = false;
     } else {
       const values = this.colorValues(colorArray);
-      const [min, max] = valueRange(values);
-      const scale = max > min ? 1 / (max - min) : 0;
+      const range = colorRange(values, this.isLogScale);
       const colors = new Float32Array(3 * triangles.corners.length);
       triangles.corners.forEach((point, corner) => {
         const value = colorArray.association === "cell" ? values[triangles.cells[Math.floor(corner / 3)]] : values[point];
-        colors.set(tableColor((value - min) * scale), 3 * corner);
+        colors.set(tableColor(colorFraction(value, range)), 3 * corner);
       });
       mesh.geometry.setAttribute("color", new BufferAttribute(colors, 3));
       mesh.material.vertexColors = true;
