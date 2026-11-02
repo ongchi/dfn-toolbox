@@ -10,7 +10,8 @@ It runs three libraries in the browser (WebAssembly), and there is no server:
 - [fehm-rs](https://github.com/ongchi/fehm-rs): steady water flow in the network.
 - [dfntrans-rs](https://github.com/ongchi/dfntrans-rs): particle tracking in the flow.
 
-The 3D view uses [VTK.wasm](https://kitware.github.io/vtk-wasm/).
+The 3D view uses [three.js](https://threejs.org/). After the flow, moving particles
+show the direction and the speed of the flow.
 
 ## Use
 
@@ -87,7 +88,7 @@ Then, in `app`:
 
 ```bash
 npm ci
-npm run setup     # VTK.wasm bundle and its types, WebAssembly module and examples
+npm run setup     # WebAssembly module and examples
 npm run dev       # development server
 npm run build     # static files in dist/
 ```
@@ -131,4 +132,4 @@ port of dfnWorks, LANL), [fehm-rs](https://github.com/ongchi/fehm-rs)
 (BSD-3-Clause; based on FEHM, LANL),
 [dfntrans-rs](https://github.com/ongchi/dfntrans-rs) (LGPL-3.0; a port of
 DFNTrans of dfnWorks, LANL LA-CC-14-091) and
-[VTK.wasm](https://kitware.github.io/vtk-wasm/) (BSD-3-Clause).
+[three.js](https://threejs.org/) (MIT).
