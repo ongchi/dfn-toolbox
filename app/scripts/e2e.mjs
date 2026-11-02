@@ -277,7 +277,7 @@ async function checkPhone() {
   const phoneLabels = await page.$$eval(".viewer-toolbar .icon-label", (nodes) =>
     nodes.filter((node) => getComputedStyle(node).display !== "none").length,
   );
-  check(phoneLabels === 8, "phone: the labels of the icons", String(phoneLabels));
+  check(phoneLabels === 9, "phone: the labels of the icons", String(phoneLabels));
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
   const box = await page.$eval("#viewer-canvas", (node) => {
     const { x, y, width, height } = node.getBoundingClientRect();
@@ -414,6 +414,8 @@ try {
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
+  // The moving particles stay off: they change each screenshot
+  await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
   page.on("pageerror", (error) => failures.push(`page error: ${error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -604,6 +606,15 @@ try {
     );
     const isFlowNextDisabled = await isNextDisabled();
     const flowStatus = await runStep(page, "flow");
+    // The moving particles change the view between two frames
+    await page.click("#show-particles");
+    const particleFrame = await viewerScreenshot();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    check(!particleFrame.equals(await viewerScreenshot()), `${name}: moving particles`, "view changed");
+    if (name === "two_families") {
+      await page.screenshot({ path: `${screenshotDir}/e2e_particles.png` });
+    }
+    await page.click("#show-particles");
     const isFlowNextEnabled = !(await isNextDisabled());
     const hasFlowResults = await page.$eval("#flow-results", (node) => !node.hidden);
     const isPressureShown = await page.$eval("#color-select", (node) => node.value === "point:pressure");
@@ -935,7 +946,7 @@ try {
     })),
   );
   check(
-    iconControls.length === 8 && iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
+    iconControls.length === 9 && iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
   );

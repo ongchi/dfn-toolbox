@@ -31,6 +31,7 @@ import {
   PerspectiveCamera,
   Quaternion,
   Scene,
+  ShaderMaterial,
   Sphere,
   Sprite,
   SpriteMaterial,
@@ -41,6 +42,7 @@ import { TrackballControls } from "three/addons/controls/TrackballControls.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+import { FlowParticles, type FlowField } from "./flowParticles";
 import type { FractureBatch, ShapeArrays } from "./generationClient";
 import {
   boundaryEdges,
@@ -106,6 +108,11 @@ const AXES: readonly { label: string; direction: Vector3; color: number }[] = [
   { label: "Y", direction: new Vector3(0, 1, 0), color: 0xd0b000 },
   { label: "Z", direction: new Vector3(0, 0, 1), color: 0x20a020 },
 ];
+// The moving particles of the flow: their number, and the longest time (seconds) of one
+// step, thus a slow frame or a hidden page does not make a jump. Dark on the color table.
+const PARTICLE_COUNT = 5000;
+const MAX_PARTICLE_STEP = 0.05;
+const PARTICLE_COLOR = [0.05, 0.05, 0.15] as const;
 // The fractures of a running generation: one color for each family (family
 // 1 has the first one; more families use the colors again). Not red: the
 // rejected fractures are red.
@@ -363,6 +370,62 @@ class ScalarBar {
   }
 }
 
+/** The moving particles of the flow, as line segments which fade to their old end */
+class ParticleLines {
+  readonly lines: LineSegments<BufferGeometry, ShaderMaterial>;
+  private readonly positions: Float32Array;
+  private readonly opacities: Float32Array;
+  private readonly positionAttribute: BufferAttribute;
+  private readonly opacityAttribute: BufferAttribute;
+  private readonly origin: [number, number, number];
+
+  constructor(private readonly particles: FlowParticles, points: ArrayLike<number>) {
+    this.origin = localPositions(points).origin;
+    const segmentCount = particles.segmentCount;
+    this.positions = new Float32Array(6 * segmentCount);
+    this.opacities = new Float32Array(2 * segmentCount);
+    this.positionAttribute = new BufferAttribute(this.positions, 3).setUsage(DynamicDrawUsage);
+    this.opacityAttribute = new BufferAttribute(this.opacities, 1).setUsage(DynamicDrawUsage);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", this.positionAttribute);
+    geometry.setAttribute("opacity", this.opacityAttribute);
+    this.lines = placed(
+      new LineSegments(
+        geometry,
+        new ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          uniforms: { color: { value: new Color(...PARTICLE_COLOR) } },
+          vertexShader: `
+            attribute float opacity;
+            varying float vOpacity;
+            void main() {
+              vOpacity = opacity;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }`,
+          fragmentShader: `
+            uniform vec3 color;
+            varying float vOpacity;
+            void main() {
+              gl_FragColor = vec4(color, vOpacity);
+            }`,
+        }),
+      ),
+      this.origin,
+    );
+    // The bounds of the mesh: the particles are always in it
+    this.lines.frustumCulled = false;
+    this.advance(0);
+  }
+
+  advance(seconds: number): void {
+    this.particles.advance(seconds);
+    this.particles.writeTrails(this.origin, this.positions, this.opacities);
+    this.positionAttribute.needsUpdate = true;
+    this.opacityAttribute.needsUpdate = true;
+  }
+}
+
 /** The x, y, z arrows in a small scene: they turn with the camera */
 function axesScene(): Scene {
   const scene = new Scene();
@@ -405,6 +468,8 @@ export class NetworkViewer {
   private readonly boundaryOutlines = new Map<string, LineSegments2>();
   /** Tubes and cones */
   private trajectories: Group | null = null;
+  private particleLines: ParticleLines | null = null;
+  private lastFrameTime: number | null = null;
   private colorArray: ColorArray | null = null;
   private isScalarBarShown = true;
   /** The camera moved: the next animation frame draws */
@@ -429,7 +494,7 @@ export class NetworkViewer {
 
     new ResizeObserver(() => this.resize()).observe(parent);
     this.resize();
-    this.renderer.setAnimationLoop(() => this.animate());
+    this.renderer.setAnimationLoop((time) => this.animate(time));
   }
 
   static create(canvas: HTMLCanvasElement): NetworkViewer {
@@ -458,10 +523,33 @@ export class NetworkViewer {
     this.render();
   }
 
-  private animate(): void {
+  /** The animation runs only for visible particles: other views draw on request */
+  private animate(time: number): void {
     this.controls.update();
+    const lastTime = this.lastFrameTime;
+    this.lastFrameTime = time;
+    if (this.particleLines?.lines.visible && lastTime !== null) {
+      this.particleLines.advance(Math.min(MAX_PARTICLE_STEP, (time - lastTime) / 1000));
+      this.isDrawPending = true;
+    }
     if (this.isDrawPending) {
       this.render();
+    }
+  }
+
+  /** Shows moving particles in the flow; null removes them */
+  setFlowParticles(field: FlowField | null): void {
+    if (this.particleLines) {
+      this.removeObject(this.particleLines.lines);
+      this.particleLines = null;
+    }
+    if (field === null) {
+      return;
+    }
+    const particles = new FlowParticles(field, PARTICLE_COUNT, Math.random);
+    if (particles.particleCount > 0) {
+      this.particleLines = new ParticleLines(particles, field.points);
+      this.scene.add(this.particleLines.lines);
     }
   }
 
@@ -718,7 +806,13 @@ export class NetworkViewer {
     return cones;
   }
 
-  setVisible(layer: FractureLayer | "domain" | "trajectories", isVisible: boolean): void {
+  setVisible(layer: FractureLayer | "domain" | "trajectories" | "particles", isVisible: boolean): void {
+    if (layer === "particles") {
+      if (this.particleLines) {
+        this.particleLines.lines.visible = isVisible;
+      }
+      return;
+    }
     if (layer === "trajectories") {
       if (this.trajectories) {
         this.trajectories.visible = isVisible;
@@ -746,7 +840,7 @@ export class NetworkViewer {
     this.scene.updateMatrixWorld();
     this.scene.traverseVisible((object) => {
       const { geometry } = object as Partial<Mesh>;
-      if (geometry === undefined || object instanceof InstancedMesh || object === this.scene) {
+      if (geometry === undefined || object instanceof InstancedMesh || object === this.particleLines?.lines) {
         return;
       }
       if (geometry.boundingBox === null) {

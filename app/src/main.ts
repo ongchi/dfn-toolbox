@@ -126,6 +126,7 @@ const ui = {
   showUserFractures: byId<HTMLInputElement>("show-user-fractures"),
   showRemoved: byId<HTMLInputElement>("show-removed"),
   showRejected: byId<HTMLInputElement>("show-rejected"),
+  showParticles: byId<HTMLInputElement>("show-particles"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
   showColorBar: byId<HTMLInputElement>("show-color-bar"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
@@ -767,6 +768,9 @@ function clearFlowOutput(): void {
   flowOutputToml = null;
   ui.flowResults.hidden = true;
   removeColorOptions([PRESSURE_OPTION, FLOW_VELOCITY_OPTION]);
+  ui.showParticles.checked = false;
+  ui.showParticles.disabled = true;
+  viewer?.setFlowParticles(null);
   clearTransportOutput();
   renderTransport();
 }
@@ -851,6 +855,20 @@ async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
   ]);
 
   await showOutputInViewer(PRESSURE_OPTION);
+  ui.showParticles.disabled = false;
+  ui.showParticles.checked = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  showParticlesInViewer();
+}
+
+/** The moving particles of the flow; the page can have a flow before the viewer is ready */
+function showParticlesInViewer(): void {
+  const mesh = flowMesh();
+  if (!viewer || flowOutput === null || mesh === null) {
+    return;
+  }
+  viewer.setFlowParticles({ points: mesh.points, triangles: mesh.triangles, velocities: flowOutput.darcyVelocities });
+  applyLayerVisibility(viewer);
+  viewer.render();
 }
 
 function volumeFluxText(volumeFlux: number): string {
@@ -896,6 +914,7 @@ function applyLayerVisibility(view: NetworkViewer): void {
   view.setVisible("removed", ui.showRemoved.checked);
   view.setVisible("rejected", ui.showRejected.checked);
   view.setVisible("trajectories", ui.showTrajectories.checked);
+  view.setVisible("particles", ui.showParticles.checked);
 }
 
 /** The value of a "Color by" option: `<association>:<name>`, "" = one color */
@@ -1026,6 +1045,7 @@ async function startViewer(): Promise<void> {
   }
   await showOutputInViewer();
   await showTransportInViewer();
+  showParticlesInViewer();
   updateUserFracturesInViewer();
   viewer.resetCamera();
   viewer.render();
@@ -1143,7 +1163,7 @@ function bindEvents(): void {
     updateViewer((view) => view.colorBy(colorArrayOf(ui.colorSelect.value))),
   );
   ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
-  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories]) {
+  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories, ui.showParticles]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.showColorBar.addEventListener("change", () => updateViewer((view) => view.setScalarBarShown(ui.showColorBar.checked)));
