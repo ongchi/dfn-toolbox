@@ -6,10 +6,11 @@ import { flowToLibraryToml } from "../src/flow/toml";
 import { networkToLibraryToml } from "../src/form/toml";
 import { dataArrayValues } from "../src/inputFiles";
 import {
+  FileOutput,
+  FlowMesh,
   MeshStep,
   run_flow,
   run_generation,
-  run_transport,
   TrajectoryDetail,
   type FlowResult,
   type GenerationResult,
@@ -18,7 +19,7 @@ import {
 } from "../src/pkg/dfn_wasm.js";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow } from "../src/workflow";
-import { exampleNames, initWasm, readExample, readMesh, userFracturesFile } from "./cases";
+import { exampleNames, initWasm, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile } from "./cases";
 
 // Milliseconds: the network, the flow and the transport of an example
 const WORKFLOW_TIMEOUT = 60000;
@@ -61,6 +62,7 @@ describe.each(exampleNames)("%s", (exampleName) => {
   let generation: GenerationResult;
   let flow: FlowResult;
   let transport: TransportResult;
+  let flowToml: string;
 
   beforeAll(() => {
     const workflow = tomlToWorkflow(readExample(exampleName).toml);
@@ -75,14 +77,14 @@ describe.each(exampleNames)("%s", (exampleName) => {
       () => {},
     );
     const mesh = generation.file(FLOW_MESH_FILE) ?? "";
-    const flowToml = flowToLibraryToml(workflow.flow, surfacesWithPoints(mesh, flowSurfaces(roles)));
-    flow = run_flow(flowToml, mesh);
+    flowToml = flowToLibraryToml(workflow.flow, surfacesWithPoints(textBoundaries(mesh), flowSurfaces(roles)));
+    flow = runFlow(flowToml, mesh);
     const boundaries = {
-      inflow: surfacesWithPoints(mesh, roles.inflow),
-      outflow: surfacesWithPoints(mesh, roles.outflow),
+      inflow: surfacesWithPoints(textBoundaries(mesh), roles.inflow),
+      outflow: surfacesWithPoints(textBoundaries(mesh), roles.outflow),
     };
     const transportToml = transportToLibraryToml(workflow.transport, boundaries);
-    transport = run_transport(transportToml, flowToml, mesh, 1, TrajectoryDetail.View);
+    transport = runTransport(transportToml, flowToml, mesh, 1, TrajectoryDetail.View);
   }, WORKFLOW_TIMEOUT);
 
   test("the fractures are those of the file", () => {
@@ -127,6 +129,20 @@ describe.each(exampleNames)("%s", (exampleName) => {
     expect([...transport.path_velocities]).toEqual(fileArray(text, "velocity"));
     let end = 0;
     expect([...transport.path_point_counts].map((count) => (end += count))).toEqual(fileArray(text, "offsets"));
+  });
+
+  test("the mesh arrays give exactly the pressures of the mesh file", () => {
+    const shapes = generation.mesh_shapes as ViewShapes;
+    const cellArray = (name: string) => shapes.cell_array(name) ?? new Float64Array();
+    const mesh = new FlowMesh(shapes.points, shapes.connectivity, cellArray("fracture_id"), cellArray("aperture"), cellArray("permeability"));
+    for (const name of generation.mesh_boundary_names) {
+      mesh.add_boundary(name, generation.mesh_boundary_nodes(name) ?? new Uint32Array());
+    }
+    const fromArrays = run_flow(flowToml, mesh, FileOutput.Skip);
+    expect(fromArrays.error).toBeUndefined();
+    expect(fromArrays.file_names).toEqual([]);
+    expect([...fromArrays.pressures]).toEqual([...flow.pressures]);
+    expect(generation.mesh_boundary_names.length).toBeGreaterThan(0);
   });
 
   test("the sector velocities are those of the file", () => {

@@ -1,10 +1,11 @@
 //! Bindings of fehm: the steady flow on the triangle mesh of the network.
 
 use fehm::velocity::calculate_darcy_velocities;
-use fehm::{build_input_from_text, solve, write_output};
+use fehm::{build_input_from_mesh, build_input_from_text, solve, write_output};
 use wasm_bindgen::prelude::*;
 
 use crate::errors::{fehm_report, ErrorReport};
+use crate::view::{FileOutput, FlowMesh};
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// Checks the flow input. Returns the error, or `None` for a valid input.
@@ -83,15 +84,19 @@ impl FlowResult {
     }
 }
 
-/// Solves the flow and writes its output files into memory
+/// Solves the flow; `file_output` selects the output files (default: their text)
 #[wasm_bindgen]
-pub fn run_flow(toml_text: &str, mesh_text: &str) -> FlowResult {
+pub fn run_flow(toml_text: &str, mesh: &FlowMesh, file_output: Option<FileOutput>) -> FlowResult {
     let (outcome, log) = with_log(|| {
         let input =
-            build_input_from_text(toml_text, mesh_text).map_err(|error| fehm_report(&error))?;
+            build_input_from_mesh(toml_text, mesh.mesh()).map_err(|error| fehm_report(&error))?;
         let solution = solve(&input).map_err(|error| fehm_report(&error))?;
-        let files =
-            write_files_to_memory(|create_file| write_output(&input, &solution, create_file))?;
+        let files = match file_output.unwrap_or_default() {
+            FileOutput::Text => {
+                write_files_to_memory(|create_file| write_output(&input, &solution, create_file))?
+            }
+            FileOutput::Skip => Vec::new(),
+        };
         Ok::<_, ErrorReport>((input, solution, files))
     });
 

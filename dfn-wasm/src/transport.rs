@@ -4,7 +4,7 @@ use dfntrans::{build_input_from_text, track_particles, write_output, Transport};
 use wasm_bindgen::prelude::*;
 
 use crate::errors::{dfntrans_report, fehm_report, ErrorReport};
-use crate::view::TransportArrays;
+use crate::view::{FileOutput, FlowMesh, TransportArrays};
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// Largest distance of a path of the 3D view from the path of the particle,
@@ -137,20 +137,22 @@ impl TransportResult {
     }
 }
 
-/// Solves the flow, tracks the particles and writes the output files into memory
+/// Solves the flow and tracks the particles
 ///
 /// # Arguments
 ///
 /// * `flow_toml` - The fehm input which the `flow` key of the transport input names
 /// * `seed_if_zero` - Seed for an input with `seed = 0` (the binary uses the clock)
-/// * `trajectory_detail` - The points of each path in the trajectories file
+/// * `trajectory_detail` - The points of each path in the trajectories file and the arrays
+/// * `file_output` - Selects the output files (default: their text)
 #[wasm_bindgen]
 pub fn run_transport(
     transport_toml: &str,
     flow_toml: &str,
-    mesh_text: &str,
+    mesh: &FlowMesh,
     seed_if_zero: u32,
     trajectory_detail: TrajectoryDetail,
+    file_output: Option<FileOutput>,
 ) -> TransportResult {
     let mut seed = 0;
     let (outcome, log) = with_log(|| {
@@ -161,7 +163,7 @@ pub fn run_transport(
         }
         seed = input.seed;
 
-        let flow = fehm::build_input_from_text(flow_toml, mesh_text)
+        let flow = fehm::build_input_from_mesh(flow_toml, mesh.mesh())
             .map_err(|error| fehm_report(&error))?;
         let solution = fehm::solve(&flow).map_err(|error| fehm_report(&error))?;
         let mut transport =
@@ -169,8 +171,12 @@ pub fn run_transport(
         if trajectory_detail == TrajectoryDetail::View {
             simplify_trajectories(&mut transport);
         }
-        let files =
-            write_files_to_memory(|create_file| write_output(&input, &transport, create_file))?;
+        let files = match file_output.unwrap_or_default() {
+            FileOutput::Text => {
+                write_files_to_memory(|create_file| write_output(&input, &transport, create_file))?
+            }
+            FileOutput::Skip => Vec::new(),
+        };
         Ok::<_, ErrorReport>((transport, files))
     });
 

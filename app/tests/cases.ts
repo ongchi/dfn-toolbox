@@ -8,7 +8,20 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { networkToLibraryToml } from "../src/form/toml";
-import { initSync, input_file_names, MeshStep, run_generation } from "../src/pkg/dfn_wasm.js";
+import {
+  FlowMesh,
+  initSync,
+  input_file_names,
+  MeshStep,
+  run_flow,
+  run_generation,
+  run_transport,
+  type FlowResult,
+  type TrajectoryDetail,
+  type TransportResult,
+} from "../src/pkg/dfn_wasm.js";
+import type { MeshBoundary } from "../src/generationClient";
+import { dataArrayValues } from "../src/inputFiles";
 import type { FormState } from "../src/form/state";
 import { meshRegionNames } from "../src/inputFiles";
 import { userFracturesToVtp } from "../src/userFractures";
@@ -26,6 +39,31 @@ const TOLERANCE = "1e-9";
 export function initWasm(): void {
   const bytes = readFileSync(join(appDir, "src/pkg/dfn_wasm_bg.wasm"));
   initSync({ module: bytes });
+}
+
+/** The boundaries of a `dfn_mesh.vtu` text */
+export function textBoundaries(meshText: string): MeshBoundary[] {
+  return [...meshText.matchAll(/Name="boundary__([^"]+)"/g)].map(([, name]) => {
+    const values = dataArrayValues(meshText, `boundary__${name}`) ?? [];
+    const nodes = values.flatMap((value, point) => (value > 0 ? [point] : []));
+    return [name, Uint32Array.from(nodes)];
+  });
+}
+
+/** `run_flow` on the mesh of a `dfn_mesh.vtu` text, with the output files */
+export function runFlow(toml: string, meshText: string): FlowResult {
+  return run_flow(toml, FlowMesh.from_text(meshText));
+}
+
+/** `run_transport` on the mesh of a `dfn_mesh.vtu` text, with the output files */
+export function runTransport(
+  toml: string,
+  flowToml: string,
+  meshText: string,
+  seedIfZero: number,
+  detail: TrajectoryDetail,
+): TransportResult {
+  return run_transport(toml, flowToml, FlowMesh.from_text(meshText), seedIfZero, detail);
 }
 
 export interface CaseFiles {

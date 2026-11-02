@@ -6,10 +6,10 @@ import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { networkToLibraryToml } from "../src/form/toml";
-import { MeshStep, run_flow, run_generation, run_transport, TrajectoryDetail, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
+import { MeshStep, run_generation, TrajectoryDetail, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "../src/workflow";
-import { exampleNames, initWasm, meshPath, readExample, readMesh, userFracturesFile } from "./cases";
+import { exampleNames, initWasm, meshPath, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile } from "./cases";
 
 // Milliseconds: the network, the flow and the transport of an example
 const WORKFLOW_TIMEOUT = 60000;
@@ -43,16 +43,16 @@ describe.each(exampleNames)("%s", (exampleName) => {
     );
     expect(generation.error).toBeUndefined();
     const mesh = generation.file(FLOW_MESH_FILE) ?? "";
-    surfacesInMesh = surfacesWithPoints(mesh, flowSurfaces(roles));
+    surfacesInMesh = surfacesWithPoints(textBoundaries(mesh), flowSurfaces(roles));
 
     const flowToml = flowToLibraryToml(workflow.flow, surfacesInMesh);
-    flow = run_flow(flowToml, mesh);
+    flow = runFlow(flowToml, mesh);
 
     const boundaries = {
-      inflow: surfacesWithPoints(mesh, roles.inflow),
-      outflow: surfacesWithPoints(mesh, roles.outflow),
+      inflow: surfacesWithPoints(textBoundaries(mesh), roles.inflow),
+      outflow: surfacesWithPoints(textBoundaries(mesh), roles.outflow),
     };
-    transport = run_transport(transportToLibraryToml(workflow.transport, boundaries), flowToml, mesh, 1, TrajectoryDetail.Full);
+    transport = runTransport(transportToLibraryToml(workflow.transport, boundaries), flowToml, mesh, 1, TrajectoryDetail.Full);
   }, WORKFLOW_TIMEOUT);
 
   test("the domain is a predefined mesh", () => {

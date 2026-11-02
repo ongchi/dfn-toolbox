@@ -13,7 +13,7 @@ import { boundarySurfaceCells, DEFAULT_SURFACE_COLORS, domainBoundarySurfaceName
 import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm, type FlowBoundary } from "./flow/form";
-import { defaultFlowState, FLOW_MESH_FILE, type FlowState } from "./flow/state";
+import { defaultFlowState, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
@@ -25,6 +25,7 @@ import {
   firstFractures,
   GenerationClient,
   type FlowInput,
+  type FlowMeshArrays,
   type FlowOutput,
   type FractureBatch,
   type GenerationCallbacks,
@@ -319,7 +320,7 @@ function flowBoundaries(): FlowBoundary[] | null {
   if (mesh === null) {
     return null;
   }
-  const withPoints = surfacesWithPoints(mesh, flowSurfaces(boundaryRoles));
+  const withPoints = surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles));
   return flowSurfaces(boundaryRoles).map((name) => ({
     name,
     isInflow: roleOf(boundaryRoles, name) === "inflow",
@@ -646,7 +647,7 @@ function flowInput(): FlowInput | string {
   if (ui.flowForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
-  return { toml: flowToLibraryToml(flowState, surfacesWithPoints(mesh, flowSurfaces(boundaryRoles))), mesh };
+  return { toml: flowToLibraryToml(flowState, surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles))), mesh };
 }
 
 async function runFlow(): Promise<void> {
@@ -687,8 +688,8 @@ function transportInput(): TransportInput | string {
     return "A field of the form has an invalid value (red border). Correct it first.";
   }
   const boundaries = {
-    inflow: surfacesWithPoints(mesh, boundaryRoles.inflow),
-    outflow: surfacesWithPoints(mesh, boundaryRoles.outflow),
+    inflow: surfacesWithPoints(mesh.boundaries, boundaryRoles.inflow),
+    outflow: surfacesWithPoints(mesh.boundaries, boundaryRoles.outflow),
   };
   return { toml: transportToLibraryToml(transportState, boundaries), flowToml: flowOutputToml, mesh };
 }
@@ -783,13 +784,21 @@ function clearTransportOutput(): void {
   }
 }
 
-function outputFile(name: string): string | null {
-  return output?.files.find(([fileName]) => fileName === name)?.[1] ?? null;
-}
-
 /** The triangle mesh of the last "Meshing", the mesh of the flow */
-function flowMesh(): string | null {
-  return outputFile(FLOW_MESH_FILE);
+function flowMesh(): FlowMeshArrays | null {
+  const shapes = output?.shapes;
+  if (shapes == null || shapes.mesh === null) {
+    return null;
+  }
+  const cellArray = (name: string) => shapes.mesh?.cellArrays.find(([arrayName]) => arrayName === name)?.[1] ?? new Float64Array();
+  return {
+    points: shapes.mesh.points,
+    triangles: shapes.mesh.connectivity,
+    fractureIds: cellArray("fracture_id"),
+    apertures: cellArray("aperture"),
+    permeabilities: cellArray("permeability"),
+    boundaries: shapes.meshBoundaries,
+  };
 }
 
 function showStats(list: HTMLDListElement, stats: [string, string][]): void {

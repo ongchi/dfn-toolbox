@@ -3,9 +3,72 @@
 
 use dfngen::fracture::poly::Poly;
 use dfngen::io::output::to_output_coordinates;
+use dfngen::io::vtk::{mesh_boundary_arrays, BoundaryNames};
 use dfngen::Network;
 use dfntrans::Transport;
 use wasm_bindgen::prelude::*;
+
+/// Whether a run writes its output files into memory
+#[wasm_bindgen]
+#[derive(Clone, Copy, Default, PartialEq)]
+pub enum FileOutput {
+    /// The text of each file: the tests compare it with the native binaries
+    #[default]
+    Text,
+    /// No files: the app uses the arrays
+    Skip,
+}
+
+/// The triangle mesh for the flow and the transport
+#[wasm_bindgen]
+pub struct FlowMesh(fehm::mesh::Mesh);
+
+#[wasm_bindgen]
+impl FlowMesh {
+    /// The mesh without boundaries; `points` has x, y, z of each point, and
+    /// `triangles` the 3 point numbers of each triangle
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        points: &[f64],
+        triangles: &[u32],
+        fracture_ids: &[f64],
+        apertures: Vec<f64>,
+        permeabilities: Vec<f64>,
+    ) -> Self {
+        Self(fehm::mesh::Mesh {
+            points: points.as_chunks::<3>().0.to_vec(),
+            triangles: triangles
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .map(|corners| corners.map(|point| point as usize))
+                .collect(),
+            fracture_ids: fracture_ids.iter().map(|&id| id as i64).collect(),
+            apertures,
+            permeabilities,
+            boundaries: Vec::new(),
+        })
+    }
+
+    /// Adds a boundary: its points in increasing order
+    pub fn add_boundary(&mut self, name: String, nodes: &[u32]) {
+        self.0.boundaries.push(fehm::mesh::BoundaryNodes {
+            name,
+            nodes: nodes.iter().map(|&node| node as usize).collect(),
+        });
+    }
+
+    /// The mesh of a `dfn_mesh.vtu` text, for the tests
+    pub fn from_text(text: &str) -> Result<FlowMesh, String> {
+        fehm::io::vtu::parse_mesh(text).map(Self)
+    }
+}
+
+impl FlowMesh {
+    pub(crate) fn mesh(&self) -> fehm::mesh::Mesh {
+        self.0.clone()
+    }
+}
 
 /// Polygons or triangles of one layer of the view
 #[wasm_bindgen]
@@ -64,6 +127,8 @@ pub(crate) struct NetworkShapes {
     pub(crate) rejected: Option<ViewShapes>,
     /// `None` without the triangle mesh
     pub(crate) mesh: Option<ViewShapes>,
+    /// (name, its points in increasing order) of each boundary of the mesh
+    pub(crate) mesh_boundaries: Vec<(String, Vec<u32>)>,
 }
 
 impl NetworkShapes {
@@ -97,6 +162,7 @@ impl NetworkShapes {
             removed: (!removed_polys.is_empty()).then(|| polygon_shapes(&removed_polys, network)),
             rejected: writes_rejected.then(|| polygon_shapes(&rejected_polys, network)),
             mesh: network.mesh.as_ref().map(|_| mesh_shapes(network)),
+            mesh_boundaries: mesh_boundaries(network),
         }
     }
 }
@@ -199,6 +265,40 @@ fn mesh_shapes(network: &Network) -> ViewShapes {
             ("aperture".to_string(), apertures),
         ],
     }
+}
+
+/// The point arrays `boundary__<name>` of `dfn_mesh.vtu`, as lists of points
+fn mesh_boundaries(network: &Network) -> Vec<(String, Vec<u32>)> {
+    let Some(mesh) = &network.mesh else {
+        return Vec::new();
+    };
+    let domain_mesh = &network.input.domain_mesh;
+    let regions: Vec<&str> = domain_mesh
+        .regions()
+        .iter()
+        .map(|region| region.name.as_str())
+        .collect();
+    let surfaces: Vec<&str> = domain_mesh
+        .boundary_surfaces()
+        .iter()
+        .map(|surface| surface.name.as_str())
+        .collect();
+    let names = BoundaryNames {
+        regions: &regions,
+        surfaces: &surfaces,
+    };
+    mesh_boundary_arrays(mesh, &names)
+        .into_iter()
+        .map(|(name, is_on_boundary)| {
+            let nodes = is_on_boundary
+                .iter()
+                .enumerate()
+                .filter(|(_, &is_on)| is_on)
+                .map(|(point, _)| point as u32)
+                .collect();
+            (name, nodes)
+        })
+        .collect()
 }
 
 /// The paths and the velocities of a transport

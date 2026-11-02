@@ -11,7 +11,7 @@ use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 use crate::errors::{dfngen_report, ErrorReport};
-use crate::view::{NetworkShapes, ViewShapes};
+use crate::view::{FileOutput, NetworkShapes, ViewShapes};
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// The files which an input file needs, from its text
@@ -141,6 +141,25 @@ impl GenerationResult {
             .and_then(|shapes| shapes.rejected.clone())
     }
 
+    /// Names of the boundaries of the triangle mesh
+    #[wasm_bindgen(getter)]
+    pub fn mesh_boundary_names(&self) -> Vec<String> {
+        self.shapes
+            .iter()
+            .flat_map(|shapes| &shapes.mesh_boundaries)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// The points of a boundary of the triangle mesh, in increasing order
+    pub fn mesh_boundary_nodes(&self, name: &str) -> Option<Vec<u32>> {
+        self.shapes
+            .iter()
+            .flat_map(|shapes| &shapes.mesh_boundaries)
+            .find(|(boundary, _)| boundary == name)
+            .map(|(_, nodes)| nodes.clone())
+    }
+
     /// The triangle mesh of the final fractures
     #[wasm_bindgen(getter)]
     pub fn mesh_shapes(&self) -> Option<ViewShapes> {
@@ -228,6 +247,10 @@ struct Callbacks<'a> {
     clippy::needless_pass_by_value,
     reason = "wasm-bindgen does not take Option<&str> and Option<&Function>"
 )]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments of a wasm-bindgen function are the JS interface"
+)]
 pub fn run_generation(
     toml_text: &str,
     domain_mesh_text: &str,
@@ -236,6 +259,7 @@ pub fn run_generation(
     mesh_step: MeshStep,
     on_progress: &js_sys::Function,
     on_checkpoint: Option<js_sys::Function>,
+    file_output: Option<FileOutput>,
 ) -> GenerationResult {
     let texts = InputTexts {
         toml: toml_text,
@@ -246,7 +270,14 @@ pub fn run_generation(
         on_progress: Some(on_progress),
         on_checkpoint: on_checkpoint.as_ref(),
     };
-    run(&texts, seed_if_zero, None, mesh_step.into(), &callbacks)
+    run(
+        &texts,
+        seed_if_zero,
+        None,
+        mesh_step.into(),
+        &callbacks,
+        file_output.unwrap_or_default(),
+    )
 }
 
 /// Generates a network from the checkpoint of a stopped generation, as
@@ -276,6 +307,7 @@ pub fn resume_generation(
     mesh_step: MeshStep,
     on_progress: &js_sys::Function,
     on_checkpoint: Option<js_sys::Function>,
+    file_output: Option<FileOutput>,
 ) -> GenerationResult {
     let texts = InputTexts {
         toml: toml_text,
@@ -293,6 +325,7 @@ pub fn resume_generation(
         Some((checkpoint, mode)),
         mesh_step.into(),
         &callbacks,
+        file_output.unwrap_or_default(),
     )
 }
 
@@ -314,6 +347,10 @@ pub fn resume_generation(
     clippy::needless_pass_by_value,
     reason = "wasm-bindgen does not take Option<&str> and Option<&[u8]>"
 )]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments of a wasm-bindgen function are the JS interface"
+)]
 pub fn mesh_generation(
     network_toml_text: &str,
     current_toml_text: &str,
@@ -322,6 +359,7 @@ pub fn mesh_generation(
     current_user_fractures_text: Option<String>,
     seed: u64,
     checkpoint: Option<Vec<u8>>,
+    file_output: Option<FileOutput>,
 ) -> GenerationResult {
     let network_texts = InputTexts {
         toml: network_toml_text,
@@ -347,6 +385,7 @@ pub fn mesh_generation(
         restart,
         MeshSource::Texts(&current_texts),
         &callbacks,
+        file_output.unwrap_or_default(),
     )
 }
 
@@ -377,6 +416,7 @@ fn run(
     restart: Option<(&[u8], RestartMode)>,
     mesh_source: MeshSource,
     callbacks: &Callbacks,
+    file_output: FileOutput,
 ) -> GenerationResult {
     let mut seed = 0;
     let (outcome, log) = with_log(|| {
@@ -437,7 +477,12 @@ fn run(
         .map_err(|error| dfngen_report(&error))?;
         seed = network.input.seed;
 
-        let files = write_files_to_memory(|create_file| write_output(&network, create_file))?;
+        let files = match file_output {
+            FileOutput::Text => {
+                write_files_to_memory(|create_file| write_output(&network, create_file))?
+            }
+            FileOutput::Skip => Vec::new(),
+        };
         Ok::<_, ErrorReport>((network, files))
     });
 

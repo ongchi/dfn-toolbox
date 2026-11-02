@@ -3,7 +3,7 @@
 // clusters which connect an in-flow and an out-flow surface, the flow has a
 // pressure on each of them, and the particles go from the in-flow to the
 // out-flow surfaces.
-import { dataArrayValues } from "./inputFiles";
+import type { MeshBoundary } from "./generationClient";
 import { string, TableReader, type Table, type TomlTable } from "./form/toml";
 
 export type SurfaceRole = "inflow" | "outflow" | "noflow";
@@ -40,12 +40,12 @@ export function flowSurfaces(roles: BoundaryRoles): string[] {
 }
 
 /**
- * The surfaces of `names` with a point in the triangle mesh: a value above 0
- * in the point array `boundary__<name>`. A surface of a group of two or more
- * surfaces can have no point; fehm and dfntrans reject such a boundary.
+ * The surfaces of `names` with a point in the triangle mesh. A surface of a
+ * group of two or more surfaces can have no point; fehm and dfntrans reject
+ * such a boundary.
  */
-export function surfacesWithPoints(triangleMesh: string, names: string[]): string[] {
-  return names.filter((name) => dataArrayValues(triangleMesh, `boundary__${name}`)?.some((value) => value > 0));
+export function surfacesWithPoints(meshBoundaries: MeshBoundary[], names: string[]): string[] {
+  return names.filter((name) => meshBoundaries.some(([boundary, nodes]) => boundary === name && nodes.length > 0));
 }
 
 /** A TOML array of names */

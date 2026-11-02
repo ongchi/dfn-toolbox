@@ -8,8 +8,8 @@ import { beforeAll, expect, test } from "vitest";
 import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
 import { defaultFlowState, FLOW_MESH_FILE, pressureOf } from "../src/flow/state";
 import { flowTables, flowToLibraryToml } from "../src/flow/toml";
-import { check_flow_input, run_flow } from "../src/pkg/dfn_wasm.js";
-import { compareOutputFolders, generateExample, initWasm, runNativeFehm } from "./cases";
+import { check_flow_input } from "../src/pkg/dfn_wasm.js";
+import { compareOutputFolders, generateExample, initWasm, runFlow, runNativeFehm, textBoundaries } from "./cases";
 
 // The example with the boundary arrays of the mesh surface, of the regions
 // west_box, east_box and other_boxes, and of the boundary surfaces north and east
@@ -37,7 +37,7 @@ function meshWithEmptyArray(): string {
 }
 
 test("the surfaces with points are the boundary arrays with a value above 0", () => {
-  expect(surfacesWithPoints(meshWithEmptyArray(), ["north", "empty", "east", "nowhere"])).toEqual(["north", "east"]);
+  expect(surfacesWithPoints(textBoundaries(meshWithEmptyArray()), ["north", "empty", "east", "nowhere"])).toEqual(["north", "east"]);
 });
 
 test("the TOML of the flow form is a valid input", () => {
@@ -61,7 +61,7 @@ test("the flow of the workflow file is a valid input", () => {
 
 test("the output files agree with the native binary of fehm", () => {
   const toml = flowToml(PRESSURES);
-  const result = run_flow(toml, mesh);
+  const result = runFlow(toml, mesh);
   expect(result.error).toBeUndefined();
 
   const wasmDir = mkdtempSync(join(tmpdir(), "fehm-wasm-"));
@@ -72,7 +72,7 @@ test("the output files agree with the native binary of fehm", () => {
 });
 
 test("the in-flow and the out-flow are equal", () => {
-  const result = run_flow(flowToml(PRESSURES), mesh);
+  const result = runFlow(flowToml(PRESSURES), mesh);
   const [inflow, outflow] = result.boundary_flows;
   expect(result.boundary_names).toEqual(["north", "east"]);
   expect(inflow).toBeGreaterThan(0);

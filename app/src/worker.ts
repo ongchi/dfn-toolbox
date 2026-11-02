@@ -1,13 +1,15 @@
 // Runs the generation, the flow and the transport (WebAssembly) in a Web
 // Worker, so the page stays responsive. Messages: see `generationClient.ts`.
 import { toToolError, type ToolError } from "./errors";
-import type { FractureBatch, NetworkShapes, ShapeArrays, WorkerRequest, WorkerResponse } from "./generationClient";
+import type { FlowMeshArrays, FractureBatch, NetworkShapes, ShapeArrays, WorkerRequest, WorkerResponse } from "./generationClient";
 import init, {
   mesh_generation,
   run_flow,
   resume_generation,
   run_generation,
   run_transport,
+  FileOutput,
+  FlowMesh,
   MeshStep,
   RestartMode,
   TrajectoryDetail,
@@ -113,19 +115,34 @@ function networkShapes(result: GenerationResult): NetworkShapes | null {
     removed: optionalShapeArrays(result.removed_shapes),
     rejected: optionalShapeArrays(result.rejected_shapes),
     mesh: optionalShapeArrays(result.mesh_shapes),
+    meshBoundaries: result.mesh_boundary_names.map((name: string): [string, Uint32Array] => [
+      name,
+      result.mesh_boundary_nodes(name) ?? new Uint32Array(),
+    ]),
   };
+}
+
+/** The WebAssembly object of the mesh; the caller frees it */
+function flowMesh(arrays: FlowMeshArrays): FlowMesh {
+  const mesh = new FlowMesh(arrays.points, arrays.triangles, arrays.fractureIds, arrays.apertures, arrays.permeabilities);
+  for (const [name, nodes] of arrays.boundaries) {
+    mesh.add_boundary(name, nodes);
+  }
+  return mesh;
 }
 
 /** Posts the result of a generation; the WebAssembly object is freed */
 function postGenerationResult(result: GenerationResult): void {
   const shapes = networkShapes(result);
-  const buffers = [shapes?.fractures ?? null, shapes?.removed ?? null, shapes?.rejected ?? null, shapes?.mesh ?? null].flatMap(shapeBuffers);
+  const buffers = [
+    ...[shapes?.fractures ?? null, shapes?.removed ?? null, shapes?.rejected ?? null, shapes?.mesh ?? null].flatMap(shapeBuffers),
+    ...(shapes?.meshBoundaries ?? []).map(([, nodes]) => nodes.buffer as ArrayBuffer),
+  ];
   post(
     {
       type: "result",
       error: toolError(result.error),
       seed: result.seed.toString(),
-      files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
       acceptedCount: result.accepted_count,
       finalCount: result.final_count,
       rejectedCount: result.rejected_count,
@@ -148,12 +165,15 @@ function handle(request: WorkerRequest): void {
         request.current.userFractures,
         BigInt(request.seed),
         request.checkpoint ?? undefined,
+        FileOutput.Skip,
       ),
     );
     return;
   }
   if (request.type === "runFlow") {
-    const result = run_flow(request.toml, request.mesh);
+    const mesh = flowMesh(request.mesh);
+    const result = run_flow(request.toml, mesh, FileOutput.Skip);
+    mesh.free();
     const flows: Float64Array = result.boundary_flows;
     const pressures: Float64Array = result.pressures;
     const darcyVelocities: Float64Array = result.darcy_velocities;
@@ -161,8 +181,7 @@ function handle(request: WorkerRequest): void {
       {
         type: "flowResult",
         error: toolError(result.error),
-        files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
-        boundaryFlows: result.boundary_names.map((name: string, index: number) => ({ name, massFlow: flows[index] })),
+          boundaryFlows: result.boundary_names.map((name: string, index: number) => ({ name, massFlow: flows[index] })),
         newtonIterations: result.newton_iterations,
         pressures,
         darcyVelocities,
@@ -173,7 +192,9 @@ function handle(request: WorkerRequest): void {
     return;
   }
   if (request.type === "runTransport") {
-    const result = run_transport(request.toml, request.flowToml, request.mesh, request.seedIfZero, TrajectoryDetail.View);
+    const mesh = flowMesh(request.mesh);
+    const result = run_transport(request.toml, request.flowToml, mesh, request.seedIfZero, TrajectoryDetail.View, FileOutput.Skip);
+    mesh.free();
     const pathPoints: Float64Array = result.path_points;
     const pathVelocities: Float64Array = result.path_velocities;
     const pathPointCounts: Uint32Array = result.path_point_counts;
@@ -184,8 +205,7 @@ function handle(request: WorkerRequest): void {
         type: "transportResult",
         error: toolError(result.error),
         seed: result.seed,
-        files: result.file_names.map((name: string): [string, string] => [name, result.file(name) ?? ""]),
-        particleCount: result.particle_count,
+          particleCount: result.particle_count,
         exitCount: result.exit_count,
         inflowVolumeFlux: result.inflow_volume_flux,
         outflowVolumeFlux: result.outflow_volume_flux,
@@ -238,6 +258,7 @@ function handle(request: WorkerRequest): void {
           MeshStep.Skip,
           onProgress,
           onCheckpoint,
+          FileOutput.Skip,
         )
       : resume_generation(
           request.toml,
@@ -248,6 +269,7 @@ function handle(request: WorkerRequest): void {
           MeshStep.Skip,
           onProgress,
           onCheckpoint,
+          FileOutput.Skip,
         ),
   );
 }

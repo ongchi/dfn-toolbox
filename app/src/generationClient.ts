@@ -8,11 +8,28 @@ export interface GenerationInput {
   userFractures: string | undefined;
 }
 
+/** The triangle mesh of a generation, for the flow and the transport */
+export interface FlowMeshArrays {
+  /** x, y, z of each point */
+  points: Float64Array;
+  /** The three point numbers of each triangle */
+  triangles: Uint32Array;
+  /** One number for each triangle */
+  fractureIds: Float64Array;
+  /** One number for each triangle (m) */
+  apertures: Float64Array;
+  /** One number for each triangle (m²) */
+  permeabilities: Float64Array;
+  boundaries: MeshBoundary[];
+}
+
+/** (name, its points in increasing order) of a boundary of the triangle mesh */
+export type MeshBoundary = [string, Uint32Array];
+
 export interface FlowInput {
   /** The TOML of fehm */
   toml: string;
-  /** The triangle mesh of the generation (dfn_mesh.vtu) */
-  mesh: string;
+  mesh: FlowMeshArrays;
 }
 
 export interface TransportInput {
@@ -20,8 +37,7 @@ export interface TransportInput {
   toml: string;
   /** The TOML of fehm of the last flow run */
   flowToml: string;
-  /** The triangle mesh of the generation (dfn_mesh.vtu) */
-  mesh: string;
+  mesh: FlowMeshArrays;
 }
 
 /** A restart of a stopped generation from its checkpoint */
@@ -71,15 +87,14 @@ export interface NetworkShapes {
   rejected: ShapeArrays | null;
   /** null without the triangle mesh */
   mesh: ShapeArrays | null;
+  meshBoundaries: MeshBoundary[];
 }
 
 export interface GenerationOutput {
-  /** The error of the library; then there are no files */
+  /** The error of the library; then there are no shapes */
   error: ToolError | null;
   /** Seed which the generation used (decimal digits) */
   seed: string;
-  /** (name, text) of each output file */
-  files: [string, string][];
   acceptedCount: number;
   finalCount: number;
   rejectedCount: number;
@@ -96,10 +111,8 @@ export interface BoundaryFlow {
 }
 
 export interface FlowOutput {
-  /** The error of the library; then there are no files */
+  /** The error of the library; then the arrays are empty */
   error: ToolError | null;
-  /** (name, text) of each output file */
-  files: [string, string][];
   boundaryFlows: BoundaryFlow[];
   newtonIterations: number;
   /** Pressure of each mesh point (MPa) */
@@ -109,19 +122,17 @@ export interface FlowOutput {
 }
 
 export interface TransportOutput {
-  /** The error of the library; then there are no files */
+  /** The error of the library; then the arrays are empty */
   error: ToolError | null;
   /** Seed which the run used */
   seed: number;
-  /** (name, text) of each output file; the trajectories have only the points of the 3D view */
-  files: [string, string][];
   particleCount: number;
   exitCount: number;
   /** m³/s */
   inflowVolumeFlux: number;
   /** m³/s */
   outflowVolumeFlux: number;
-  /** x, y, z of each point of all paths */
+  /** x, y, z of each point of all paths: only the points of the 3D view */
   pathPoints: Float64Array;
   /** x, y, z of the velocity at each point of all paths */
   pathVelocities: Float64Array;

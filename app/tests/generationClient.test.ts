@@ -38,7 +38,15 @@ test("a transport result replaces the worker, which gives its memory back", asyn
   }
   vi.stubGlobal("Worker", FakeWorker);
 
-  await new GenerationClient().runTransport({ toml: "", flowToml: "", mesh: "" });
+  const mesh = {
+    points: new Float64Array(),
+    triangles: new Uint32Array(),
+    fractureIds: new Float64Array(),
+    apertures: new Float64Array(),
+    permeabilities: new Float64Array(),
+    boundaries: [],
+  };
+  await new GenerationClient().runTransport({ toml: "", flowToml: "", mesh });
   vi.unstubAllGlobals();
 
   expect(workers.map((worker) => worker.isTerminated)).toEqual([true, false]);

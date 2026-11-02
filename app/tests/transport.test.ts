@@ -8,11 +8,11 @@ import { beforeAll, expect, test } from "vitest";
 import { flowSurfaces, type BoundaryRoles } from "../src/boundaryRoles";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
-import { check_transport_input, run_transport, TrajectoryDetail } from "../src/pkg/dfn_wasm.js";
+import { check_transport_input, TrajectoryDetail } from "../src/pkg/dfn_wasm.js";
 import { defaultTransportState, TRANSPORT_FLOW_FILE, type TransportState } from "../src/transport/state";
 import { transportTables, transportToLibraryToml } from "../src/transport/toml";
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
-import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans } from "./cases";
+import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans, runTransport } from "./cases";
 
 // The example with the boundary surfaces north and east
 const EXAMPLE_NAME = "l_shape_north_east";
@@ -68,7 +68,7 @@ const TRANSPORT_TOLERANCE = "1e-5";
 
 test("the output files agree with the native binary of dfntrans", () => {
   const toml = transportToml();
-  const result = run_transport(toml, flowToml, mesh, 1, TrajectoryDetail.Full);
+  const result = runTransport(toml, flowToml, mesh, 1, TrajectoryDetail.Full);
   expect(result.error).toBeUndefined();
 
   const wasmDir = mkdtempSync(join(tmpdir(), "dfntrans-wasm-"));
@@ -84,7 +84,7 @@ test("the output files agree with the native binary of dfntrans", () => {
 });
 
 test("some particles exit through the out-flow boundary", () => {
-  const result = run_transport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.Full);
+  const result = runTransport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.Full);
   expect(result.particle_count).toBeGreaterThan(0);
   expect(result.exit_count).toBeGreaterThan(0);
   expect(result.inflow_volume_flux).toBeGreaterThan(0);
@@ -93,7 +93,7 @@ test("some particles exit through the out-flow boundary", () => {
 test("seed 0 uses the seed of the page", () => {
   const state = transportState();
   state.seed = 0;
-  expect(run_transport(transportToml(state), flowToml, mesh, 77, TrajectoryDetail.Full).seed).toBe(77);
+  expect(runTransport(transportToml(state), flowToml, mesh, 77, TrajectoryDetail.Full).seed).toBe(77);
 });
 
 test("no in-flow boundary is an error", () => {
@@ -103,7 +103,7 @@ test("no in-flow boundary is an error", () => {
 
 test("an unknown boundary is an error of the run", () => {
   const toml = transportToml().replace('inflow = ["north"]', 'inflow = ["nowhere"]');
-  const error = run_transport(toml, flowToml, mesh, 1, TrajectoryDetail.Full).error;
+  const error = runTransport(toml, flowToml, mesh, 1, TrajectoryDetail.Full).error;
   expect([error?.kind, error?.field_values]).toEqual(["dfntrans.UnknownBoundary", ["nowhere"]]);
 });
 
@@ -113,8 +113,8 @@ function trajectoryPointCount(vtpText: string): number {
 }
 
 test("the trajectories for the 3D view have far fewer points than those of the binary", () => {
-  const full = run_transport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.Full);
-  const view = run_transport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.View);
+  const full = runTransport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.Full);
+  const view = runTransport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.View);
   expect(view.error).toBeUndefined();
   const fullPoints = trajectoryPointCount(full.file("trajectories.vtp") ?? "");
   const viewPoints = trajectoryPointCount(view.file("trajectories.vtp") ?? "");
@@ -125,7 +125,7 @@ test("the trajectories for the 3D view have far fewer points than those of the b
 
 test("the transport velocities give a speed at the points of the mesh", () => {
   const state = transportState();
-  const result = run_transport(transportToml(state), flowToml, mesh, 1, TrajectoryDetail.Full);
+  const result = runTransport(transportToml(state), flowToml, mesh, 1, TrajectoryDetail.Full);
   expect(result.error).toBeUndefined();
   const pointCount = Number(mesh.match(/NumberOfPoints="(\d+)"/)?.[1]);
   const speeds = [...nodeVelocityMagnitudes(result.sector_nodes, result.sector_velocities, pointCount, state.timeUnit)];
