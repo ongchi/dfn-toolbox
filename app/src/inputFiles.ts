@@ -34,15 +34,19 @@ export function dataArrayValues(vtuText: string, name: string): number[] | null 
   return match === null ? null : match[1].trim().split(/\s+/).filter((word) => word !== "").map(Number);
 }
 
+/** The numbers of <Points> of an ASCII VTK file; the array can have any name */
+export function pointValues(vtkText: string): number[] {
+  const pointsText = vtkText.match(/<Points>\s*<DataArray[^>]*>([^<]*)<\/DataArray>/)?.[1] ?? "";
+  return pointsText.trim().split(/\s+/).filter((word) => word !== "").map(Number);
+}
+
 /**
  * The bounding box of the cells of each region of an ASCII .vtu mesh (the
  * cells with a value above 0 in `region__<name>`), in the order of the file.
  * A region with no cell is not in the list.
  */
 export function meshRegionBounds(vtuText: string): RegionBounds[] {
-  // The array of <Points> can have any name
-  const pointsText = vtuText.match(/<Points>\s*<DataArray[^>]*>([^<]*)<\/DataArray>/)?.[1] ?? "";
-  const points = pointsText.trim().split(/\s+/).filter((word) => word !== "").map(Number);
+  const points = pointValues(vtuText);
   const connectivity = dataArrayValues(vtuText, "connectivity") ?? [];
   const offsets = dataArrayValues(vtuText, "offsets") ?? [];
   return meshRegionNames(vtuText).flatMap((name): RegionBounds[] => {

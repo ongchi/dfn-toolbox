@@ -68,12 +68,6 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/app/package-lock.json
-      # fetch-vtk.sh downloads the bundle only if the cached file does not have its SHA-256
-      - uses: actions/cache@v6
-        with:
-          path: web/app/public/vtk/vtk-wasm32-emscripten.tar.gz
-          key: vtk-wasm-${{ hashFiles('web/fetch-vtk.sh') }}
-
       - uses: actions/configure-pages@v6
         id: pages
       - name: Test and build the site

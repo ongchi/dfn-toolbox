@@ -138,25 +138,9 @@ async function boundaryLabels(page, formSelector, sectionTitle) {
   );
 }
 
-/** Keeps the WebAssembly memories of the page thread: only VTK.wasm runs there */
-async function rememberPageMemories(page) {
-  await page.evaluateOnNewDocument(() => {
-    globalThis.pageMemories = [];
-    for (const name of ["instantiate", "instantiateStreaming"]) {
-      const original = WebAssembly[name];
-      WebAssembly[name] = async (...args) => {
-        const output = await original.apply(WebAssembly, args);
-        const memories = Object.values((output.instance ?? output).exports).filter((value) => value instanceof WebAssembly.Memory);
-        globalThis.pageMemories.push(...memories);
-        return output;
-      };
-    }
-  });
-}
-
-/** The size (bytes) of the VTK.wasm heap */
-async function viewHeapSize(page) {
-  return page.evaluate(() => globalThis.pageMemories.reduce((sum, memory) => sum + memory.buffer.byteLength, 0));
+/** The number of geometries of the view on the graphics card */
+async function viewGeometryCount(page) {
+  return page.$eval("#viewer-canvas", (node) => Number(node.dataset.geometryCount));
 }
 
 /** Runs the step of a sidebar tab; returns the status text */
@@ -430,7 +414,6 @@ try {
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
-  await rememberPageMemories(page);
   page.on("pageerror", (error) => failures.push(`page error: ${error.message}`));
   page.on("console", (message) => {
     if (message.type() === "error") {
@@ -663,14 +646,14 @@ try {
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_transport.png` });
   }
 
-  // More runs of the transport use the memory of the old views: the heap of the view does not grow
+  // More runs of the transport free the shapes of the old views
   await runStep(page, "transport");
-  const heapBefore = await viewHeapSize(page);
+  const geometriesBefore = await viewGeometryCount(page);
   for (let run = 0; run < TRANSPORT_REPEATS; run += 1) {
     await runStep(page, "transport");
   }
-  const heapAfter = await viewHeapSize(page);
-  check(heapBefore > 0 && heapAfter === heapBefore, "view memory of repeated transports", `${heapBefore} → ${heapAfter} bytes`);
+  const geometriesAfter = await viewGeometryCount(page);
+  check(geometriesBefore > 0 && geometriesAfter === geometriesBefore, "view memory of repeated transports", `${geometriesBefore} → ${geometriesAfter} geometries`);
 
   // The Log view has the three sections and does not change the 3D view
   await page.mouse.move(0, 0);

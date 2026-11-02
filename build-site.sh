@@ -20,7 +20,6 @@ projects_dir="$(dirname "$web_dir")"
 app_dir="$web_dir/app"
 
 (cd "$app_dir" && npm ci)
-"$web_dir/fetch-vtk.sh"
 "$web_dir/build-wasm.sh"
 
 # The tests compare the WebAssembly module with the native binaries

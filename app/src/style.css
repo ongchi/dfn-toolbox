@@ -531,6 +531,46 @@ progress {
   touch-action: none;
 }
 
+/* The colors of the view and their values, over the view at the right */
+.scalar-bar {
+  position: absolute;
+  right: 12px;
+  bottom: 10%;
+  height: 60%;
+  max-width: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #1a1a1a;
+  pointer-events: none;
+}
+
+.scalar-bar[hidden] {
+  display: none;
+}
+
+.scalar-bar-title {
+  font-weight: 700;
+}
+
+.scalar-bar-body {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  min-height: 0;
+}
+
+.scalar-bar-ramp {
+  width: 24px;
+}
+
+.scalar-bar-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
 .viewer-message {
   position: absolute;
   inset: 0;

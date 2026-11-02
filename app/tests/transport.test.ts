@@ -6,13 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { flowSurfaces, type BoundaryRoles } from "../src/boundaryRoles";
-import { pointCount } from "../src/flow/polyData";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_transport_input, run_transport, TrajectoryDetail } from "../src/pkg/dfn_wasm.js";
 import { defaultTransportState, TRANSPORT_FLOW_FILE, type TransportState } from "../src/transport/state";
 import { transportTables, transportToLibraryToml } from "../src/transport/toml";
-import { markVelocityAsVectors } from "../src/transport/trajectories";
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
 import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans } from "./cases";
 
@@ -92,12 +90,6 @@ test("some particles exit through the out-flow boundary", () => {
   expect(result.inflow_volume_flux).toBeGreaterThan(0);
 });
 
-test("the trajectories have the velocity as the active vectors for the view", () => {
-  const result = run_transport(transportToml(), flowToml, mesh, 1, TrajectoryDetail.Full);
-  const trajectories = markVelocityAsVectors(result.file("trajectories.vtp") ?? "");
-  expect(trajectories).toMatch(/<PointData Vectors="velocity">[\s\S]*Name="velocity" NumberOfComponents="3"/);
-});
-
 test("seed 0 uses the seed of the page", () => {
   const state = transportState();
   state.seed = 0;
@@ -135,6 +127,7 @@ test("the transport velocities give a speed at the points of the mesh", () => {
   const state = transportState();
   const result = run_transport(transportToml(state), flowToml, mesh, 1, TrajectoryDetail.Full);
   expect(result.error).toBeUndefined();
-  const speeds = nodeVelocityMagnitudes(result.file("velocities.vtp") ?? "", pointCount(mesh), state.timeUnit);
+  const pointCount = Number(mesh.match(/NumberOfPoints="(\d+)"/)?.[1]);
+  const speeds = [...nodeVelocityMagnitudes(result.sector_nodes, result.sector_velocities, pointCount, state.timeUnit)];
   expect(speeds.every((speed) => Number.isFinite(speed) && speed >= 0) && speeds.some((speed) => speed > 0)).toBe(true);
 });

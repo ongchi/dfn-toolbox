@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
-import { addPointArray, triangleGridToPolyData } from "../src/flow/polyData";
 import { defaultFlowState, FLOW_MESH_FILE, pressureOf } from "../src/flow/state";
 import { flowTables, flowToLibraryToml } from "../src/flow/toml";
 import { check_flow_input, run_flow } from "../src/pkg/dfn_wasm.js";
@@ -87,28 +86,4 @@ test("a boundary array with no point is an error", () => {
 
 test("no boundary is an error", () => {
   expect(check_flow_input(flowToml({}), mesh)?.kind).toBe("fehm.NoBoundaryDefined");
-});
-
-test("the pressure file as PolyData has the triangles and the pressure", () => {
-  const result = run_flow(flowToml(PRESSURES), mesh);
-  const polyData = triangleGridToPolyData(result.file("pressure.vtu") ?? "");
-  expect(polyData).toMatch(/<VTKFile type="PolyData"/);
-  expect(polyData).toMatch(/<Piece NumberOfPoints="\d+" NumberOfVerts="0" NumberOfLines="0" NumberOfStrips="0" NumberOfPolys="\d+">/);
-  expect(polyData).toMatch(/<Polys>/);
-  expect(polyData).not.toMatch(/Name="types"/);
-  expect(polyData).toMatch(/Name="pressure"/);
-});
-
-test("the mesh with the pressure has the pressure of fehm in its point data", () => {
-  const pressureVtu = run_flow(flowToml(PRESSURES), mesh).file("pressure.vtu") ?? "";
-  const pressureArray = pressureVtu.match(/<DataArray[^>]*Name="pressure"[^>]*>[^<]*<\/DataArray>/)?.[0] ?? "";
-  const pointData = addPointArray(mesh, pressureVtu, "pressure").match(/<PointData>[\s\S]*<\/PointData>/)?.[0] ?? "";
-  expect(pressureArray).not.toBe("");
-  expect(pointData).toContain(pressureArray);
-});
-
-test("a pressure file with other points is an error", () => {
-  const pressureVtu = run_flow(flowToml(PRESSURES), mesh).file("pressure.vtu") ?? "";
-  const otherPoints = pressureVtu.replace(/NumberOfPoints="\d+"/, 'NumberOfPoints="1"');
-  expect(() => addPointArray(mesh, otherPoints, "pressure")).toThrow(/not the same number of points/);
 });

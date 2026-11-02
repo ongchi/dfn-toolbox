@@ -5,6 +5,8 @@
 // values in place of the random ones.
 
 import type { OrientationConvention, PlaneOrientationState, UserFractureState } from "./form/state";
+import { dataArrayValues, pointValues } from "./inputFiles";
+import type { CellShapes } from "./viewerGeometry";
 
 /** The name of the polygon file in the dfngen input */
 export const USER_FRACTURES_FILE = "user_fractures.vtp";
@@ -152,4 +154,14 @@ export function userFracturesToVtp(fractures: UserFractureState[], regionNames: 
     "</VTKFile>",
     "",
   ].join("\n");
+}
+
+/** The polygons of a text of `userFracturesToVtp`, for the 3D view */
+export function polygonFileShapes(vtpText: string): CellShapes {
+  const offsets = dataArrayValues(vtpText, "offsets") ?? [];
+  return {
+    points: pointValues(vtpText),
+    vertexCounts: offsets.map((offset, cell) => offset - (cell === 0 ? 0 : offsets[cell - 1])),
+    connectivity: dataArrayValues(vtpText, "connectivity") ?? [],
+  };
 }

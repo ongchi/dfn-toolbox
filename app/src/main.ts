@@ -9,11 +9,10 @@ import {
   surfacesWithPoints,
   type BoundaryRoles,
 } from "./boundaryRoles";
-import { boundarySurfacePolyData, DEFAULT_SURFACE_COLORS, domainBoundarySurfaceNames } from "./boundarySurfaces";
+import { boundarySurfaceCells, DEFAULT_SURFACE_COLORS, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm, type FlowBoundary } from "./flow/form";
-import { addArray, addPointArray, pointCount, triangleGridToPolyData, vectorMagnitudes } from "./flow/polyData";
 import { defaultFlowState, FLOW_MESH_FILE, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
@@ -33,11 +32,11 @@ import {
   type GenerationInput,
   type GenerationOutput,
   type Restart,
+  type ShapeArrays,
   type TransportInput,
   type TransportOutput,
 } from "./generationClient";
 import {
-  dataArrayValues,
   meshDescription,
   meshRegionBounds,
   meshRegionNames,
@@ -48,9 +47,8 @@ import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
-import { markVelocityAsVectors } from "./transport/trajectories";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
-import { userFracturesToVtp } from "./userFractures";
+import { polygonFileShapes, userFracturesToVtp } from "./userFractures";
 import {
   FLOW_VELOCITY_ARRAY,
   NetworkViewer,
@@ -58,17 +56,15 @@ import {
   TRANSPORT_VELOCITY_ARRAY,
   type ColorArray,
   type FractureLayer,
+  type LayerShapes,
 } from "./viewer";
+import { vectorMagnitudes } from "./viewerGeometry";
 import type { Workflow } from "./workflow";
 
 const DEFAULT_COLOR_OPTION = "cell:fracture_id";
-const FRACTURES_FILE = "fractures.vtp";
-const PRESSURE_FILE = "pressure.vtu";
 // The example of the page at the start
 const DEFAULT_EXAMPLE = "box_west_east";
 const PRESSURE_OPTION = colorOptionValue(PRESSURE_ARRAY);
-const TRAJECTORIES_FILE = "trajectories.vtp";
-const VELOCITIES_FILE = "velocities.vtp";
 const FLOW_VELOCITY_OPTION = colorOptionValue(FLOW_VELOCITY_ARRAY);
 const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
 // The view of the fractures of a running generation is drawn again at most this often
@@ -416,12 +412,12 @@ function renderBoundarySurfaces(): void {
 }
 
 /** Shows the domain mesh and its boundary surfaces */
-async function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["mesh"]>): Promise<void> {
-  await view.setDomainMesh(mesh.text);
-  await view.setBoundarySurfaces(
+function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["mesh"]>): void {
+  view.setDomainMesh(domainWireframe(mesh.text));
+  view.setBoundarySurfaces(
     boundarySurfaceNames.map((name) => ({
       name,
-      vtpText: boundarySurfacePolyData(mesh.text, name),
+      cells: boundarySurfaceCells(mesh.text, name),
       color: boundarySurfaceColor(name),
     })),
   );
@@ -437,9 +433,9 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   renderBoundarySurfaces();
   clearOutput();
   if (viewer && mesh) {
-    await showDomainInViewer(viewer, mesh);
+    showDomainInViewer(viewer, mesh);
     viewer.resetCamera();
-    await viewer.render();
+    viewer.render();
   }
 }
 
@@ -519,7 +515,7 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
   const fractures: FractureBatch[] = stopped === null ? [] : [stopped.fractures];
   if (stopped !== null) {
     viewer?.addGenerationFractures(stopped.fractures);
-    void viewer?.render();
+    viewer?.render();
   }
   let checkpoint: GenerationCheckpoint | null = stopped?.checkpoint ?? null;
   let lastAcceptedCount = checkpoint?.acceptedCount ?? null;
@@ -543,7 +539,7 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
       const now = performance.now();
       if (now - lastRenderTime >= GENERATION_RENDER_INTERVAL_MS || fraction >= 1) {
         lastRenderTime = now;
-        void viewer.render();
+        viewer.render();
       }
     },
     onCheckpoint: (newCheckpoint) => {
@@ -586,7 +582,7 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
     // The final layers replace the fractures of the run; after an error or a cancel, nothing does
     if (viewer) {
       viewer.clearGenerationFractures();
-      void viewer.render();
+      viewer.render();
     }
     setBusy(false);
   }
@@ -737,9 +733,9 @@ function clearOutput(): void {
   ui.colorSelect.disabled = true;
   if (viewer) {
     for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
-      void viewer.setLayer(layer, null);
+      viewer.setLayer(layer, null);
     }
-    void viewer.render();
+    viewer.render();
   }
   clearFlowOutput();
   renderFlow();
@@ -759,7 +755,7 @@ function removeColorOptions(optionValues: string[]): void {
   }
   if (isSelected) {
     ui.colorSelect.value = DEFAULT_COLOR_OPTION;
-    void viewer?.colorBy(colorArrayOf(ui.colorSelect.value));
+    viewer?.colorBy(colorArrayOf(ui.colorSelect.value));
   }
 }
 
@@ -782,8 +778,8 @@ function clearTransportOutput(): void {
   ui.showTrajectories.checked = false;
   ui.showTrajectories.disabled = true;
   if (viewer) {
-    void viewer.setTrajectories(null);
-    void viewer.render();
+    viewer.setTrajectories(null);
+    viewer.render();
   }
 }
 
@@ -794,14 +790,6 @@ function outputFile(name: string): string | null {
 /** The triangle mesh of the last "Meshing", the mesh of the flow */
 function flowMesh(): string | null {
   return outputFile(FLOW_MESH_FILE);
-}
-
-function flowOutputFile(name: string): string | null {
-  return flowOutput?.files.find(([fileName]) => fileName === name)?.[1] ?? null;
-}
-
-function transportOutputFile(name: string): string | null {
-  return transportOutput?.files.find(([fileName]) => fileName === name)?.[1] ?? null;
 }
 
 function showStats(list: HTMLDListElement, stats: [string, string][]): void {
@@ -831,7 +819,7 @@ async function showOutput(result: GenerationOutput): Promise<void> {
     ["Seed", result.seed],
   ]);
 
-  ui.showRejected.disabled = outputFile("fractures_rejected.vtp") === null;
+  ui.showRejected.disabled = result.shapes?.rejected == null;
   await showOutputInViewer();
 }
 
@@ -872,7 +860,7 @@ async function showTransportOutput(result: TransportOutput, timeUnit: TimeUnit):
     ["Seed", String(result.seed)],
   ]);
 
-  const hasTrajectories = transportOutputFile(TRAJECTORIES_FILE) !== null;
+  const hasTrajectories = result.pathPointCounts.length > 0;
   ui.showTrajectories.disabled = !hasTrajectories;
   ui.showTrajectories.checked = hasTrajectories;
   await showTransportInViewer();
@@ -881,13 +869,16 @@ async function showTransportOutput(result: TransportOutput, timeUnit: TimeUnit):
 }
 
 async function showTransportInViewer(): Promise<void> {
-  const trajectories = transportOutputFile(TRAJECTORIES_FILE);
-  if (!viewer || trajectories === null) {
+  if (!viewer || transportOutput === null || transportOutput.pathPointCounts.length === 0) {
     return;
   }
-  await viewer.setTrajectories(markVelocityAsVectors(trajectories));
+  viewer.setTrajectories({
+    points: transportOutput.pathPoints,
+    velocities: transportOutput.pathVelocities,
+    pointCounts: transportOutput.pathPointCounts,
+  });
   applyLayerVisibility(viewer);
-  await viewer.render();
+  viewer.render();
 }
 
 function applyLayerVisibility(view: NetworkViewer): void {
@@ -913,28 +904,34 @@ function colorArrayOf(optionValue: string): ColorArray | null {
   return { name: optionValue.slice(separator + 1), association };
 }
 
+/** The shapes of a layer with no point array */
+function layerShapes(shapes: ShapeArrays | null | undefined): LayerShapes | null {
+  return shapes == null ? null : { ...shapes, pointArrays: [] };
+}
+
 /**
  * The triangle mesh of the final fractures, with the pressure and the flow
  * velocity of the flow, and the velocity of the transport, if they exist
  */
-function meshWithFlowArrays(mesh: string): string {
-  const pressure = flowOutputFile(PRESSURE_FILE);
-  if (pressure === null) {
-    return mesh;
+function meshWithFlowArrays(mesh: ShapeArrays): LayerShapes {
+  if (flowOutput === null) {
+    return { ...mesh, pointArrays: [] };
   }
-  const darcyVelocities = dataArrayValues(pressure, "darcy_velocity") ?? [];
-  const flowMeshText = addArray(
-    addPointArray(mesh, pressure, PRESSURE_ARRAY.name),
-    "cell",
-    FLOW_VELOCITY_ARRAY.name,
-    vectorMagnitudes(darcyVelocities),
-  );
-  const velocities = transportOutputFile(VELOCITIES_FILE);
-  if (velocities === null) {
-    return flowMeshText;
+  const pointArrays: [string, Float64Array][] = [[PRESSURE_ARRAY.name, flowOutput.pressures]];
+  if (transportOutput !== null && transportOutput.sectorNodes.length > 0) {
+    const speeds = nodeVelocityMagnitudes(
+      transportOutput.sectorNodes,
+      transportOutput.sectorVelocities,
+      mesh.points.length / 3,
+      transportTimeUnit,
+    );
+    pointArrays.push([TRANSPORT_VELOCITY_ARRAY.name, speeds]);
   }
-  const speeds = nodeVelocityMagnitudes(velocities, pointCount(mesh), transportTimeUnit);
-  return addArray(flowMeshText, "point", TRANSPORT_VELOCITY_ARRAY.name, speeds);
+  return {
+    ...mesh,
+    cellArrays: [...mesh.cellArrays, [FLOW_VELOCITY_ARRAY.name, vectorMagnitudes(flowOutput.darcyVelocities)]],
+    pointArrays,
+  };
 }
 
 /**
@@ -946,21 +943,22 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
   if (!viewer || !output) {
     return;
   }
-  const mesh = flowMesh();
+  const shapes = output.shapes;
   // Before "Meshing", the polygons of the final fractures
-  await viewer.setLayer("final", mesh === null ? outputFile(FRACTURES_FILE) : triangleGridToPolyData(meshWithFlowArrays(mesh)));
-  await viewer.setLayer("removed", outputFile("fractures_removed.vtp"));
-  await viewer.setLayer("rejected", outputFile("fractures_rejected.vtp"));
+  viewer.setLayer("final", shapes?.mesh ? meshWithFlowArrays(shapes.mesh) : layerShapes(shapes?.fractures));
+  viewer.setLayer("removed", layerShapes(shapes?.removed));
+  viewer.setLayer("rejected", layerShapes(shapes?.rejected));
   applyLayerVisibility(viewer);
 
   const previous = ui.colorSelect.value;
-  const options = (await viewer.cellArrayNames())
+  const options = viewer
+    .cellArrayNames()
     .filter((name) => name !== FLOW_VELOCITY_ARRAY.name)
     .map((name) => new Option(name, colorOptionValue({ name, association: "cell" })));
-  if (flowOutputFile(PRESSURE_FILE) !== null) {
+  if (flowOutput !== null) {
     options.push(new Option("Pressure", PRESSURE_OPTION), new Option("Flow velocity", FLOW_VELOCITY_OPTION));
   }
-  if (transportOutputFile(VELOCITIES_FILE) !== null) {
+  if (transportOutput !== null && transportOutput.sectorNodes.length > 0) {
     options.push(new Option("Transport velocity", TRANSPORT_VELOCITY_OPTION));
   }
   ui.colorSelect.replaceChildren(new Option("One color", ""), ...options);
@@ -968,8 +966,8 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
   ui.colorSelect.value =
     [selected, previous, DEFAULT_COLOR_OPTION].find((value) => value !== null && values.includes(value)) ?? "";
   ui.colorSelect.disabled = false;
-  await viewer.colorBy(colorArrayOf(ui.colorSelect.value));
-  await viewer.render();
+  viewer.colorBy(colorArrayOf(ui.colorSelect.value));
+  viewer.render();
 }
 
 // ---------------------------------------------------------------- viewer
@@ -977,6 +975,18 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
 // The updates of the layer "user" run one after the other: two updates at the
 // same time could both add their polygons
 let userFracturesUpdate: Promise<void> = Promise.resolve();
+
+/** The polygons of a polygon file as a layer */
+function polygonLayerShapes(vtpText: string): LayerShapes {
+  const { points, vertexCounts, connectivity } = polygonFileShapes(vtpText);
+  return {
+    points: Float64Array.from(points),
+    vertexCounts: Uint32Array.from(vertexCounts),
+    connectivity: Uint32Array.from(connectivity),
+    cellArrays: [],
+    pointArrays: [],
+  };
+}
 
 /** Shows the polygons of the user-defined fractures of the form (those with a region of the mesh) */
 function updateUserFracturesInViewer(): void {
@@ -986,9 +996,9 @@ function updateUserFracturesInViewer(): void {
         return;
       }
       const fractures = state.userFractures.filter((fracture) => regionNames.includes(fracture.region));
-      await viewer.setLayer("user", fractures.length === 0 ? null : userFracturesToVtp(fractures, regionNames));
+      viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, regionNames)));
       applyLayerVisibility(viewer);
-      await viewer.render();
+      viewer.render();
     })
     // A failed update does not stop the next ones
     .catch((error: unknown) => showStatus(errorText(error), true));
@@ -996,26 +1006,26 @@ function updateUserFracturesInViewer(): void {
 
 async function startViewer(): Promise<void> {
   try {
-    viewer = await NetworkViewer.create(ui.canvas);
+    viewer = NetworkViewer.create(ui.canvas);
   } catch (error) {
     ui.viewerMessage.textContent = `The 3D viewer is not available: ${errorText(error)}`;
     return;
   }
   ui.viewerMessage.hidden = true;
   if (files.mesh) {
-    await showDomainInViewer(viewer, files.mesh);
+    showDomainInViewer(viewer, files.mesh);
   }
   await showOutputInViewer();
   await showTransportInViewer();
   updateUserFracturesInViewer();
   viewer.resetCamera();
-  await viewer.render();
+  viewer.render();
 }
 
 async function updateViewer(action: (viewer: NetworkViewer) => void | Promise<void>): Promise<void> {
   if (viewer) {
     await action(viewer);
-    await viewer.render();
+    viewer.render();
   }
 }
 
