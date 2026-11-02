@@ -67,10 +67,21 @@ test.each([
   expect(domainEdges(connectivity, [pointCount], [type], pointCount).length).toBe(2 * edgeCount);
 });
 
-test("the color table goes from blue to red", () => {
-  expect(tableColor(0)[2]).toBe(1);
-  expect(tableColor(0)[0]).toBeCloseTo(0, 2);
-  expect(tableColor(1)).toEqual([1, 0, 0]);
+test("the color table is Turbo: dark ends, blue, green in the middle, red", () => {
+  expect(Math.max(...tableColor(0))).toBeLessThan(0.2);
+  const [lowRed, lowGreen, lowBlue] = tableColor(0.1);
+  const [middleRed, middleGreen, middleBlue] = tableColor(0.5);
+  const [highRed, highGreen, highBlue] = tableColor(1);
+  expect(lowBlue).toBeGreaterThan(Math.max(lowRed, lowGreen));
+  expect(middleGreen).toBeGreaterThan(Math.max(middleRed, middleBlue));
+  expect(highRed).toBeGreaterThan(Math.max(highGreen, highBlue));
+  expect(highRed).toBeLessThan(0.6);
+});
+
+test("the colors stay in the range 0 to 1", () => {
+  const components = Array.from({ length: 1001 }, (_, index) => tableColor(index / 1000)).flat();
+  expect(Math.min(...components)).toBeGreaterThanOrEqual(0);
+  expect(Math.max(...components)).toBeLessThanOrEqual(1);
 });
 
 test("the scalar bar has evenly spaced values from the largest value", () => {

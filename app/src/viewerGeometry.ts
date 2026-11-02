@@ -162,20 +162,17 @@ export function domainEdges(
   return Uint32Array.from([...keys].flatMap((key) => [Math.floor(key / pointCount), key % pointCount]));
 }
 
-/** The red, green and blue (0 to 1) of the color table at `fraction` (0 to 1): from blue to red, as `vtkLookupTable` */
+/** The coefficients of x⁰ to x⁵ of the polynomial of each color of `tableColor` */
+const TURBO_RED = [0.13572138, 4.6153926, -42.66032258, 132.13108234, -152.94239396, 59.28637943];
+const TURBO_GREEN = [0.09140261, 2.19418839, 4.84296658, -14.18503333, 4.27729857, 2.82956604];
+const TURBO_BLUE = [0.1066733, 12.64194608, -60.58204836, 110.36276771, -89.90310912, 27.34824973];
+
+/** The red, green and blue (0 to 1) of the color table at `fraction` (0 to 1): the polynomial approximation of Turbo (Google) */
 export function tableColor(fraction: number): [number, number, number] {
-  const hue = (0.667 * (1 - Math.min(1, Math.max(0, fraction))) * 6) % 6;
-  const sector = Math.floor(hue);
-  const part = hue - sector;
-  const table: [number, number, number][] = [
-    [1, part, 0],
-    [1 - part, 1, 0],
-    [0, 1, part],
-    [0, 1 - part, 1],
-    [part, 0, 1],
-    [1, 0, 1 - part],
-  ];
-  return table[sector];
+  const x = Math.min(1, Math.max(0, fraction));
+  const component = (coefficients: number[]) =>
+    Math.min(1, Math.max(0, coefficients.reduceRight((sum, coefficient) => sum * x + coefficient, 0)));
+  return [component(TURBO_RED), component(TURBO_GREEN), component(TURBO_BLUE)];
 }
 
 /** The smallest and the largest value; [0, 0] without values */

@@ -18,7 +18,10 @@ import {
   DoubleSide,
   DynamicDrawUsage,
   Group,
+  InstancedBufferGeometry,
+  InstancedInterleavedBuffer,
   InstancedMesh,
+  InterleavedBufferAttribute,
   LinearSRGBColorSpace,
   LineBasicMaterial,
   LineSegments,
@@ -35,6 +38,7 @@ import {
   Sphere,
   Sprite,
   SpriteMaterial,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -70,7 +74,11 @@ const DEPTH_MARGIN = 1.2;
 const MINIMUM_NEAR_PART = 0.001;
 
 const SCALAR_BAR_LABEL_COUNT = 5;
+const SCALAR_BAR_RAMP_STOPS = 33;
 const FRACTURE_COLOR = [0.95, 0.75, 0.3] as const;
+// The final fractures: translucent, thus the particles on all fractures are visible
+const FRACTURE_OPACITY = 0.9;
+const FRACTURE_EDGE_OPACITY = 0.6;
 const EDGE_COLOR = [0.2, 0.2, 0.2] as const;
 const DOMAIN_COLOR = [0.3, 0.3, 0.3] as const;
 const REMOVED_COLOR = [0.6, 0.6, 0.6] as const;
@@ -109,10 +117,12 @@ const AXES: readonly { label: string; direction: Vector3; color: number }[] = [
   { label: "Z", direction: new Vector3(0, 0, 1), color: 0x20a020 },
 ];
 // The moving particles of the flow: their number, and the longest time (seconds) of one
-// step, thus a slow frame or a hidden page does not make a jump. Dark on the color table.
-const PARTICLE_COUNT = 5000;
+// step, thus a slow frame or a hidden page does not make a jump. White: the colors of the data stay visible.
+const PARTICLE_COUNT = 1500;
 const MAX_PARTICLE_STEP = 0.05;
-const PARTICLE_COLOR = [0.05, 0.05, 0.15] as const;
+const PARTICLE_COLOR = [1, 1, 1] as const;
+/** CSS pixels */
+const PARTICLE_WIDTH = 1;
 // The fractures of a running generation: one color for each family (family
 // 1 has the first one; more families use the colors again). Not red: the
 // rejected fractures are red.
@@ -232,8 +242,8 @@ function surfaceMaterial(color: readonly [number, number, number], opacity = 1):
   });
 }
 
-function lineMaterial(color: readonly [number, number, number]): LineBasicMaterial {
-  return new LineBasicMaterial({ color: new Color(...color) });
+function lineMaterial(color: readonly [number, number, number], opacity = 1): LineBasicMaterial {
+  return new LineBasicMaterial({ color: new Color(...color), opacity, transparent: opacity < 1 });
 }
 
 function placed<T extends Object3D>(object: T, origin: [number, number, number]): T {
@@ -342,8 +352,8 @@ class ScalarBar {
     body.className = "scalar-bar-body";
     const ramp = document.createElement("div");
     ramp.className = "scalar-bar-ramp";
-    const stops = Array.from({ length: 7 }, (_, index) => {
-      const [red, green, blue] = tableColor(index / 6);
+    const stops = Array.from({ length: SCALAR_BAR_RAMP_STOPS }, (_, index) => {
+      const [red, green, blue] = tableColor(index / (SCALAR_BAR_RAMP_STOPS - 1));
       return `rgb(${[red, green, blue].map((component) => Math.round(255 * component)).join(" ")})`;
     });
     ramp.style.background = `linear-gradient(to top, ${stops.join(", ")})`;
@@ -370,13 +380,47 @@ class ScalarBar {
   }
 }
 
-/** The moving particles of the flow, as line segments which fade to their old end */
+/** A quad for each segment of a trail: WebGL lines have 1 pixel, and these have `PARTICLE_WIDTH` */
+const PARTICLE_VERTEX_SHADER = `
+  attribute vec3 segmentStart;
+  attribute vec3 segmentEnd;
+  attribute float opacityStart;
+  attribute float opacityEnd;
+  uniform vec2 resolution;
+  uniform float width;
+  varying float vOpacity;
+  void main() {
+    vec4 start = projectionMatrix * modelViewMatrix * vec4(segmentStart, 1.0);
+    vec4 end = projectionMatrix * modelViewMatrix * vec4(segmentEnd, 1.0);
+    if (start.w <= 0.0 || end.w <= 0.0) {
+      // Behind the camera: outside the view
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      return;
+    }
+    vec2 direction = (end.xy / end.w - start.xy / start.w) * resolution;
+    direction = dot(direction, direction) > 0.0 ? normalize(direction) : vec2(1.0, 0.0);
+    // position.x: 0 at the start, 1 at the end; position.y: the side of the line
+    vOpacity = mix(opacityStart, opacityEnd, position.x);
+    vec4 point = mix(start, end, position.x);
+    // The trail gets narrow to its old end
+    point.xy += vec2(-direction.y, direction.x) * position.y * width * (0.4 + 0.6 * vOpacity) / resolution * point.w;
+    gl_Position = point;
+  }`;
+
+const PARTICLE_FRAGMENT_SHADER = `
+  uniform vec3 color;
+  varying float vOpacity;
+  void main() {
+    gl_FragColor = vec4(color, vOpacity);
+  }`;
+
+/** The moving particles of the flow, as trails which fade to their old end */
 class ParticleLines {
-  readonly lines: LineSegments<BufferGeometry, ShaderMaterial>;
+  readonly object: Mesh<InstancedBufferGeometry, ShaderMaterial>;
   private readonly positions: Float32Array;
   private readonly opacities: Float32Array;
-  private readonly positionAttribute: BufferAttribute;
-  private readonly opacityAttribute: BufferAttribute;
+  private readonly positionBuffer: InstancedInterleavedBuffer;
+  private readonly opacityBuffer: InstancedInterleavedBuffer;
   private readonly origin: [number, number, number];
 
   constructor(private readonly particles: FlowParticles, points: ArrayLike<number>) {
@@ -384,45 +428,50 @@ class ParticleLines {
     const segmentCount = particles.segmentCount;
     this.positions = new Float32Array(6 * segmentCount);
     this.opacities = new Float32Array(2 * segmentCount);
-    this.positionAttribute = new BufferAttribute(this.positions, 3).setUsage(DynamicDrawUsage);
-    this.opacityAttribute = new BufferAttribute(this.opacities, 1).setUsage(DynamicDrawUsage);
-    const geometry = new BufferGeometry();
-    geometry.setAttribute("position", this.positionAttribute);
-    geometry.setAttribute("opacity", this.opacityAttribute);
-    this.lines = placed(
-      new LineSegments(
+    this.positionBuffer = new InstancedInterleavedBuffer(this.positions, 6).setUsage(DynamicDrawUsage);
+    this.opacityBuffer = new InstancedInterleavedBuffer(this.opacities, 2).setUsage(DynamicDrawUsage);
+    const geometry = new InstancedBufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(Float32Array.of(0, -1, 0, 1, -1, 0, 1, 1, 0, 0, 1, 0), 3));
+    geometry.setIndex([0, 1, 2, 0, 2, 3]);
+    geometry.setAttribute("segmentStart", new InterleavedBufferAttribute(this.positionBuffer, 3, 0));
+    geometry.setAttribute("segmentEnd", new InterleavedBufferAttribute(this.positionBuffer, 3, 3));
+    geometry.setAttribute("opacityStart", new InterleavedBufferAttribute(this.opacityBuffer, 1, 0));
+    geometry.setAttribute("opacityEnd", new InterleavedBufferAttribute(this.opacityBuffer, 1, 1));
+    geometry.instanceCount = segmentCount;
+    this.object = placed(
+      new Mesh(
         geometry,
         new ShaderMaterial({
           transparent: true,
           depthWrite: false,
-          uniforms: { color: { value: new Color(...PARTICLE_COLOR) } },
-          vertexShader: `
-            attribute float opacity;
-            varying float vOpacity;
-            void main() {
-              vOpacity = opacity;
-              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }`,
-          fragmentShader: `
-            uniform vec3 color;
-            varying float vOpacity;
-            void main() {
-              gl_FragColor = vec4(color, vOpacity);
-            }`,
+          side: DoubleSide,
+          uniforms: {
+            color: { value: new Color(...PARTICLE_COLOR) },
+            resolution: { value: new Vector2(1, 1) },
+            width: { value: PARTICLE_WIDTH },
+          },
+          vertexShader: PARTICLE_VERTEX_SHADER,
+          fragmentShader: PARTICLE_FRAGMENT_SHADER,
         }),
       ),
       this.origin,
     );
-    // The bounds of the mesh: the particles are always in it
-    this.lines.frustumCulled = false;
+    // The particles are in the mesh, and on top of the translucent shapes
+    this.object.frustumCulled = false;
+    this.object.renderOrder = 1;
     this.advance(0);
+  }
+
+  /** The size of the view in CSS pixels */
+  setResolution(width: number, height: number): void {
+    (this.object.material.uniforms.resolution.value as Vector2).set(width, height);
   }
 
   advance(seconds: number): void {
     this.particles.advance(seconds);
     this.particles.writeTrails(this.origin, this.positions, this.opacities);
-    this.positionAttribute.needsUpdate = true;
-    this.opacityAttribute.needsUpdate = true;
+    this.positionBuffer.needsUpdate = true;
+    this.opacityBuffer.needsUpdate = true;
   }
 }
 
@@ -520,6 +569,7 @@ export class NetworkViewer {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.controls.handleResize();
+    this.particleLines?.setResolution(width, height);
     this.render();
   }
 
@@ -528,7 +578,7 @@ export class NetworkViewer {
     this.controls.update();
     const lastTime = this.lastFrameTime;
     this.lastFrameTime = time;
-    if (this.particleLines?.lines.visible && lastTime !== null) {
+    if (this.particleLines?.object.visible && lastTime !== null) {
       this.particleLines.advance(Math.min(MAX_PARTICLE_STEP, (time - lastTime) / 1000));
       this.isDrawPending = true;
     }
@@ -540,7 +590,7 @@ export class NetworkViewer {
   /** Shows moving particles in the flow; null removes them */
   setFlowParticles(field: FlowField | null): void {
     if (this.particleLines) {
-      this.removeObject(this.particleLines.lines);
+      this.removeObject(this.particleLines.object);
       this.particleLines = null;
     }
     if (field === null) {
@@ -549,7 +599,8 @@ export class NetworkViewer {
     const particles = new FlowParticles(field, PARTICLE_COUNT, Math.random);
     if (particles.particleCount > 0) {
       this.particleLines = new ParticleLines(particles, field.points);
-      this.scene.add(this.particleLines.lines);
+      this.particleLines.setResolution(this.canvas.clientWidth, this.canvas.clientHeight);
+      this.scene.add(this.particleLines.object);
     }
   }
 
@@ -640,7 +691,10 @@ export class NetworkViewer {
     group.add(mesh);
     if (layer === "final" || layer === "user") {
       const edges = edgeGeometry(shapes.points, cellEdges(shapes, shapes.points.length / 3));
-      const lines = new LineSegments(edges.geometry, lineMaterial(layer === "user" ? USER_EDGE_COLOR : EDGE_COLOR));
+      const lines = new LineSegments(
+        edges.geometry,
+        layer === "user" ? lineMaterial(USER_EDGE_COLOR) : lineMaterial(EDGE_COLOR, FRACTURE_EDGE_OPACITY),
+      );
       group.add(placed(lines, edges.origin));
     }
     this.scene.add(group);
@@ -659,7 +713,7 @@ export class NetworkViewer {
       case "user":
         return surfaceMaterial(USER_COLOR, USER_OPACITY);
       case "final":
-        return surfaceMaterial(FRACTURE_COLOR);
+        return surfaceMaterial(FRACTURE_COLOR, FRACTURE_OPACITY);
     }
   }
 
@@ -809,7 +863,7 @@ export class NetworkViewer {
   setVisible(layer: FractureLayer | "domain" | "trajectories" | "particles", isVisible: boolean): void {
     if (layer === "particles") {
       if (this.particleLines) {
-        this.particleLines.lines.visible = isVisible;
+        this.particleLines.object.visible = isVisible;
       }
       return;
     }
@@ -840,7 +894,7 @@ export class NetworkViewer {
     this.scene.updateMatrixWorld();
     this.scene.traverseVisible((object) => {
       const { geometry } = object as Partial<Mesh>;
-      if (geometry === undefined || object instanceof InstancedMesh || object === this.particleLines?.lines) {
+      if (geometry === undefined || object instanceof InstancedMesh || object === this.particleLines?.object) {
         return;
       }
       if (geometry.boundingBox === null) {
