@@ -1,7 +1,8 @@
 // The fields of the pair of angles of an orientation: for the mean normal of
-// a family and the normal of a user-defined fracture.
+// a family and the normal of a user-defined fracture. The pair is the one of
+// the page (settings dialog).
 import type { FormContext } from "./context";
-import { numberField, selectField } from "./fields";
+import { numberField } from "./fields";
 import { ORIENTATION_KEYS, type OrientationConvention, type PlaneOrientationState } from "./state";
 
 const ANGLE_LABELS: Record<OrientationConvention, [string, string]> = {
@@ -10,32 +11,20 @@ const ANGLE_LABELS: Record<OrientationConvention, [string, string]> = {
   dip_strike: ["Dip (°)", "Strike (°)"],
 };
 
-/** The select of the convention; a new convention shows its angle fields */
-export function conventionField(orientation: PlaneOrientationState, help: string, context: FormContext): HTMLElement {
-  return selectField<OrientationConvention>({
-    label: "Orientation",
-    help,
-    value: orientation.convention,
-    choices: [
-      ["theta_phi", "Theta and phi"],
-      ["trend_plunge", "Trend and plunge"],
-      ["dip_strike", "Dip and strike"],
-    ],
-    onInput: (value) => {
-      orientation.convention = value;
-      context.rerender();
-    },
-  });
-}
-
-/** The two angles of the convention */
-export function angleFields(orientation: PlaneOrientationState, context: FormContext): HTMLElement[] {
-  const [firstKey, secondKey] = ORIENTATION_KEYS[orientation.convention];
-  const [firstLabel, secondLabel] = ANGLE_LABELS[orientation.convention];
+/** The two angles of the convention; `help` (what the normal is) goes to the first */
+export function angleFields(
+  orientation: PlaneOrientationState,
+  convention: OrientationConvention,
+  help: string,
+  context: FormContext,
+): HTMLElement[] {
+  const [firstKey, secondKey] = ORIENTATION_KEYS[convention];
+  const [firstLabel, secondLabel] = ANGLE_LABELS[convention];
   return [
     numberField({
       label: firstLabel,
       key: firstKey,
+      help,
       value: orientation.firstAngle,
       onInput: (value) => {
         orientation.firstAngle = value;

@@ -152,19 +152,53 @@ pre {
   padding: 6px;
 }
 
-/* The link to the source code: a round panel below the layers, as wide as their rail */
-.repository-link {
+/* The settings button and the link to the source code: round panels below the layers, as wide as their rail */
+.round-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--rail-width);
   height: var(--rail-width);
+  padding: 0;
   border-radius: 50%;
   color: var(--muted);
+  font: inherit;
+  cursor: pointer;
 }
 
-.repository-link:hover {
+.round-button:hover {
   color: var(--text);
+}
+
+.round-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The settings of the whole input: a modal dialog in the middle of the page */
+.settings-dialog {
+  width: min(420px, calc(100% - 2 * var(--gap)));
+  padding: 0;
+  color: var(--text);
+}
+
+.settings-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.settings-content {
+  padding: 16px;
+}
+
+.settings-content h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
 .rail-separator {
@@ -1039,7 +1073,7 @@ progress {
     max-width: none;
   }
 
-  /* The view settings at the top: the colors at the left of the layers, the link below the layers */
+  /* The view settings at the top: the colors at the left of the layers, the round buttons below the layers */
   .viewer-toolbar {
     left: calc(var(--gap) + env(safe-area-inset-left));
     display: grid;
@@ -1048,7 +1082,7 @@ progress {
     justify-content: space-between;
   }
 
-  .viewer-toolbar .repository-link {
+  .viewer-toolbar .round-button {
     grid-column: 2;
   }
 
@@ -1067,7 +1101,7 @@ progress {
   /* The icons have no label here: the rail can scroll */
   .layer-rail {
     flex: none;
-    max-height: calc(100dvh - var(--covered-bottom, 0px) - 3 * var(--gap) - var(--rail-width) - env(safe-area-inset-top));
+    max-height: calc(100dvh - var(--covered-bottom, 0px) - 4 * var(--gap) - 2 * var(--rail-width) - env(safe-area-inset-top));
     overflow-y: auto;
   }
 

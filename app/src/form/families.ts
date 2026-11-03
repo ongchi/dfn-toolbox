@@ -1,13 +1,14 @@
 import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
 import { element, numberField, optionalNumberField, row, section, selectField } from "./fields";
-import { angleFields, conventionField } from "./orientation";
+import { angleFields } from "./orientation";
 import {
   defaultFamily,
   defaultRadius,
   type FamilyState,
   type FormState,
   type LogNormalSampling,
+  type OrientationConvention,
   type RadiusDistribution,
   type RadiusState,
 } from "./state";
@@ -95,11 +96,11 @@ function changeDistribution(old: RadiusState, distribution: RadiusDistribution):
   return radius;
 }
 
-function orientationFields(family: FamilyState, context: FormContext): HTMLElement[] {
+function orientationFields(family: FamilyState, convention: OrientationConvention, context: FormContext): HTMLElement[] {
   const orientation = family.orientation;
   return [
+    row(...angleFields(orientation, convention, "mean normal of the Fisher distribution", context)),
     row(
-      conventionField(orientation, "mean normal of the Fisher distribution", context),
       numberField({
         label: "Concentration",
         key: "kappa",
@@ -113,7 +114,6 @@ function orientationFields(family: FamilyState, context: FormContext): HTMLEleme
         },
       }),
     ),
-    row(...angleFields(orientation, context)),
   ];
 }
 
@@ -236,7 +236,7 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
       }),
     ),
     ...radiusFields(family, context),
-    ...orientationFields(family, context),
+    ...orientationFields(family, state.orientationConvention, context),
     ...apertureFields(
       {
         label: "Aperture",

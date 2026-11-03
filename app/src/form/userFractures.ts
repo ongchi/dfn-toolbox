@@ -2,7 +2,7 @@
 import type { RegionBounds } from "../inputFiles";
 import type { FormContext } from "./context";
 import { element, numberField, row, section, selectField } from "./fields";
-import { angleFields, conventionField } from "./orientation";
+import { angleFields } from "./orientation";
 import { defaultUserFracture, type FormState, type UserFractureState } from "./state";
 
 const AXES = ["x", "y", "z"] as const;
@@ -137,8 +137,7 @@ function fractureCard(state: FormState, index: number, context: FormContext): HT
         },
       }),
     ),
-    row(conventionField(fracture.orientation, "normal of the fracture", context)),
-    row(...angleFields(fracture.orientation, context)),
+    row(...angleFields(fracture.orientation, state.orientationConvention, "normal of the fracture", context)),
   );
   return card;
 }

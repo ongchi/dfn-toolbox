@@ -1098,6 +1098,54 @@ try {
     `without panel ${centerWithoutPanel?.toFixed(0)}, with panel ${centerWithPanel?.toFixed(0)} (free center ${freeCenter.toFixed(0)})`,
   );
 
+  // The gear between the layer rail and the GitHub link opens the settings dialog. Its orientation option
+  // gives the angle fields of the families and user fractures, with the angles of the same planes.
+  const toolbarItems = await page.$$eval("#viewer-toolbar > *", (nodes) =>
+    nodes.map((node) => node.id || node.classList[node.classList.length - 1]).join(", "),
+  );
+  check(toolbarItems === "color-panel, layer-rail, settings-button, repository-link", "the gear before the GitHub link", toolbarItems);
+  await selectExample(page, "user_fractures_stochastic");
+  // "Theta (°): 90" for each angle field of a form
+  const angles = (form) =>
+    page.$$eval(`${form} .field`, (fields) =>
+      fields
+        .map((field) => [field.querySelector(".field-label")?.textContent ?? "", field.querySelector("input")?.value])
+        .filter(([label]) => /^(Theta|Phi|Trend|Plunge|Dip|Strike) \(°\)$/.test(label))
+        .map(([label, value]) => `${label.split(" ")[0]} ${value}`)
+        .join(", "),
+    );
+  const orientationSelects = await page.$$eval("#form .field-label, #fractures-form .field-label", (nodes) =>
+    nodes.filter((node) => node.textContent === "Orientation").length,
+  );
+  const anglesBefore = `${await angles("#form")} | ${await angles("#fractures-form")}`;
+  await page.click("#settings-button");
+  const isDialogOpen = () => page.$eval("#settings-dialog", (node) => node.open);
+  const isOpenAfterClick = await isDialogOpen();
+  const optionAtOpen = await page.$eval("#orientation-option", (node) => node.value);
+  await page.screenshot({ path: `${screenshotDir}/e2e_settings.png` });
+  await page.select("#orientation-option", "dip_strike");
+  const anglesDipStrike = `${await angles("#form")} | ${await angles("#fractures-form")}`;
+  await page.keyboard.press("Escape");
+  const isOpenAfterEscape = await isDialogOpen();
+  await page.click("#settings-button");
+  await page.select("#orientation-option", "theta_phi");
+  const anglesBack = `${await angles("#form")} | ${await angles("#fractures-form")}`;
+  // A click on the backdrop, outside the content
+  await page.mouse.click(5, 5);
+  const isOpenAfterBackdrop = await isDialogOpen();
+  check(
+    orientationSelects === 0 &&
+      isOpenAfterClick &&
+      optionAtOpen === "theta_phi" &&
+      anglesBefore === "Theta 0, Phi 0 | Theta 90, Phi 90" &&
+      anglesDipStrike === "Dip 0, Strike 0 | Dip 90, Strike 270" &&
+      anglesBack === anglesBefore &&
+      !isOpenAfterEscape &&
+      !isOpenAfterBackdrop,
+    "the orientation option of the settings dialog",
+    `${orientationSelects} selects; open ${isOpenAfterClick} (${optionAtOpen}); ${anglesBefore} → ${anglesDipStrike} → ${anglesBack}; closed by Escape ${!isOpenAfterEscape}, by backdrop ${!isOpenAfterBackdrop}`,
+  );
+
   await checkPhone();
 } finally {
   await browser.close();

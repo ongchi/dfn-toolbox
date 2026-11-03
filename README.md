@@ -24,6 +24,10 @@ input is in the page: the app does not save the input or the output.
   highlighted until a second click.
 - **User fractures**: add fractures, each with a region, center, shape,
   aperture and orientation.
+- **Settings** (the gear button below the layers of the 3D view): the pair of
+  angles of all orientations (theta and phi, trend and plunge, or dip and
+  strike). A new choice changes the angles of each family and fracture to the
+  same plane.
 - **DFN**: set the fracture families. "Generate" makes the fractures, and
   "Meshing" makes their triangle mesh. A generation can stop and keep its
   fractures, then continue later. The network keeps only the clusters which

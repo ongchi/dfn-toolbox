@@ -19,7 +19,7 @@ import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
 import { clearPinnedSurface, getPinnedSurface } from "./form/fields";
 import { boundarySurfaceSection, type FileHandlers } from "./form/files";
-import { defaultFormState, type FormState } from "./form/state";
+import { defaultFormState, ORIENTATION_KEYS, type FormState, type OrientationConvention } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
 import {
   CancelledError,
@@ -50,7 +50,7 @@ import { renderTransportForm } from "./transport/form";
 import { defaultTransportState, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
-import { polygonFileShapes, userFracturesToVtp } from "./userFractures";
+import { convertOrientation, polygonFileShapes, userFracturesToVtp } from "./userFractures";
 import {
   FLOW_VELOCITY_ARRAY,
   NetworkViewer,
@@ -143,6 +143,9 @@ const ui = {
   panelOpen: byId<HTMLButtonElement>("panel-open"),
   sheetSize: byId<HTMLButtonElement>("sheet-size"),
   logButton: byId<HTMLButtonElement>("log-button"),
+  settingsButton: byId<HTMLButtonElement>("settings-button"),
+  settingsDialog: byId<HTMLDialogElement>("settings-dialog"),
+  orientationOption: byId<HTMLSelectElement>("orientation-option"),
   logView: byId<HTMLDivElement>("log-view"),
   logEmpty: byId<HTMLParagraphElement>("log-empty"),
   results: byId<HTMLDetailsElement>("results"),
@@ -460,7 +463,7 @@ function generationInput(): GenerationInput | string {
   return {
     toml: networkToLibraryToml(state, boundaryRoles),
     mesh: files.mesh.text,
-    userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, regionNames),
+    userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, state.orientationConvention, regionNames),
   };
 }
 
@@ -1019,7 +1022,7 @@ function updateUserFracturesInViewer(): void {
         return;
       }
       const fractures = state.userFractures.filter((fracture) => regionNames.includes(fracture.region));
-      viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, regionNames)));
+      viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, state.orientationConvention, regionNames)));
       applyLayerVisibility(viewer);
       viewer.render();
     })
@@ -1120,6 +1123,24 @@ function setSheetSize(size: SheetSize): void {
   ui.sheetSize.setAttribute("aria-label", size === "half" ? "Larger settings" : "Smaller settings");
 }
 
+function openSettings(): void {
+  ui.orientationOption.value = state.orientationConvention;
+  ui.settingsDialog.showModal();
+}
+
+/** A new pair of angles for all orientations: the angles change, each plane (and mean normal) stays */
+function setOrientationConvention(convention: OrientationConvention): void {
+  const from = state.orientationConvention;
+  for (const family of state.families) {
+    family.orientation = { ...convertOrientation(family.orientation, from, convention), kappa: family.orientation.kappa };
+  }
+  for (const fracture of state.userFractures) {
+    fracture.orientation = convertOrientation(fracture.orientation, from, convention);
+  }
+  state.orientationConvention = convention;
+  render();
+}
+
 function toggleLog(): void {
   ui.logView.hidden = !ui.logView.hidden;
   ui.logButton.setAttribute("aria-expanded", String(!ui.logView.hidden));
@@ -1180,6 +1201,21 @@ function bindEvents(): void {
   ui.panelOpen.addEventListener("click", () => setSettingsShown(true));
   ui.sheetSize.addEventListener("click", () => setSheetSize(ui.layout.dataset.sheet === "full" ? "half" : "full"));
   ui.logButton.addEventListener("click", toggleLog);
+  ui.settingsButton.addEventListener("click", openSettings);
+  ui.orientationOption.addEventListener("change", () => {
+    const convention = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).find(
+      (candidate) => candidate === ui.orientationOption.value,
+    );
+    if (convention !== undefined) {
+      setOrientationConvention(convention);
+    }
+  });
+  // A click on the backdrop: the target is the dialog itself, not its content
+  ui.settingsDialog.addEventListener("click", (event) => {
+    if (event.target === ui.settingsDialog) {
+      ui.settingsDialog.close();
+    }
+  });
   const coveredAreaObserver = new ResizeObserver(updateCoveredArea);
   for (const panel of [ui.dock, ui.runPanel, ui.settingsPanel, ui.viewerToolbar]) {
     coveredAreaObserver.observe(panel);

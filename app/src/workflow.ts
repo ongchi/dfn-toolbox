@@ -15,6 +15,7 @@
 //   seed = 12345
 //   min_feature_size = 0.4
 //   domain = "Box.vtu"                 # the name of a predefined mesh; no `user_fractures`
+//   orientation_option = "theta_phi"   # or "trend_plunge", "dip_strike": the pair of each orientation table; not in the dfngen input
 //   [network.generation]               # as [generation]
 //   [network.fram]                     # as [fram]; optional
 //   [network.mesh]                     # optional; no `enable` and no [network.region_boundaries]: always on
@@ -30,7 +31,7 @@
 //   aspect_ratio = 0.545               # y radius / x radius
 //   beta = 0.0                         # degrees; rotation in the plane of the fracture
 //   aperture = 3e-4                    # m; above 0
-//   orientation = { theta = 90.0, phi = 90.0 }   # the normal, as a family without kappa
+//   orientation = { theta = 90.0, phi = 90.0 }   # the normal (the pair of orientation_option), as a family without kappa
 //
 //   [flow]                             # the fehm input, without `mesh`
 //   temperature = 20.0

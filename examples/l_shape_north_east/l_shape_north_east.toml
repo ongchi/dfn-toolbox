@@ -18,6 +18,7 @@ outflow = ["east"]
 seed = 376
 min_feature_size = 0.3
 domain = "L-shape.vtu"
+orientation_option = "theta_phi"
 
 [network.generation]
 n_poly = 100

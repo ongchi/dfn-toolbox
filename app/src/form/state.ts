@@ -50,12 +50,11 @@ export type RadiusState =
 
 export type RadiusDistribution = RadiusState["distribution"];
 
-/** The pair of angles of the orientation, in the names of the input keys */
+/** The pair of angles of each orientation (`orientation_option` of `[network]`), in the names of the input keys */
 export type OrientationConvention = "theta_phi" | "trend_plunge" | "dip_strike";
 
-/** The orientation of a plane: the pair of angles of its normal */
+/** The orientation of a plane: the pair of angles of its normal, in the convention of the page */
 export interface PlaneOrientationState {
-  convention: OrientationConvention;
   /** theta, trend or dip, in degrees */
   firstAngle: number;
   /** phi, plunge or strike, in degrees */
@@ -108,6 +107,8 @@ export interface FormState {
   minFeatureSize: number;
   /** Name of the domain mesh file, as in the `domain` key */
   domain: string;
+  /** The pair of angles of all families and user-defined fractures (settings dialog) */
+  orientationConvention: OrientationConvention;
   userFractures: UserFractureState[];
   generation: GenerationState;
   fram: FramState;
@@ -174,7 +175,7 @@ export function defaultFamily(): FamilyState {
     p32Target: 0.5,
     aperture: defaultAperture("constant"),
     radius: defaultRadius("truncated_power_law"),
-    orientation: { convention: "theta_phi", firstAngle: 0.0, secondAngle: 0.0, kappa: 8.0 },
+    orientation: { firstAngle: 0.0, secondAngle: 0.0, kappa: 8.0 },
   };
 }
 
@@ -188,7 +189,7 @@ export function defaultUserFracture(region: string, center: [number, number, num
     aspectRatio: 1.0,
     beta: 0.0,
     aperture: 1e-4,
-    orientation: { convention: "theta_phi", firstAngle: 0.0, secondAngle: 0.0 },
+    orientation: { firstAngle: 0.0, secondAngle: 0.0 },
   };
 }
 
@@ -197,6 +198,7 @@ export function defaultFormState(): FormState {
     seed: "12345",
     minFeatureSize: 0.1,
     domain: "",
+    orientationConvention: "theta_phi",
     userFractures: [],
     generation: { stopCondition: "n_poly", nPoly: 100, forceLargeFractures: false, removeFracturesLessThan: 0.0 },
     fram: { ...FRAM_DEFAULTS, enable: true },

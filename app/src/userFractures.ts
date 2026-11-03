@@ -39,7 +39,7 @@ function scale(vector: Vector, factor: number): Vector {
  * `Fisher::new_with_theta_phi`, `normal_from_trend_plunge` and
  * `normal_from_dip_strike` (dfngen-rs `distribution/fisher.rs`, `geometry.rs`).
  */
-export function planeNormal(orientation: PlaneOrientationState): Vector {
+export function planeNormal(orientation: PlaneOrientationState, convention: OrientationConvention): Vector {
   const first = orientation.firstAngle * DEGREES;
   const second = orientation.secondAngle * DEGREES;
   const normals: Record<OrientationConvention, () => Vector> = {
@@ -47,8 +47,44 @@ export function planeNormal(orientation: PlaneOrientationState): Vector {
     trend_plunge: () => [-Math.sin(first) * Math.cos(second), -Math.cos(first) * Math.cos(second), Math.sin(second)],
     dip_strike: () => [Math.sin(first) * Math.cos(second), -Math.sin(first) * Math.sin(second), Math.cos(first)],
   };
-  const normal = normals[orientation.convention]();
+  const normal = normals[convention]();
   return scale(normal, 1 / length(normal));
+}
+
+// The converted angles are rounded: 1e-6 degree, thus 90 does not become 89.99999999999999
+const ANGLE_DIGITS = 1e6;
+
+function roundedAngle(radians: number): number {
+  // + 0: no -0 in the form
+  return Math.round((radians / DEGREES) * ANGLE_DIGITS) / ANGLE_DIGITS + 0;
+}
+
+/** An azimuth (phi, trend, strike) from 0 to below 360 degrees */
+function azimuth(radians: number): number {
+  const degrees = roundedAngle(radians);
+  return degrees < 0 ? degrees + 360 : degrees === 360 ? 0 : degrees;
+}
+
+/** The pair of angles of a unit normal: the inverse of `planeNormal` (a vertical normal has the azimuth 0) */
+export function anglesOfNormal([x, y, z]: Vector, convention: OrientationConvention): PlaneOrientationState {
+  const vertical = Math.min(1, Math.max(-1, z));
+  switch (convention) {
+    case "theta_phi":
+      return { firstAngle: roundedAngle(Math.acos(vertical)), secondAngle: azimuth(Math.atan2(y, x)) };
+    case "trend_plunge":
+      return { firstAngle: azimuth(Math.atan2(-x, -y)), secondAngle: roundedAngle(Math.asin(vertical)) };
+    case "dip_strike":
+      return { firstAngle: roundedAngle(Math.acos(vertical)), secondAngle: azimuth(Math.atan2(-y, x)) };
+  }
+}
+
+/** The angles of the same plane (or mean normal) in another convention */
+export function convertOrientation(
+  orientation: PlaneOrientationState,
+  from: OrientationConvention,
+  to: OrientationConvention,
+): PlaneOrientationState {
+  return from === to ? { ...orientation } : anglesOfNormal(planeNormal(orientation, from), to);
 }
 
 /** Rotation of `vector` about the unit vector `axis` by `angle` (radians), Rodrigues' formula */
@@ -88,10 +124,10 @@ function rotationFromZ(to: Vector): (vector: Vector) => Vector {
  * the aspect ratio), `rotation_2d(beta)`, the rotation from +z to the
  * normal, and the translation to the center.
  */
-export function fractureVertices(fracture: UserFractureState): Vector[] {
+export function fractureVertices(fracture: UserFractureState, convention: OrientationConvention): Vector[] {
   const angleStep = (2 * Math.PI) / fracture.numberOfPoints;
   const beta = fracture.beta * DEGREES;
-  const rotate = rotationFromZ(planeNormal(fracture.orientation));
+  const rotate = rotationFromZ(planeNormal(fracture.orientation, convention));
   return Array.from({ length: fracture.numberOfPoints }, (_, index): Vector => {
     // `Poly::new`: the first vertex is half a step from the x axis
     const angle = angleStep * (index + 0.5);
@@ -116,14 +152,19 @@ function dataArray(name: string, type: string, components: number, values: (numb
  * The polygon file of the fractures (ASCII VTK PolyData, as dfngen-rs reads
  * it): one polygon cell for each fracture, the cell array `aperture`, and one
  * cell array `region__<name>` for each region of the mesh (1 for the region
- * of the fracture). The region of each fracture must be one of `regionNames`.
+ * of the fracture). The region of each fracture must be one of `regionNames`;
+ * `convention` is the pair of angles of their orientations.
  */
-export function userFracturesToVtp(fractures: UserFractureState[], regionNames: string[]): string {
+export function userFracturesToVtp(
+  fractures: UserFractureState[],
+  convention: OrientationConvention,
+  regionNames: string[],
+): string {
   const unknown = fractures.find((fracture) => !regionNames.includes(fracture.region));
   if (unknown !== undefined) {
     throw new Error(`the region ${unknown.region} of a user-defined fracture is not in the domain mesh`);
   }
-  const vertices = fractures.map(fractureVertices);
+  const vertices = fractures.map((fracture) => fractureVertices(fracture, convention));
   const points = vertices.flat();
   const offsets = vertices.map((_, index) => vertices.slice(0, index + 1).reduce((sum, polygon) => sum + polygon.length, 0));
   return [

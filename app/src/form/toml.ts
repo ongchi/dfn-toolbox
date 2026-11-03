@@ -120,19 +120,22 @@ function apertureEntries(aperture: ApertureState): [string, string][] {
   return entries;
 }
 
-function planeOrientationEntries(orientation: PlaneOrientationState): [string, string][] {
-  const [firstKey, secondKey] = ORIENTATION_KEYS[orientation.convention];
+/** The pair of angles of all orientation tables of `[network]` (dfnWorks `orientationOption`); not in the dfngen input */
+const ORIENTATION_OPTION_KEY = "orientation_option";
+
+function planeOrientationEntries(orientation: PlaneOrientationState, convention: OrientationConvention): [string, string][] {
+  const [firstKey, secondKey] = ORIENTATION_KEYS[convention];
   return [
     [firstKey, float(orientation.firstAngle)],
     [secondKey, float(orientation.secondAngle)],
   ];
 }
 
-function orientationEntries(orientation: OrientationState): [string, string][] {
-  return [...planeOrientationEntries(orientation), ["kappa", float(orientation.kappa)]];
+function orientationEntries(orientation: OrientationState, convention: OrientationConvention): [string, string][] {
+  return [...planeOrientationEntries(orientation, convention), ["kappa", float(orientation.kappa)]];
 }
 
-function familyLines(family: FamilyState, isP32: boolean): string[] {
+function familyLines(family: FamilyState, isP32: boolean, convention: OrientationConvention): string[] {
   const lines = [
     `number_of_points = ${integer(family.numberOfPoints)}`,
     `probability = ${float(family.probability)}`,
@@ -149,11 +152,11 @@ function familyLines(family: FamilyState, isP32: boolean): string[] {
   }
   lines.push(`aperture = ${inlineTable(apertureEntries(family.aperture))}`);
   lines.push(`radius = ${inlineTable(radiusEntries(family.radius))}`);
-  lines.push(`orientation = ${inlineTable(orientationEntries(family.orientation))}`);
+  lines.push(`orientation = ${inlineTable(orientationEntries(family.orientation, convention))}`);
   return lines;
 }
 
-function userFractureLines(fracture: UserFractureState): string[] {
+function userFractureLines(fracture: UserFractureState, convention: OrientationConvention): string[] {
   return [
     `region = ${string(fracture.region)}`,
     `center = [${fracture.center.map(float).join(", ")}]`,
@@ -162,7 +165,7 @@ function userFractureLines(fracture: UserFractureState): string[] {
     `aspect_ratio = ${float(fracture.aspectRatio)}`,
     `beta = ${float(fracture.beta)}`,
     `aperture = ${float(fracture.aperture)}`,
-    `orientation = ${inlineTable(planeOrientationEntries(fracture.orientation))}`,
+    `orientation = ${inlineTable(planeOrientationEntries(fracture.orientation, convention))}`,
   ];
 }
 
@@ -173,6 +176,7 @@ export function networkTables(state: FormState): TomlTable[] {
     `seed = ${state.seed}`,
     `min_feature_size = ${float(state.minFeatureSize)}`,
     `domain = ${string(state.domain)}`,
+    `${ORIENTATION_OPTION_KEY} = ${string(state.orientationConvention)}`,
   ];
   const tables: TomlTable[] = [{ name: "", isArray: false, lines: rootLines }];
 
@@ -209,10 +213,10 @@ export function networkTables(state: FormState): TomlTable[] {
   });
 
   for (const family of state.families) {
-    tables.push({ name: "family", isArray: true, lines: familyLines(family, isP32) });
+    tables.push({ name: "family", isArray: true, lines: familyLines(family, isP32, state.orientationConvention) });
   }
   for (const fracture of state.userFractures) {
-    tables.push({ name: "user_fracture", isArray: true, lines: userFractureLines(fracture) });
+    tables.push({ name: "user_fracture", isArray: true, lines: userFractureLines(fracture, state.orientationConvention) });
   }
   return tables;
 }
@@ -235,8 +239,10 @@ export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): st
   const clustersLines = ["keep_isolated_fractures = false", clustersLine(roles)];
   const tables = networkTables(state).flatMap((table) => {
     if (table.name === "") {
+      // dfngen has the pair of keys in each orientation table, and no global option
+      const lines = table.lines.filter((line) => !line.startsWith(`${ORIENTATION_OPTION_KEY} =`));
       const fileLines = state.userFractures.length === 0 ? [] : [`user_fractures = ${string(USER_FRACTURES_FILE)}`];
-      return [{ ...table, lines: [...table.lines, ...fileLines] }];
+      return [{ ...table, lines: [...lines, ...fileLines] }];
     }
     if (table.name === "mesh") {
       return [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }];
@@ -510,27 +516,26 @@ function readOptionalAperture(reader: TableReader, key: string, path: string, pr
   return readAperture(reader.subTable(key), path, problems);
 }
 
-/** The pair of angles of an orientation table; the reader checks the other keys */
-function readPlaneOrientation(reader: TableReader, path: string, problems: string[]): PlaneOrientationState {
-  const conventions = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).filter((convention) =>
-    ORIENTATION_KEYS[convention].some((key) => reader.has(key)),
-  );
-  if (conventions.length !== 1) {
-    problems.push(`${path}: must have one pair: theta and phi, trend and plunge, or dip and strike`);
-  }
-  const convention = conventions[0] ?? "theta_phi";
+/** The pair of angles of `orientation_option` in an orientation table; another pair is an unknown key */
+function readPlaneOrientation(reader: TableReader, convention: OrientationConvention): PlaneOrientationState {
   const [firstKey, secondKey] = ORIENTATION_KEYS[convention];
-  return { convention, firstAngle: reader.float(firstKey, 0), secondAngle: reader.float(secondKey, 0) };
+  return { firstAngle: reader.float(firstKey, 0), secondAngle: reader.float(secondKey, 0) };
 }
 
-function readOrientation(table: Table, path: string, problems: string[]): OrientationState {
+function readOrientation(table: Table, path: string, convention: OrientationConvention, problems: string[]): OrientationState {
   const reader = new TableReader(table, path, problems);
-  const orientation = { ...readPlaneOrientation(reader, path, problems), kappa: reader.float("kappa", 0) };
+  const orientation = { ...readPlaneOrientation(reader, convention), kappa: reader.float("kappa", 0) };
   reader.checkUnknownKeys();
   return orientation;
 }
 
-function readFamily(table: Table, path: string, isP32: boolean, problems: string[]): FamilyState {
+function readFamily(
+  table: Table,
+  path: string,
+  isP32: boolean,
+  convention: OrientationConvention,
+  problems: string[],
+): FamilyState {
   const reader = new TableReader(table, path, problems);
   const p32Target = reader.optionalFloat("p32_target");
   if (isP32 && p32Target === null) {
@@ -552,16 +557,21 @@ function readFamily(table: Table, path: string, isP32: boolean, problems: string
     p32Target: p32Target ?? defaultFamily().p32Target,
     aperture: aperture ?? defaultAperture("constant"),
     radius: readRadius(reader.subTable("radius"), `${path}: radius`, problems),
-    orientation: readOrientation(reader.subTable("orientation"), `${path}: orientation`, problems),
+    orientation: readOrientation(reader.subTable("orientation"), `${path}: orientation`, convention, problems),
   };
   reader.checkUnknownKeys();
   return family;
 }
 
-function readUserFracture(table: Table, path: string, problems: string[]): UserFractureState {
+function readUserFracture(
+  table: Table,
+  path: string,
+  convention: OrientationConvention,
+  problems: string[],
+): UserFractureState {
   const reader = new TableReader(table, path, problems);
   const orientationReader = new TableReader(reader.subTable("orientation"), `${path}: orientation`, problems);
-  const orientation = readPlaneOrientation(orientationReader, `${path}: orientation`, problems);
+  const orientation = readPlaneOrientation(orientationReader, convention);
   orientationReader.checkUnknownKeys();
   const fracture: UserFractureState = {
     region: reader.string("region", ""),
@@ -628,19 +638,25 @@ export function readNetwork(table: Table, problems: string[]): FormState {
   };
   clustersReader.checkUnknownKeys();
 
+  const orientationConvention = reader.choice(
+    ORIENTATION_OPTION_KEY,
+    Object.keys(ORIENTATION_KEYS) as OrientationConvention[],
+    "theta_phi",
+  );
   const families = reader
     .tables("family")
     .map((table, index) =>
-      readFamily(table, `network family ${index + 1}`, generation.stopCondition === "p32", problems),
+      readFamily(table, `network family ${index + 1}`, generation.stopCondition === "p32", orientationConvention, problems),
     );
 
   const state: FormState = {
     seed: reader.integerDigits("seed", "0"),
     minFeatureSize: reader.float("min_feature_size", 0),
     domain: reader.string("domain", ""),
+    orientationConvention,
     userFractures: reader
       .tables("user_fracture")
-      .map((table, index) => readUserFracture(table, `network user fracture ${index + 1}`, problems)),
+      .map((table, index) => readUserFracture(table, `network user fracture ${index + 1}`, orientationConvention, problems)),
     generation,
     fram,
     mesh,

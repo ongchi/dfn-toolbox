@@ -186,9 +186,40 @@ test("the user fracture of the example is read with all its keys", () => {
       aspectRatio: 0.545,
       beta: 0,
       aperture: 3e-4,
-      orientation: { convention: "theta_phi", firstAngle: 90, secondAngle: 90 },
+      orientation: { firstAngle: 90, secondAngle: 90 },
     },
   ]);
+});
+
+test("orientation_option gives the pair of angles of each orientation table", () => {
+  const toml = USER_FRACTURES.replace('orientation_option = "theta_phi"', 'orientation_option = "dip_strike"')
+    .replaceAll("theta =", "dip =")
+    .replaceAll("phi =", "strike =");
+  const { network } = tomlToWorkflow(toml);
+  expect(network.orientationConvention).toBe("dip_strike");
+  expect(network.userFractures[0].orientation).toEqual({ firstAngle: 90, secondAngle: 90 });
+  // The user fractures are polygons in the dfngen input: the family has the pair
+  expect(networkLibraryToml(toml)).toMatch(/orientation = \{ dip = 0\.0, strike = 0\.0, kappa = 0\.1 \}/);
+});
+
+test("the dfngen input has no orientation_option: dfngen has the pair in each table", () => {
+  expect(networkLibraryToml(USER_FRACTURES)).not.toMatch(/orientation_option/);
+});
+
+test("another pair than the one of orientation_option is an error", () => {
+  const toml = USER_FRACTURES.replace('orientation_option = "theta_phi"', 'orientation_option = "trend_plunge"');
+  expect(problemsOf(toml)).toContain("network family 1: orientation: `trend` is missing");
+  expect(problemsOf(toml)).toContain("network family 1: orientation: `theta` is an unknown key");
+});
+
+test("an unknown orientation_option is an error", () => {
+  const toml = USER_FRACTURES.replace('orientation_option = "theta_phi"', 'orientation_option = "strike_dip"');
+  expect(problemsOf(toml)).toContain('[network]: `orientation_option` must be "theta_phi", "trend_plunge", "dip_strike"');
+});
+
+test("orientation_option is necessary", () => {
+  const toml = USER_FRACTURES.replace('orientation_option = "theta_phi"\n', "");
+  expect(problemsOf(toml)).toContain("[network]: `orientation_option` is missing");
 });
 
 test("a user fracture without aperture is an error", () => {

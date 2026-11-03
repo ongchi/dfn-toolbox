@@ -111,7 +111,7 @@ export function readMesh(name: string): string {
 export function userFracturesFile(network: FormState): string | undefined {
   return network.userFractures.length === 0
     ? undefined
-    : userFracturesToVtp(network.userFractures, meshRegionNames(readMesh(network.domain)));
+    : userFracturesToVtp(network.userFractures, network.orientationConvention, meshRegionNames(readMesh(network.domain)));
 }
 
 // The workflow examples of dfn-toolbox (../examples)
