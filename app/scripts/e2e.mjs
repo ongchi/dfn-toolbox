@@ -554,15 +554,15 @@ try {
   );
 
   // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
-  // The mesh section is in the settings dialog, not on the DFN tab
+  // The FRAM and mesh sections are in the settings dialog, not on the DFN tab
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
   const networkSections = await sectionTitles("#form");
   const settingsSections = await sectionTitles("#settings-dialog");
   check(
-    !networkSections.includes("Triangle mesh for the flow") &&
-      settingsSections === "Orientation of the fractures, Triangle mesh for the flow",
-    "mesh section in the settings dialog",
+    networkSections === "General, Generation, Clusters, Fracture families" &&
+      settingsSections === "Orientation of the fractures, FRAM, Triangle mesh for the flow",
+    "FRAM and mesh sections in the settings dialog",
     `DFN tab: ${networkSections}; settings: ${settingsSections}`,
   );
   const tabWalk = [];

@@ -27,8 +27,8 @@ input is in the page: the app does not save the input or the output.
 - **Settings** (the gear button below the layers of the 3D view): the pair of
   angles of all orientations (theta and phi, trend and plunge, or dip and
   strike). A new choice changes the angles of each family and fracture to the
-  same plane. Also the size of the triangles of the mesh for the flow
-  ("Meshing" uses them).
+  same plane. Also the FRAM rules of the generation, and the size of the
+  triangles of the mesh for the flow ("Meshing" uses them).
 - **DFN**: set the fracture families. "Generate" makes the fractures, and
   "Meshing" makes their triangle mesh. A generation can stop and keep its
   fractures, then continue later. The network keeps only the clusters which
