@@ -87,10 +87,10 @@ const RUN_BUTTON_TEXT: Record<SidebarTab, string | null> = {
   transport: "Track particles",
 };
 
-/** The screens with one view at a time: the condition of this layout in `style.css` */
-const ONE_VIEW_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
-type WorkspaceView = "view" | "log";
-type PhoneView = "form" | WorkspaceView;
+/** The screens with the settings in a bottom sheet: the condition of this layout in `style.css` */
+const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
+/** The heights of the bottom sheet */
+type SheetSize = "half" | "full";
 
 function byId<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -134,9 +134,14 @@ const ui = {
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
   layout: byId<HTMLElement>("layout"),
-  viewer: byId<HTMLDivElement>("viewer"),
   viewerToolbar: byId<HTMLDivElement>("viewer-toolbar"),
-  toolbarToggle: byId<HTMLButtonElement>("toolbar-toggle"),
+  dock: byId<HTMLDivElement>("dock"),
+  runPanel: byId<HTMLDivElement>("run-panel"),
+  settingsPanel: byId<HTMLElement>("settings-panel"),
+  panelClose: byId<HTMLButtonElement>("panel-close"),
+  panelOpen: byId<HTMLButtonElement>("panel-open"),
+  sheetSize: byId<HTMLButtonElement>("sheet-size"),
+  logButton: byId<HTMLButtonElement>("log-button"),
   logView: byId<HTMLDivElement>("log-view"),
   logEmpty: byId<HTMLParagraphElement>("log-empty"),
   results: byId<HTMLDetailsElement>("results"),
@@ -220,9 +225,9 @@ function durationText(milliseconds: number): string {
 /** A run in the worker: the buttons are disabled, and "Cancel" and the progress bar show */
 function setBusy(busy: boolean): void {
   isBusy = busy;
-  // On a phone, a run from a form shows its fractures at once
-  if (busy && ui.layout.dataset.phoneView === "form" && window.matchMedia(ONE_VIEW_QUERY).matches) {
-    selectView("view");
+  // On a phone, the sheet goes down at a run: the view shows the fractures
+  if (busy && window.matchMedia(SHEET_QUERY).matches) {
+    setSheetSize("half");
   }
   ui.runButton.disabled = busy;
   ui.exampleSelect.disabled = busy;
@@ -1058,6 +1063,7 @@ async function startViewer(): Promise<void> {
   await showTransportInViewer();
   showParticlesInViewer();
   updateUserFracturesInViewer();
+  updateCoveredArea();
   viewer.resetCamera();
   viewer.render();
 }
@@ -1122,35 +1128,40 @@ function switchDomainSource(): void {
   }
 }
 
-/** Shows the 3D view or the Log view; the 3D view stays in the layout and only takes no input */
-function selectWorkspaceView(name: WorkspaceView): void {
-  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workspace-tab]")) {
-    tab.classList.toggle("is-active", tab.dataset.workspaceTab === name);
-  }
-  ui.logView.hidden = name !== "log";
-  ui.viewer.inert = name === "log";
+/** Shows or hides the settings panel (a phone: the bottom sheet); the view then has the free part of the page */
+function setSettingsShown(isShown: boolean): void {
+  ui.layout.classList.toggle("is-panel-closed", !isShown);
+  ui.panelOpen.hidden = isShown;
+  (isShown ? ui.panelClose : ui.panelOpen).focus();
 }
 
-/** The view of a phone; `style.css` uses it only on a screen with one view at a time */
-function selectView(name: PhoneView): void {
-  ui.layout.dataset.phoneView = name;
-  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-phone-view]")) {
-    button.classList.toggle("is-active", button.dataset.phoneView === name);
-  }
-  if (name !== "form") {
-    selectWorkspaceView(name);
-  }
+/** The height of the bottom sheet of a phone; `style.css` uses it only on such a screen */
+function setSheetSize(size: SheetSize): void {
+  ui.layout.dataset.sheet = size;
+  ui.sheetSize.setAttribute("aria-label", size === "half" ? "Larger settings" : "Smaller settings");
 }
 
-/** The settings button: with another view shown, it opens the 3D view with the sheet */
-function toggleViewerToolbar(): void {
-  const isFormOnly = ui.layout.dataset.phoneView === "form" && window.matchMedia(ONE_VIEW_QUERY).matches;
-  const isViewShown = ui.logView.hidden && !isFormOnly;
-  if (!isViewShown) {
-    selectView("view");
-  }
-  const isOpen = ui.viewerToolbar.classList.toggle("is-open", !isViewShown || !ui.viewerToolbar.classList.contains("is-open"));
-  ui.toolbarToggle.setAttribute("aria-expanded", String(isOpen));
+function toggleLog(): void {
+  ui.logView.hidden = !ui.logView.hidden;
+  ui.logButton.setAttribute("aria-expanded", String(!ui.logView.hidden));
+}
+
+/**
+ * The parts of the page which the panels cover: the view centers the model in the
+ * rest, and `style.css` places the Log panel, the legend and the layers with them.
+ */
+function updateCoveredArea(): void {
+  const isSheet = window.matchMedia(SHEET_QUERY).matches;
+  const pageHeight = window.innerHeight;
+  const coveredBottom = isSheet ? pageHeight - ui.dock.getBoundingClientRect().top : 0;
+  ui.layout.style.setProperty("--covered-bottom", `${coveredBottom}px`);
+  ui.layout.style.setProperty("--run-panel-height", `${ui.runPanel.offsetHeight}px`);
+  const isPanelShown = !ui.layout.classList.contains("is-panel-closed");
+  viewer?.setCoveredArea({
+    left: !isSheet && isPanelShown ? ui.settingsPanel.getBoundingClientRect().right : 0,
+    top: isSheet ? ui.viewerToolbar.querySelector(".color-panel")?.getBoundingClientRect().bottom ?? 0 : 0,
+    bottom: coveredBottom,
+  });
 }
 
 function bindEvents(): void {
@@ -1186,16 +1197,17 @@ function bindEvents(): void {
       selectSidebarTab(name ?? "network");
     });
   }
-  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-workspace-tab]")) {
-    tab.addEventListener("click", () => selectView(tab.dataset.workspaceTab === "log" ? "log" : "view"));
+  ui.panelClose.addEventListener("click", () => setSettingsShown(false));
+  ui.panelOpen.addEventListener("click", () => setSettingsShown(true));
+  ui.sheetSize.addEventListener("click", () => setSheetSize(ui.layout.dataset.sheet === "full" ? "half" : "full"));
+  ui.logButton.addEventListener("click", toggleLog);
+  const coveredAreaObserver = new ResizeObserver(updateCoveredArea);
+  for (const panel of [ui.dock, ui.runPanel, ui.settingsPanel, ui.viewerToolbar]) {
+    coveredAreaObserver.observe(panel);
   }
-  for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-phone-view]")) {
-    const name = button.dataset.phoneView;
-    if (name === "form" || name === "view" || name === "log") {
-      button.addEventListener("click", () => selectView(name));
-    }
-  }
-  ui.toolbarToggle.addEventListener("click", toggleViewerToolbar);
+  // A closed panel has no size: its change has no resize
+  new MutationObserver(updateCoveredArea).observe(ui.layout, { attributeFilter: ["class", "data-sheet"] });
+  window.addEventListener("resize", updateCoveredArea);
 }
 
 /** Fills the list of the examples, and opens the default example */

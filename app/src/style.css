@@ -1,21 +1,34 @@
 :root {
-  --background: #f6f7f9;
-  --surface: #ffffff;
-  --border: #d9dde3;
-  --text: #1d2228;
-  --muted: #5f6b78;
-  --accent: #1f6feb;
-  --accent-text: #ffffff;
-  --accent-background: #e8f0fe;
-  --warning: #9a5b00;
-  --warning-background: #fff4e0;
-  --error: #b42318;
-  --invalid: #d92d20;
+  /* The 3D view fills the page; the controls float over it in dark translucent panels */
+  --view-background: #15181d;
+  --panel: rgb(26 29 34 / 0.86);
+  --panel-solid: #1a1d22;
+  --panel-blur: blur(12px);
+  --panel-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+  --gap: 12px;
+  --settings-width: 420px;
+  --scalar-bar-width: 300px;
+  --surface: rgb(255 255 255 / 0.07);
+  --surface-hover: rgb(255 255 255 / 0.13);
+  --border: rgb(255 255 255 / 0.16);
+  --text: #eef0f2;
+  --muted: #a9b0b8;
+  --accent: #ff8a5c;
+  --accent-strong: #ffab8a;
+  --accent-background: rgb(255 138 92 / 0.16);
+  --accent-text: #1a1d22;
+  --warning: #f5c26b;
+  --warning-background: rgb(245 194 107 / 0.14);
+  --error: #ff8f8f;
+  --error-background: rgb(255 120 120 / 0.14);
+  --invalid: #ff6b7f;
   --radius: 6px;
+  --panel-radius: 12px;
+  color-scheme: dark;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 14px;
   color: var(--text);
-  background: var(--background);
+  background: var(--view-background);
 }
 
 * {
@@ -27,10 +40,8 @@ body {
   height: 100vh;
   /* The visible height: 100vh of a phone browser goes below its address bar */
   height: 100dvh;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
-  display: flex;
-  flex-direction: column;
-  background: var(--background);
+  overflow: hidden;
+  background: var(--view-background);
 }
 
 code,
@@ -43,43 +54,88 @@ pre {
   display: none !important;
 }
 
-/* ---------------------------------------------------------------- toolbar */
+/* ---------------------------------------------------------------- panels */
 
-.toolbar {
+.panel {
+  background: var(--panel);
+  -webkit-backdrop-filter: var(--panel-blur);
+  backdrop-filter: var(--panel-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+}
+
+.panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 8px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  padding: 10px 8px 6px 16px;
 }
 
-.toolbar h1 {
+.panel-header h1 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
+/* Below the title */
 .subtitle {
-  font-size: 13px;
+  display: block;
+  font-size: 12px;
   font-weight: normal;
   color: var(--muted);
 }
 
-.repository-link {
+.repository-link,
+.icon-button {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
   color: var(--muted);
+  cursor: pointer;
 }
 
-.repository-link:hover {
+.repository-link:hover,
+.icon-button:hover {
   color: var(--text);
+  background: var(--surface-hover);
 }
 
+/* The handle of the bottom sheet: only on a phone */
+.sheet-handle {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- layer rail and color panel */
+
+/* The top right: the colors of the view, and below them the layers */
 .viewer-toolbar {
+  position: absolute;
+  top: calc(var(--gap) + env(safe-area-inset-top));
+  right: calc(var(--gap) + env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--gap);
+  max-height: calc(100% - 2 * var(--gap));
+  pointer-events: none;
+}
+
+.viewer-toolbar > * {
+  pointer-events: auto;
+}
+
+.color-panel {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  padding: 6px 12px;
 }
 
 .toolbar-field {
@@ -89,30 +145,32 @@ pre {
   color: var(--muted);
 }
 
-.toolbar-group {
+.layer-rail {
   display: flex;
+  flex-direction: column;
   gap: 4px;
+  padding: 6px;
 }
 
-.toolbar-separator {
-  width: 1px;
-  height: 20px;
+.rail-separator {
+  height: 1px;
+  margin: 2px 4px;
   background: var(--border);
 }
 
 /* A checkbox or a button with an icon. The checkbox is invisible over the icon:
-   it keeps its state, its disabled state and the keyboard. */
+   it keeps its state, its disabled state and the keyboard. The label shows
+   at the left of the rail at the pointer, as on a map. */
 .icon-toggle {
   position: relative;
   display: inline-flex;
-  flex-direction: column;
+  flex: none;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-width: 32px;
-  min-height: 32px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 50%;
   background: var(--surface);
   color: var(--muted);
   font: inherit;
@@ -120,7 +178,8 @@ pre {
 }
 
 .icon-toggle:hover {
-  border-color: var(--muted);
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .icon-toggle input[type="checkbox"] {
@@ -136,15 +195,16 @@ pre {
 .icon-toggle:has(input:checked) {
   border-color: var(--accent);
   background: var(--accent-background);
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .icon-toggle:has(input:disabled) {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 
-.icon-toggle:has(input:focus-visible) {
+.icon-toggle:has(input:focus-visible),
+.icon-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -172,9 +232,25 @@ pre {
 }
 
 .icon-label {
-  display: none;
-  font-size: 11px;
-  line-height: 1.2;
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.icon-toggle:hover .icon-label,
+.icon-toggle:has(:focus-visible) .icon-label,
+.icon-toggle:focus-visible .icon-label {
+  opacity: 1;
 }
 
 /* ---------------------------------------------------------------- buttons */
@@ -183,6 +259,7 @@ pre {
 .button-small {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -203,6 +280,7 @@ pre {
 
 .button:hover,
 .button-small:hover {
+  background: var(--surface-hover);
   border-color: var(--muted);
 }
 
@@ -215,6 +293,17 @@ pre {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
+  font-weight: 600;
+}
+
+.button-primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.button[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .file-button input {
@@ -233,42 +322,86 @@ input[type="text"] {
   min-width: 0;
 }
 
+select option {
+  background: var(--panel-solid);
+  color: var(--text);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
 /* ---------------------------------------------------------------- layout */
 
 .layout {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 440px minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 0;
+  position: relative;
+  height: 100%;
 }
 
-/* Outside of the sidebar: a phone also shows them with the 3D view and the Log view */
+/* The settings at the left, the run bar at the bottom right of them */
+.dock {
+  display: contents;
+}
+
+.settings-panel {
+  position: absolute;
+  top: calc(var(--gap) + env(safe-area-inset-top));
+  left: calc(var(--gap) + env(safe-area-inset-left));
+  bottom: var(--gap);
+  width: var(--settings-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.layout.is-panel-closed .settings-panel {
+  display: none;
+}
+
 .sidebar-tabs {
-  grid-column: 1;
-  grid-row: 1;
+  flex: none;
   min-width: 0;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
 }
 
 .sidebar {
-  grid-column: 1;
-  grid-row: 2;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
 }
 
-.workspace {
-  grid-column: 2;
-  grid-row: 1 / 4;
+.run-panel {
+  position: absolute;
+  left: calc(2 * var(--gap) + var(--settings-width) + env(safe-area-inset-left));
+  bottom: calc(var(--gap) + env(safe-area-inset-bottom));
+  max-width: calc(100% - 4 * var(--gap) - var(--settings-width) - var(--scalar-bar-width));
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  min-height: 0;
+  gap: 8px;
+  padding: 8px;
+}
+
+.layout.is-panel-closed .run-panel {
+  left: calc(var(--gap) + env(safe-area-inset-left));
+  max-width: calc(100% - 3 * var(--gap) - var(--scalar-bar-width));
+}
+
+/* The results, above the run bar */
+.log-view {
+  position: absolute;
+  left: calc(2 * var(--gap) + var(--settings-width) + env(safe-area-inset-left));
+  bottom: calc(var(--run-panel-height, 60px) + 2 * var(--gap) + env(safe-area-inset-bottom));
+  width: min(420px, calc(100% - 3 * var(--gap) - var(--settings-width)));
+  max-height: 50%;
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+.layout.is-panel-closed .log-view {
+  left: calc(var(--gap) + env(safe-area-inset-left));
+  width: min(420px, calc(100% - 2 * var(--gap)));
 }
 
 /* ---------------------------------------------------------------- form */
@@ -298,7 +431,7 @@ input[type="text"] {
 .example-description {
   margin: 0;
   padding: 8px 16px;
-  background: var(--background);
+  background: var(--surface);
   color: var(--muted);
   border-bottom: 1px solid var(--border);
 }
@@ -327,6 +460,8 @@ input[type="text"] {
   width: 48px;
   height: 24px;
   padding: 0;
+  border: 1px solid var(--border);
+  background: none;
 }
 
 .form-section {
@@ -453,43 +588,52 @@ input[type="text"] {
   margin-bottom: 2px;
 }
 
-/* ---------------------------------------------------------------- run panel */
-
-.run-panel {
-  grid-column: 1;
-  grid-row: 3;
-  border-top: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* ---------------------------------------------------------------- run bar */
 
 .run-buttons {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+
+/* A line between the run buttons and the Log button */
+.log-button {
+  margin-left: 8px;
+  position: relative;
+}
+
+.log-button::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--border);
 }
 
 progress {
   width: 100%;
+  min-width: 240px;
+  height: 6px;
+  accent-color: var(--accent);
 }
 
 .status {
   margin: 0;
   max-height: 160px;
+  max-width: 640px;
   overflow: auto;
   white-space: pre-wrap;
   padding: 6px 8px;
   border-radius: var(--radius);
-  background: var(--background);
+  background: var(--surface);
 }
 
 .status.is-error {
   color: var(--error);
-  background: #fef3f2;
+  background: var(--error-background);
 }
 
 .status.is-warning {
@@ -500,25 +644,14 @@ progress {
 /* ---------------------------------------------------------------- viewer */
 
 .viewer {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-}
-
-.viewer-toolbar {
-  padding: 6px 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  position: absolute;
+  inset: 0;
 }
 
 .viewer-canvas {
-  flex: 1;
-  position: relative;
-  min-height: 0;
-  background: #ffffff;
+  position: absolute;
+  inset: 0;
+  background: var(--view-background);
 }
 
 .viewer-canvas canvas {
@@ -531,17 +664,25 @@ progress {
   touch-action: none;
 }
 
-/* The colors of the view and their values, over the view at the right */
+/* The colors of the view and their values: the legend at the bottom right */
 .scalar-bar {
   position: absolute;
-  right: 12px;
-  bottom: 10%;
-  height: 60%;
-  max-width: 110px;
+  right: calc(var(--gap) + env(safe-area-inset-right));
+  bottom: calc(var(--gap) + env(safe-area-inset-bottom));
+  width: var(--scalar-bar-width);
+  max-width: calc(100% - 2 * var(--gap));
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  color: #1a1a1a;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  background: var(--panel);
+  -webkit-backdrop-filter: var(--panel-blur);
+  backdrop-filter: var(--panel-blur);
+  box-shadow: var(--panel-shadow);
+  color: var(--text);
+  font-size: 12px;
   pointer-events: none;
 }
 
@@ -554,19 +695,20 @@ progress {
 }
 
 .scalar-bar-body {
-  flex: 1;
   display: flex;
-  gap: 6px;
-  min-height: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .scalar-bar-ramp {
-  width: 24px;
+  height: 10px;
+  border-radius: 3px;
 }
 
+/* The values come from the largest to the smallest: the smallest is at the left */
 .scalar-bar-labels {
   display: flex;
-  flex-direction: column;
+  flex-direction: row-reverse;
   justify-content: space-between;
   font-variant-numeric: tabular-nums;
 }
@@ -579,27 +721,6 @@ progress {
   justify-content: center;
   color: var(--muted);
   pointer-events: none;
-}
-
-/* The 3D view and the Log view have one place */
-.workspace-views {
-  flex: 1;
-  position: relative;
-  display: flex;
-  min-height: 0;
-}
-
-.workspace-tabs {
-  background: var(--surface);
-}
-
-/* Over the 3D view, which stays in the layout: its canvas keeps its size */
-.log-view {
-  position: absolute;
-  inset: 0;
-  overflow: auto;
-  padding: 12px 16px;
-  background: var(--surface);
 }
 
 /* Each section is an accordion: a click on its title shows or hides its values */
@@ -653,6 +774,10 @@ progress {
   border-bottom: 2px solid transparent;
 }
 
+.tab:hover {
+  color: var(--text);
+}
+
 .tab.is-active {
   color: var(--text);
   border-bottom-color: var(--accent);
@@ -675,15 +800,20 @@ progress {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------------------------------------------------------- phone */
+/* ---------------------------------------------------------------- touch screens */
 
-.label-short,
-.phone-switch {
+.label-short {
   display: none;
 }
 
-/* A touch screen: portrait, or the two panels of a low landscape screen */
+/* A touch screen: portrait, or a low landscape screen */
 @media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --gap: 8px;
+    --settings-width: 340px;
+    --scalar-bar-width: 220px;
+  }
+
   .label-long {
     display: none;
   }
@@ -696,27 +826,19 @@ progress {
     display: none;
   }
 
-  .toolbar {
-    padding: 0 16px;
-  }
-
-  /* The link is larger than the icon for a finger */
-  .repository-link {
-    align-items: center;
-    justify-content: center;
+  .repository-link,
+  .icon-button {
     min-width: 44px;
     min-height: 44px;
-    margin-right: -10px;
-  }
-
-  .sidebar-tabs {
-    flex: none;
-    overflow-x: auto;
   }
 
   .tab {
     flex: none;
     min-height: 44px;
+  }
+
+  .sidebar-tabs {
+    overflow-x: auto;
   }
 
   .button,
@@ -770,16 +892,18 @@ progress {
     gap: 0;
   }
 
-  .run-panel {
-    padding-top: 8px;
+  .icon-toggle {
+    width: 44px;
+    height: 44px;
   }
 
-  .run-buttons {
-    flex-wrap: wrap;
+  /* No pointer over a touch screen: the icons have no label */
+  .icon-label {
+    display: none;
   }
 
-  .run-buttons .button {
-    flex: 1;
+  .color-panel {
+    padding: 0 10px;
   }
 
   /* About three lines; a longer text scrolls */
@@ -787,135 +911,166 @@ progress {
     max-height: 4.6em;
   }
 
-  /* The controls of the 3D view: a sheet which the settings button opens */
-  .phone-switch {
-    display: flex;
-    gap: 8px;
-  }
-
-  .phone-switch .button {
-    flex: 1;
-  }
-
-  .phone-switch .viewer-settings {
-    flex: none;
-    min-width: 44px;
-    font-size: 20px;
-  }
-
-  .viewer-toolbar {
-    display: none;
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1;
-    max-height: 70%;
-    overflow-y: auto;
-    padding: 8px 16px;
-    border-top: 1px solid var(--border);
-    border-bottom: none;
-  }
-
-  .viewer-toolbar.is-open {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .toolbar-group {
-    display: contents;
-  }
-
-  .toolbar-separator {
-    display: none;
-  }
-
-  .toolbar-field {
-    grid-column: 1 / -1;
-  }
-
-  .toolbar-field select {
-    flex: 1;
-  }
-
-  .icon-toggle {
-    min-height: 52px;
-    padding: 4px 2px;
-  }
-
-  .icon-label {
-    display: block;
-  }
 }
 
-/* One view at a time. The form and the workspace share one grid cell, and the
-   other view stays in the layout: the canvas keeps its size during a run. */
-@media (max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .workspace {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .sidebar-tabs,
-  .sidebar,
-  .run-panel {
-    border-right: none;
-  }
-
-  .workspace-tabs {
-    display: none;
-  }
-
-  .layout[data-phone-view="form"] .workspace,
-  .layout:not([data-phone-view="form"]) .sidebar {
-    visibility: hidden;
-  }
-
-  .phone-switch .is-active {
-    border-color: var(--accent);
-    color: var(--accent);
-    font-weight: 600;
-  }
-}
-
-/* The two panels side by side: no switch of the views, and the settings
-   button is in the row of the run buttons */
+/* A low landscape screen: the settings panel and the run bar are narrower */
 @media (max-height: 500px) and (orientation: landscape) {
-  .layout {
-    grid-template-columns: 320px minmax(0, 1fr);
-  }
-
-  .phone-switch button[data-phone-view] {
-    display: none;
-  }
-
-  .run-panel {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .run-buttons {
-    flex: 1;
-    min-width: 0;
-  }
-
   .run-buttons .button {
     padding: 6px 8px;
   }
 
-  .phone-switch {
-    order: 1;
+  .layer-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: calc(100vw - 3 * var(--gap) - var(--settings-width));
   }
 
-  .run-panel progress,
-  .run-panel .status {
-    order: 2;
-    flex-basis: 100%;
+  .rail-separator {
+    width: 1px;
+    height: auto;
+    margin: 4px 2px;
   }
 }
 
+/* A phone in portrait: the settings are a bottom sheet with the run bar below
+   them, and the 3D view fills the screen above the sheet */
+@media (max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px) {
+  .dock {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100% - env(safe-area-inset-top) - 56px);
+    border-top: 1px solid var(--border);
+    border-radius: var(--panel-radius) var(--panel-radius) 0 0;
+    background: var(--panel);
+    -webkit-backdrop-filter: var(--panel-blur);
+    backdrop-filter: var(--panel-blur);
+    box-shadow: var(--panel-shadow);
+  }
+
+  .dock > .panel {
+    position: static;
+    width: auto;
+    max-width: none;
+    border: none;
+    border-radius: 0;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .settings-panel {
+    flex: 1;
+  }
+
+  .layout[data-sheet="half"] .settings-panel {
+    flex: none;
+    height: 45dvh;
+  }
+
+  .layout[data-sheet="full"]:not(.is-panel-closed) .dock {
+    top: calc(env(safe-area-inset-top) + 56px);
+  }
+
+  .panel-header {
+    position: relative;
+    padding-top: 14px;
+  }
+
+  /* The bar at the top of the sheet: a tap gives the sheet the other height */
+  .sheet-handle {
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 88px;
+    height: 44px;
+    transform: translateX(-50%);
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  .sheet-handle::before {
+    content: "";
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    top: 6px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--muted);
+  }
+
+  .run-panel {
+    flex: none;
+    border-top: 1px solid var(--border) !important;
+    padding: 8px var(--gap) calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .run-buttons .button {
+    flex: 1;
+  }
+
+  .run-buttons #panel-open,
+  .run-buttons .log-button {
+    flex: none;
+    min-width: 44px;
+  }
+
+  .run-panel,
+  .layout.is-panel-closed .run-panel {
+    max-width: none;
+  }
+
+  /* The view settings: one row at the top, the colors at the left of the layers */
+  .viewer-toolbar {
+    left: calc(var(--gap) + env(safe-area-inset-left));
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .color-panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .toolbar-field select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* The icons have no label here: the rail can scroll */
+  .layer-rail {
+    flex: none;
+    max-height: calc(100dvh - var(--covered-bottom, 0px) - 2 * var(--gap) - env(safe-area-inset-top));
+    overflow-y: auto;
+  }
+
+  .log-view,
+  .layout.is-panel-closed .log-view {
+    left: var(--gap);
+    right: var(--gap);
+    top: calc(var(--gap) + env(safe-area-inset-top));
+    bottom: auto;
+    width: auto;
+    max-height: 45%;
+    z-index: 1;
+  }
+
+  /* At the left of the layer rail (44px icons, padding and border) */
+  .scalar-bar {
+    left: calc(var(--gap) + env(safe-area-inset-left));
+    right: auto;
+    max-width: calc(100% - 58px - 3 * var(--gap));
+    bottom: calc(var(--covered-bottom, 0px) + var(--gap));
+  }
+}

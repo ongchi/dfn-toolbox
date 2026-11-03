@@ -188,50 +188,44 @@ async function checkPhone() {
   await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
   await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
 
-  const visibleViews = () =>
-    page.evaluate(() =>
-      [
-        ["form", ".sidebar"],
-        ["3D", "#viewer"],
-        ["log", "#log-view"],
-      ]
-        .filter(([, selector]) => {
-          const node = document.querySelector(selector);
-          return !node.hidden && getComputedStyle(node).visibility === "visible";
-        })
-        .map(([name]) => name)
-        .join(" ")
-        .replace("3D log", "log"),
-    );
+  // The 3D view fills the screen; the settings are a bottom sheet with two heights, which a tap on its handle changes
+  const sheetState = () =>
+    page.evaluate(() => {
+      const layout = document.querySelector("#layout");
+      const isPanelShown = getComputedStyle(document.querySelector("#settings-panel")).display !== "none";
+      return `${isPanelShown ? layout.dataset.sheet : "closed"}`;
+    });
   const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
   const sizeAtStart = await canvasSize();
-  const viewNames = [await visibleViews()];
-  await page.tap('button[data-phone-view="view"]');
-  viewNames.push(await visibleViews());
-  await page.tap('button[data-phone-view="log"]');
-  viewNames.push(await visibleViews());
-  await page.tap('button[data-phone-view="form"]');
-  viewNames.push(await visibleViews());
-  check(viewNames.join(", ") === "form, 3D, log, form", "phone: one view at a time", viewNames.join(", "));
-  check((await canvasSize()) === sizeAtStart, "phone: the canvas keeps its size", `${sizeAtStart} → ${await canvasSize()}`);
+  const sheetStates = [await sheetState()];
+  await page.tap("#sheet-size");
+  sheetStates.push(await sheetState());
+  await page.tap("#sheet-size");
+  sheetStates.push(await sheetState());
+  await page.tap("#panel-close");
+  sheetStates.push(await sheetState());
+  await page.tap("#panel-open");
+  sheetStates.push(await sheetState());
+  check(sheetStates.join(", ") === "half, full, half, closed, half", "phone: the heights of the sheet", sheetStates.join(", "));
+  check(
+    (await canvasSize()) === sizeAtStart && sizeAtStart === "390 x 844",
+    "phone: the canvas fills the screen and keeps its size",
+    `${sizeAtStart} → ${await canvasSize()}`,
+  );
+
+  // The part of the view above the sheet
+  const freeViewShot = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const top = await page.$eval("#dock", (node) => node.getBoundingClientRect().top);
+    return Buffer.from(await page.screenshot({ clip: { x: 0, y: 0, width: 390, height: top } }));
+  };
 
   // The outline of a surface stays after a tap in the form, until a second tap
-  const phoneView = async () => {
-    await page.tap('button[data-phone-view="view"]');
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const box = await page.$eval("#viewer-canvas", (node) => {
-      const { x, y, width, height } = node.getBoundingClientRect();
-      return { x, y, width, height };
-    });
-    const image = Buffer.from(await page.screenshot({ clip: box }));
-    await page.tap('button[data-phone-view="form"]');
-    return image;
-  };
-  const viewBeforeTap = await phoneView();
+  const viewBeforeTap = await freeViewShot();
   await page.tap("#boundary-surfaces .file-row-header .field-label");
-  const viewAfterTap = await phoneView();
+  const viewAfterTap = await freeViewShot();
   await page.tap("#boundary-surfaces .file-row-header .field-label");
-  const viewAfterSecondTap = await phoneView();
+  const viewAfterSecondTap = await freeViewShot();
   check(
     !viewAfterTap.equals(viewBeforeTap) && viewAfterSecondTap.equals(viewBeforeTap),
     "phone: a tap shows the outline, a second tap removes it",
@@ -245,40 +239,36 @@ async function checkPhone() {
     await page.screenshot({ path: `${screenshotDir}/e2e_phone_${tab}.png` });
   }
 
-  // A run from a form opens the 3D view; a run from the Log view stays there
+  // A run lowers the full sheet to half: the view shows the fractures
   await page.tap('[data-sidebar-tab="network"]');
+  await page.tap("#sheet-size");
+  const sheetBeforeRun = await sheetState();
   await page.tap("#run-button");
   await page.waitForFunction(() => !document.querySelector("#results").hidden, { timeout: RUN_TIMEOUT });
   await waitIdle(page);
-  const viewAfterRun = await visibleViews();
-  await page.tap('button[data-phone-view="log"]');
-  await page.tap("#run-button");
-  await waitIdle(page);
-  const viewAfterLogRun = await visibleViews();
-  check(viewAfterRun === "3D" && viewAfterLogRun === "log", "phone: view after a run", `${viewAfterRun}, ${viewAfterLogRun}`);
-  await page.screenshot({ path: `${screenshotDir}/e2e_phone_log.png` });
-  await page.tap('button[data-phone-view="view"]');
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  const sheetAfterRun = await sheetState();
+  check(sheetBeforeRun === "full" && sheetAfterRun === "half", "phone: the sheet at a run", `${sheetBeforeRun} → ${sheetAfterRun}`);
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_view.png` });
 
-  // The step tabs also show with the 3D view: a tap changes the step and its run button, not the view
-  await page.tap('[data-sidebar-tab="flow"]');
-  const runTextOnView = await page.$eval("#run-button", (node) => node.textContent);
-  const viewAfterStepTab = await visibleViews();
-  check(runTextOnView === "Solve flow" && viewAfterStepTab === "3D", "phone: step tabs on the 3D view", `${runTextOnView}, ${viewAfterStepTab}`);
-  await page.tap('[data-sidebar-tab="network"]');
+  // The Log panel opens over the view, above the sheet
+  await page.tap("#log-button");
+  const logBox = await page.$eval("#log-view", (node) => {
+    const { bottom } = node.getBoundingClientRect();
+    return { bottom, isShown: !node.hidden, dockTop: document.querySelector("#dock").getBoundingClientRect().top };
+  });
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_log.png` });
+  await page.tap("#log-button");
+  check(
+    logBox.isShown && logBox.bottom <= logBox.dockTop && (await page.$eval("#log-view", (node) => node.hidden)),
+    "phone: the Log panel",
+    JSON.stringify(logBox),
+  );
 
-  // The sheet of the view controls
-  const isSheetShown = () => page.$eval("#viewer-toolbar", (node) => getComputedStyle(node).display !== "none");
-  const isSheetShownBefore = await isSheetShown();
-  await page.tap("#toolbar-toggle");
-  const isSheetShownAfter = await isSheetShown();
-  const sheetProblems = await touchProblems(page);
+  // The view controls are always on the view; the icons have no label on a touch screen
   const phoneLabels = await page.$$eval(".viewer-toolbar .icon-label", (nodes) =>
     nodes.filter((node) => getComputedStyle(node).display !== "none").length,
   );
-  check(phoneLabels === 9, "phone: the labels of the icons", String(phoneLabels));
-  await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
+  check(phoneLabels === 0, "phone: no labels of the icons", String(phoneLabels));
   const box = await page.$eval("#viewer-canvas", (node) => {
     const { x, y, width, height } = node.getBoundingClientRect();
     return { x, y, width, height };
@@ -291,29 +281,8 @@ async function checkPhone() {
   const viewBeforeColor = await viewShot();
   await page.select("#color-select", colorOption);
   const viewAfterColor = await viewShot();
-  await page.tap("#toolbar-toggle");
-  check(
-    !isSheetShownBefore && isSheetShownAfter && !(await isSheetShown()) && sheetProblems.length === 0 && !viewAfterColor.equals(viewBeforeColor),
-    "phone: the sheet of the view controls",
-    sheetProblems.join(", ") || `${isSheetShownBefore} → ${isSheetShownAfter}`,
-  );
-  // The settings button is at the right of the switch; from another view it opens the 3D view with the sheet
-  const isSettingsLast = await page.$eval("#toolbar-toggle", (node) => node.parentElement.lastElementChild === node);
-  await page.tap('button[data-phone-view="log"]');
-  await page.tap("#toolbar-toggle");
-  const viewFromLog = await visibleViews();
-  const isSheetShownFromLog = await isSheetShown();
-  await page.tap('button[data-phone-view="form"]');
-  await page.tap("#toolbar-toggle");
-  const viewFromForm = await visibleViews();
-  const isSheetShownFromForm = await isSheetShown();
-  await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
-  await page.tap("#toolbar-toggle");
-  check(
-    isSettingsLast && viewFromLog === "3D" && isSheetShownFromLog && viewFromForm === "3D" && isSheetShownFromForm && !(await isSheetShown()),
-    "phone: the settings button in the bottom bar",
-    `${viewFromLog} ${isSheetShownFromLog}, ${viewFromForm} ${isSheetShownFromForm}`,
-  );
+  check(!viewAfterColor.equals(viewBeforeColor), "phone: a new color changes the view", "changed");
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_color.png` });
 
   // One finger turns the model, two fingers zoom it
   const client = await page.createCDPSession();
@@ -343,22 +312,22 @@ async function checkPhone() {
   check(!viewAfterPinch.equals(viewAfterDrag), "phone: two fingers zoom", viewAfterPinch.equals(viewAfterDrag) ? "unchanged" : "changed");
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_pinch.png` });
 
-  // Landscape: the two panels side by side
+  // Landscape: the settings panel at the left of the view, as on a computer
   await page.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, isLandscape: true, deviceScaleFactor: 2 });
   await new Promise((resolve) => setTimeout(resolve, 500));
-  const landscape = await page.evaluate(() => ({
-    isSwitchShown: getComputedStyle(document.querySelector("button[data-phone-view]")).display !== "none",
-    isSettingsShown: getComputedStyle(document.querySelector("#toolbar-toggle")).display !== "none",
-    sidebarWidth: document.querySelector(".sidebar").getBoundingClientRect().width,
-    isCanvasShown: getComputedStyle(document.querySelector("#viewer")).visibility === "visible",
-    isSidebarShown: getComputedStyle(document.querySelector(".sidebar")).visibility === "visible",
-  }));
+  const landscape = await page.evaluate(() => {
+    const panel = document.querySelector("#settings-panel").getBoundingClientRect();
+    const rail = document.querySelector(".layer-rail").getBoundingClientRect();
+    const canvas = document.querySelector("#viewer-canvas");
+    return {
+      panelWidth: panel.width,
+      isRailRightOfPanel: rail.left > panel.right,
+      isRailInScreen: rail.bottom <= window.innerHeight,
+      canvasSize: `${canvas.clientWidth} x ${canvas.clientHeight}`,
+    };
+  });
   check(
-    !landscape.isSwitchShown &&
-      landscape.isSettingsShown &&
-      landscape.sidebarWidth === 320 &&
-      landscape.isCanvasShown &&
-      landscape.isSidebarShown,
+    landscape.panelWidth === 340 && landscape.isRailRightOfPanel && landscape.isRailInScreen && landscape.canvasSize === "844 x 390",
     "phone: landscape",
     JSON.stringify(landscape),
   );
@@ -437,24 +406,23 @@ try {
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
 
-  // The link to the repository is at the right of the title bar
+  // The link to the repository is in the title of the settings panel
   const repositoryLink = await page.$eval(".repository-link", (node) => ({
     href: node.href,
-    right: node.getBoundingClientRect().right,
-    barRight: node.parentElement.getBoundingClientRect().right,
+    isInPanelTitle: node.parentElement.matches("#settings-panel > .panel-header"),
   }));
   check(
-    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.barRight - repositoryLink.right <= 16,
+    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.isInPanelTitle,
     "repository link",
     JSON.stringify(repositoryLink),
   );
 
-  // The 3D view is the default; with no run, the Log view tells that it has no results
+  // The Log panel is closed at the start; with no run, it tells that it has no results
   const isLogShown = () => page.$eval("#log-view", (node) => !node.hidden);
   const isLogShownAtStart = await isLogShown();
-  await page.click('[data-workspace-tab="log"]');
+  await page.click("#log-button");
   const startLogText = await page.$eval("#log-view", (node) => node.innerText.trim());
-  await page.click('[data-workspace-tab="view"]');
+  await page.click("#log-button");
   const isLogShownAfterReturn = await isLogShown();
   check(
     !isLogShownAtStart && startLogText === "No results yet." && !isLogShownAfterReturn,
@@ -484,10 +452,15 @@ try {
   const exampleRoles = await domainRoles(page);
   check(exampleRoles === BOX_ROLES, "boundary surface roles", exampleRoles);
 
-  // The pointer over the row of a surface shows its outline; the view is the same again after it leaves
+  // The pointer over the row of a surface shows its outline; the view is the same again after it leaves.
+  // The screenshots have the part of the view at the right of the settings panel.
   const viewerScreenshot = async () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
-    return Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
+    const clip = await page.$eval("#settings-panel", (node) => {
+      const left = Math.ceil(node.getBoundingClientRect().right);
+      return { x: left, y: 0, width: window.innerWidth - left, height: window.innerHeight };
+    });
+    return Buffer.from(await page.screenshot({ clip }));
   };
   await page.mouse.move(0, 0);
   const viewBeforeHover = await viewerScreenshot();
@@ -682,22 +655,21 @@ try {
   const geometriesAfter = await viewGeometryCount(page);
   check(geometriesBefore > 0 && geometriesAfter === geometriesBefore, "view memory of repeated transports", `${geometriesBefore} → ${geometriesAfter} geometries`);
 
-  // The Log view has the three sections and does not change the 3D view
+  // The Log panel has the three sections and does not change the 3D view
   await page.mouse.move(0, 0);
   const viewBeforeLog = await viewerScreenshot();
   const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
   const canvasSizeBeforeLog = await canvasSize();
-  await page.click('[data-workspace-tab="log"]');
+  await page.click("#log-button");
   const canvasSizeOnLog = await canvasSize();
-  check(canvasSizeOnLog === canvasSizeBeforeLog, "canvas size on the log tab", `${canvasSizeBeforeLog} → ${canvasSizeOnLog}`);
+  check(canvasSizeOnLog === canvasSizeBeforeLog, "canvas size with the Log panel", `${canvasSizeBeforeLog} → ${canvasSizeOnLog}`);
   const logSections = await page.$$eval(".log-view .results-section:not([hidden]) summary", (nodes) =>
     nodes.map((node) => node.textContent).join(", "),
   );
   const logValueCount = await page.$$eval("#log-view dd", (nodes) => nodes.filter((node) => node.textContent !== "").length);
   const isLogEmptyTextHidden = await page.$eval("#log-empty", (node) => node.hidden);
-  const isViewerInert = await page.$eval("#viewer", (node) => node.inert);
   check(
-    logSections === "Fractures, Flow, Transport" && logValueCount > 0 && isLogEmptyTextHidden && isViewerInert,
+    logSections === "Fractures, Flow, Transport" && logValueCount > 0 && isLogEmptyTextHidden,
     "log view with results",
     `${logSections}; ${logValueCount} values`,
   );
@@ -719,10 +691,10 @@ try {
     sectionStates.join(" | "),
   );
 
-  await page.click('[data-workspace-tab="view"]');
+  await page.click("#log-button");
   await page.mouse.move(0, 0);
   const viewAfterLog = await viewerScreenshot();
-  check(viewAfterLog.equals(viewBeforeLog), "3D view after the log view", viewAfterLog.equals(viewBeforeLog) ? "same" : "different");
+  check(viewAfterLog.equals(viewBeforeLog), "3D view after the Log panel", viewAfterLog.equals(viewBeforeLog) ? "same" : "different");
 
   // A new run of an earlier step removes the "Color by" options of the later
   // outputs; the new mesh is not colored by an array which it does not have
@@ -953,12 +925,13 @@ try {
     `${continuedStatus}; with no stop: ${fullRun}`,
   );
 
-  // The icons of the 3D view: each has a name, and a computer shows no label
+  // The icons of the 3D view: each has a name, and a computer shows its label only at the pointer
+  await page.mouse.move(0, 0);
   const iconControls = await page.$$eval(".viewer-toolbar .icon-toggle", (nodes) =>
     nodes.map((node) => ({
       name: node.querySelector("input")?.getAttribute("aria-label") ?? node.getAttribute("aria-label"),
       hasTitle: node.title !== "",
-      isLabelShown: getComputedStyle(node.querySelector(".icon-label")).display !== "none",
+      isLabelShown: getComputedStyle(node.querySelector(".icon-label")).opacity !== "0",
     })),
   );
   check(
@@ -966,6 +939,10 @@ try {
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
   );
+  await page.hover("#reset-camera");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const hoverLabel = await page.$eval("#reset-camera .icon-label", (node) => getComputedStyle(node).opacity);
+  check(hoverLabel === "1", "icon label at the pointer", hoverLabel);
   await page.screenshot({ path: `${screenshotDir}/e2e_icons.png` });
 
   // The color bar goes off and comes back; the choice stays through a new color
@@ -988,10 +965,71 @@ try {
     "changed",
   );
 
-  // A computer stays on the Log tab during a run
-  await page.click('[data-workspace-tab="log"]');
+  // The Log panel stays open during a run, and the settings panel too
+  await page.click("#log-button");
   await runStep(page, "network");
-  check(await isLogShown(), "computer: a run does not change the tab", String(await isLogShown()));
+  const isPanelShownAfterRun = await page.$eval("#settings-panel", (node) => getComputedStyle(node).display !== "none");
+  check(
+    (await isLogShown()) && isPanelShownAfterRun,
+    "computer: a run keeps the panels",
+    `log ${await isLogShown()}, settings ${isPanelShownAfterRun}`,
+  );
+  await page.click("#log-button");
+
+  // The settings panel closes and opens again; "Reset view" puts the model in the middle of the free part
+  // The columns between the settings panel (if shown) and the layer rail
+  const freeColumns = () =>
+    page.evaluate(() => {
+      const panel = document.querySelector("#settings-panel");
+      const isPanelShown = getComputedStyle(panel).display !== "none";
+      return {
+        first: isPanelShown ? Math.ceil(panel.getBoundingClientRect().right) : 0,
+        last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
+      };
+    });
+  const modelCenter = async () => {
+    const image = await page.screenshot({ encoding: "base64" });
+    return page.evaluate(async (base64Image, { first, last }) => {
+      const response = await fetch(`data:image/png;base64,${base64Image}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      // The columns of the pixels which are not the background, in the middle third of the height
+      let sum = 0;
+      let count = 0;
+      for (let row = Math.floor(bitmap.height / 3); row < (2 * bitmap.height) / 3; row++) {
+        for (let column = first; column < last; column++) {
+          const start = 4 * (row * bitmap.width + column);
+          if (Math.abs(data[start] - 0x15) + Math.abs(data[start + 1] - 0x18) + Math.abs(data[start + 2] - 0x1d) > 30) {
+            sum += column;
+            count++;
+          }
+        }
+      }
+      return count === 0 ? null : sum / count;
+    }, image, await freeColumns());
+  };
+  await page.click("#panel-close");
+  await page.click("#reset-camera");
+  await page.mouse.move(700, 450);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const centerWithoutPanel = await modelCenter();
+  await page.screenshot({ path: `${screenshotDir}/e2e_panel_closed.png` });
+  await page.click("#panel-open");
+  await page.click("#reset-camera");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const panelRight = await page.$eval("#settings-panel", (node) => node.getBoundingClientRect().right);
+  const centerWithPanel = await modelCenter();
+  const freeCenter = (panelRight + 1400) / 2;
+  check(
+    centerWithoutPanel !== null &&
+      Math.abs(centerWithoutPanel - 700) < 120 &&
+      centerWithPanel !== null &&
+      Math.abs(centerWithPanel - freeCenter) < Math.abs(centerWithPanel - 700),
+    "reset view centers the model in the free part",
+    `without panel ${centerWithoutPanel?.toFixed(0)}, with panel ${centerWithPanel?.toFixed(0)} (free center ${freeCenter.toFixed(0)})`,
+  );
 
   await checkPhone();
 } finally {

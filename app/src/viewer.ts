@@ -74,6 +74,8 @@ const AMBIENT_LIGHT = 0.55 * Math.PI;
 // Near and far planes around the shapes, as parts of their radius
 const DEPTH_MARGIN = 1.2;
 const MINIMUM_NEAR_PART = 0.001;
+// Panels which leave less than this part of the width or height: the model has the center of all of the view
+const MINIMUM_FREE_PART = 0.25;
 
 const SCALAR_BAR_LABEL_COUNT = 5;
 const SCALAR_BAR_RAMP_STOPS = 33;
@@ -82,13 +84,15 @@ const FRACTURE_COLOR = [0.95, 0.75, 0.3] as const;
 const FRACTURE_OPACITY = 0.9;
 const FRACTURE_EDGE_OPACITY = 0.6;
 const EDGE_COLOR = [0.2, 0.2, 0.2] as const;
-const DOMAIN_COLOR = [0.3, 0.3, 0.3] as const;
+// Light lines on the dark background of the view
+const BACKGROUND_COLOR = 0x15181d;
+const DOMAIN_COLOR = [0.6, 0.62, 0.66] as const;
 const REMOVED_COLOR = [0.6, 0.6, 0.6] as const;
 const REMOVED_OPACITY = 0.4;
 const REJECTED_COLOR = [0.85, 0.2, 0.2] as const;
 const REJECTED_OPACITY = 0.25;
 const USER_COLOR = [0.2, 0.4, 0.9] as const;
-const USER_EDGE_COLOR = [0.1, 0.2, 0.6] as const;
+const USER_EDGE_COLOR = [0.45, 0.6, 1.0] as const;
 const USER_OPACITY = 0.5;
 
 // The trajectories: tube radius relative to the diagonal of their bounds,
@@ -108,7 +112,7 @@ const BOUNDARY_SURFACE_OPACITY = 0.25;
 const BOUNDARY_OUTLINE_WIDTH = 15;
 /** Yellow: one color for the outline of each surface, which stands out from the surface colors */
 const BOUNDARY_OUTLINE_COLOR = [1.0, 0.85, 0.0] as const;
-// The x, y, z axes in the top-left corner: their part of the shorter side of the view, and their scene
+// The x, y, z axes in the top-left corner of the free part of the view: their part of the shorter side of the view, and their scene
 const AXES_VIEW_PART = 0.2;
 const AXES_CAMERA_DISTANCE = 3;
 const AXES_LABEL_SIZE = 0.3;
@@ -358,7 +362,7 @@ class ScalarBar {
       const [red, green, blue] = tableColor(index / (SCALAR_BAR_RAMP_STOPS - 1));
       return `rgb(${[red, green, blue].map((component) => Math.round(255 * component)).join(" ")})`;
     });
-    ramp.style.background = `linear-gradient(to top, ${stops.join(", ")})`;
+    ramp.style.background = `linear-gradient(to right, ${stops.join(", ")})`;
     this.labels.className = "scalar-bar-labels";
     body.append(ramp, this.labels);
     this.root.append(this.title, body);
@@ -490,7 +494,7 @@ function axesScene(): Scene {
       context.font = `${AXES_LABEL_PIXELS * 0.7}px Arial`;
       context.textAlign = "center";
       context.textBaseline = "middle";
-      context.fillStyle = "#1a1a1a";
+      context.fillStyle = "#e6e6e6";
       context.fillText(label, AXES_LABEL_PIXELS / 2, AXES_LABEL_PIXELS / 2);
     }
     const sprite = new Sprite(new SpriteMaterial({ map: new CanvasTexture(canvas) }));
@@ -499,6 +503,13 @@ function axesScene(): Scene {
     scene.add(sprite);
   }
   return scene;
+}
+
+/** The pixels at the sides of the view which panels cover */
+export interface CoveredArea {
+  left: number;
+  top: number;
+  bottom: number;
 }
 
 export class NetworkViewer {
@@ -526,6 +537,7 @@ export class NetworkViewer {
   private isScalarBarShown = true;
   /** The camera moved: the next animation frame draws */
   private isDrawPending = false;
+  private coveredArea: CoveredArea = { left: 0, top: 0, bottom: 0 };
   private readonly canvas: HTMLCanvasElement;
 
   private constructor(canvas: HTMLCanvasElement, renderer: WebGLRenderer, parent: HTMLElement) {
@@ -558,7 +570,7 @@ export class NetworkViewer {
     ColorManagement.enabled = false;
     const renderer = new WebGLRenderer({ canvas, antialias: true });
     renderer.outputColorSpace = LinearSRGBColorSpace;
-    renderer.setClearColor(0xffffff);
+    renderer.setClearColor(BACKGROUND_COLOR);
     renderer.autoClear = false;
     return new NetworkViewer(canvas, renderer, parent);
   }
@@ -923,13 +935,33 @@ export class NetworkViewer {
     return bounds;
   }
 
-  /** Oblique view with z up, which shows all of the domain */
+  /** The panels over the view: the model has its center in the free part */
+  setCoveredArea(area: CoveredArea): void {
+    this.coveredArea = area;
+    this.render();
+  }
+
+  /** The free part of the view, in pixels; all of the view if the panels leave too little */
+  private freeArea(): { left: number; top: number; width: number; height: number } {
+    const { clientWidth: width, clientHeight: height } = this.canvas;
+    const { left, top, bottom } = this.coveredArea;
+    const freeWidth = width - left;
+    const freeHeight = height - top - bottom;
+    if (freeWidth < MINIMUM_FREE_PART * width || freeHeight < MINIMUM_FREE_PART * height) {
+      return { left: 0, top: 0, width, height };
+    }
+    return { left, top, width: freeWidth, height: freeHeight };
+  }
+
+  /** Oblique view with z up, which shows all of the domain in the free part of the view */
   resetCamera(): void {
     const sphere = this.visibleBounds().getBoundingSphere(new Sphere());
     const radius = sphere.radius > 0 ? sphere.radius : 1;
-    // The view angle is vertical: a tall view (a phone) must move back to show the width
-    const widthFactor = this.camera.aspect < 1 ? this.camera.aspect : 1;
-    const distance = radius / Math.sin((VIEW_ANGLE * Math.PI) / 360) / widthFactor;
+    // The view angle is of all of the height: a narrow or low free part must move the camera back
+    const free = this.freeArea();
+    const height = this.canvas.clientHeight || 1;
+    const halfTangent = (Math.tan((VIEW_ANGLE * Math.PI) / 360) * Math.min(free.width, free.height)) / height;
+    const distance = radius / Math.sin(Math.atan(halfTangent));
     this.camera.up.set(0, 0, 1);
     this.camera.position.copy(sphere.center).addScaledVector(START_DIRECTION, distance);
     this.camera.lookAt(sphere.center);
@@ -944,18 +976,24 @@ export class NetworkViewer {
     const distance = this.camera.position.distanceTo(sphere.center);
     this.camera.near = Math.max(distance - DEPTH_MARGIN * radius, MINIMUM_NEAR_PART * radius);
     this.camera.far = distance + DEPTH_MARGIN * radius;
-    this.camera.updateProjectionMatrix();
 
     const { clientWidth: width, clientHeight: height } = this.canvas;
+    // The center of the view moves to the center of the free part
+    const free = this.freeArea();
+    const offsetX = width / 2 - (free.left + free.width / 2);
+    const offsetY = height / 2 - (free.top + free.height / 2);
+    this.camera.setViewOffset(width, height, offsetX, offsetY, width, height);
+    this.camera.updateProjectionMatrix();
+
     this.renderer.setViewport(0, 0, width, height);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
-    this.drawAxes(width, height);
+    this.drawAxes(height, free);
     this.canvas.dataset.geometryCount = String(this.renderer.info.memory.geometries);
   }
 
-  private drawAxes(width: number, height: number): void {
-    const side = AXES_VIEW_PART * Math.min(width, height);
+  private drawAxes(height: number, free: { left: number; top: number; width: number; height: number }): void {
+    const side = AXES_VIEW_PART * Math.min(free.width, free.height);
     this.axesCamera.position
       .copy(this.camera.position)
       .sub(this.controls.target)
@@ -963,7 +1001,7 @@ export class NetworkViewer {
     this.axesCamera.up.copy(this.camera.up);
     this.axesCamera.lookAt(0, 0, 0);
     this.renderer.clearDepth();
-    this.renderer.setViewport(0, height - side, side, side);
+    this.renderer.setViewport(free.left, height - free.top - side, side, side);
     this.renderer.render(this.axes, this.axesCamera);
   }
 }

@@ -36,8 +36,11 @@ The 3D view shows the fractures during a generation. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,
 user fractures, removed and rejected fractures, and particle paths.
 
-On a phone, the app shows one view at a time. One finger turns the model, two
-fingers zoom it, and a tap on a boundary surface shows its outline.
+The 3D view fills the page, and the controls float over it: the settings at the
+left (a button hides them), the colors and the layers at the top right, the run
+buttons and the Log at the bottom. On a phone, the settings are a sheet at the
+bottom with two heights. One finger turns the model, two fingers zoom it, and a
+tap on a boundary surface shows its outline.
 
 For the same input and seed, the network and the mesh are those of the `dfngen`
 binary. The flow agrees with the `fehm` binary within 1e-9. The particles of
