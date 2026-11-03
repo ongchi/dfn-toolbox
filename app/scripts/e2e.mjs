@@ -554,8 +554,8 @@ try {
   );
 
   // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
-  // The fracture shape, FRAM, clusters and mesh sections are in the settings dialog, not on the DFN tab;
-  // the forms have no number of points
+  // The fracture shape, FRAM, clusters, mesh, fluid and routing sections are in the settings dialog, not on the
+  // DFN, Flow and Transport tabs; the forms have no number of points
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
   const networkSections = await sectionTitles("#form");
@@ -565,7 +565,7 @@ try {
   );
   check(
     networkSections === "General, Generation, Fracture families" &&
-      settingsSections === "Orientation of the fractures, Fracture shape, FRAM, Clusters, Triangle mesh for the flow" &&
+      settingsSections === "Orientation of the fractures, Fracture shape, FRAM, Clusters, Triangle mesh for the flow, Fluid, Transport" &&
       pointFields.join(", ") === "settings-dialog",
     "settings sections in the settings dialog",
     `DFN tab: ${networkSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
@@ -607,10 +607,16 @@ try {
     check(!hasResultsBefore && hasResultsAfter, `${name}: results in the log view`, `${hasResultsBefore} → ${hasResultsAfter}`);
 
     await page.click('[data-sidebar-tab="flow"]');
-    // The boundaries of the flow are the in-flow and out-flow surfaces, each with its color
+    // The boundaries of the flow are the in-flow and out-flow surfaces; the Flow tab has no other section (the
+    // fluid is in the settings dialog)
     const exampleSurfaces = await flowSurfaceNames(page);
     const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
-    check(exampleSurfaces !== "" && flowBoundaries === exampleSurfaces, `${name}: flow boundaries`, flowBoundaries);
+    const flowSections = await sectionTitles("#flow-form");
+    check(
+      exampleSurfaces !== "" && flowBoundaries === exampleSurfaces && flowSections === "Pressure boundaries",
+      `${name}: flow boundaries`,
+      `${flowBoundaries}; sections: ${flowSections}`,
+    );
     // The pointer over a pressure field highlights its surface
     await page.mouse.move(0, 0);
     const flowViewBefore = await viewerScreenshot();
@@ -703,11 +709,19 @@ try {
 
     // The trajectories and the velocities of the transport are always on
     await page.click('[data-sidebar-tab="transport"]');
-    // The Domain tab gives the in-flow and out-flow boundaries: the Transport tab has no section for them
+    // The Domain tab gives the in-flow and out-flow boundaries: the Transport tab has no section for them, and
+    // the routing is in the settings dialog
     const hasTransportBoundaries = await page.$$eval("#transport-form .form-section h3", (nodes) =>
       nodes.some((node) => node.textContent === "Boundaries"),
     );
-    check(!hasTransportBoundaries, `${name}: no transport boundaries`, String(hasTransportBoundaries));
+    const hasTransportRouting = await page.$$eval("#transport-form .field-label", (nodes) =>
+      nodes.some((node) => node.textContent === "Routing"),
+    );
+    check(
+      !hasTransportBoundaries && !hasTransportRouting,
+      `${name}: no transport boundaries and no routing`,
+      `boundaries ${hasTransportBoundaries}, routing ${hasTransportRouting}`,
+    );
     const transportStatus = await runStep(page, "transport");
     const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);

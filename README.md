@@ -29,17 +29,18 @@ input is in the page: the app does not save the input or the output.
   strike). A new choice changes the angles of each family and fracture to the
   same plane. Also the number of points of all fractures (one value for the
   families and the user fractures), the minimum feature size, the FRAM rules
-  of the generation, the choice of the clusters, and the size of the
-  triangles of the mesh for the flow ("Meshing" uses them).
+  of the generation, the choice of the clusters, the size of the triangles
+  of the mesh for the flow ("Meshing" uses them), the fluid of the flow
+  (temperature and gravity), and the routing of the particles.
 - **DFN**: set the fracture families. "Generate" makes the fractures, and
   "Meshing" makes their triangle mesh. A generation can stop and keep its
   fractures, then continue later. The network keeps only the clusters which
   connect an in-flow and an out-flow surface. If there is no such cluster, a
   warning shows, and you cannot go to the next step.
-- **Flow**: set the temperature, the gravity and a pressure for each in-flow
-  and out-flow surface, then "Solve flow".
-- **Transport**: set the seeding and the routing of the particles, then
-  "Track particles".
+- **Flow**: set a pressure for each in-flow and out-flow surface, then "Solve
+  flow" (the temperature and the gravity are in the settings).
+- **Transport**: set the seeding of the particles, then "Track particles"
+  (the routing is in the settings).
 
 The 3D view shows the fractures during a generation. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,

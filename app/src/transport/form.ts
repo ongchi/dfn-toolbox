@@ -1,6 +1,7 @@
 // The transport form: one field for each key of the dfntrans input file,
 // except the output (the trajectories and the velocities are always on) and
-// the in-flow and out-flow boundaries (the roles of the Domain tab).
+// the in-flow and out-flow boundaries (the roles of the Domain tab). The
+// routing is in the settings dialog.
 import type { FormContext } from "../form/context";
 import { checkboxField, element, numberField, row, section, selectField } from "../form/fields";
 import type { RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
@@ -86,10 +87,17 @@ function generalSection(state: TransportState, context: FormContext): HTMLElemen
         },
       }),
     ),
+  );
+}
+
+/** The routing of the particles: in the settings dialog, also before a flow */
+export function routingSection(state: TransportState, context: FormContext): HTMLElement {
+  return section(
+    "Transport",
     selectField<RoutingRule>({
       label: "Routing",
       key: "routing",
-      help: "the rule at an intersection",
+      help: "the rule of the particles at an intersection",
       value: state.routing,
       choices: [
         ["complete_mixing", "complete mixing"],

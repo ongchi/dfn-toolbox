@@ -12,7 +12,7 @@ import {
 import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
-import { renderFlowForm, type FlowBoundary } from "./flow/form";
+import { fluidSection, renderFlowForm, type FlowBoundary } from "./flow/form";
 import { defaultFlowState, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
@@ -46,7 +46,7 @@ import {
   type RegionBounds,
 } from "./inputFiles";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
-import { renderTransportForm } from "./transport/form";
+import { renderTransportForm, routingSection } from "./transport/form";
 import { defaultTransportState, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
@@ -112,6 +112,8 @@ const ui = {
   fracturesForm: byId<HTMLDivElement>("fractures-form"),
   form: byId<HTMLDivElement>("form"),
   settingsForm: byId<HTMLDivElement>("settings-form"),
+  settingsFlowForm: byId<HTMLDivElement>("settings-flow-form"),
+  settingsTransportForm: byId<HTMLDivElement>("settings-transport-form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
@@ -342,10 +344,12 @@ function flowBoundaries(): FlowBoundary[] | null {
 
 function renderFlow(): void {
   renderFlowForm(ui.flowForm, flowState, flowBoundaries(), flowContext);
+  ui.settingsFlowForm.replaceChildren(fluidSection(flowState, flowContext));
 }
 
 function renderTransport(): void {
   renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext);
+  ui.settingsTransportForm.replaceChildren(routingSection(transportState, transportContext));
 }
 
 function selectSidebarTab(name: SidebarTab): void {

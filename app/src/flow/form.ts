@@ -1,10 +1,12 @@
 // The flow form: one field for each key of the fehm input file. The pressure
-// boundaries are the in-flow and out-flow surfaces of the Domain tab.
+// boundaries are the in-flow and out-flow surfaces of the Domain tab; the
+// fluid is in the settings dialog.
 import type { FormContext } from "../form/context";
 import { bindSurfaceHighlight, checkboxField, element, numberField, row, section } from "../form/fields";
 import { pressureOf, type FlowState } from "./state";
 
-function fluidSection(state: FlowState, context: FormContext): HTMLElement {
+/** The fluid of the flow: in the settings dialog, also before a triangle mesh */
+export function fluidSection(state: FlowState, context: FormContext): HTMLElement {
   return section(
     "Fluid",
     row(
@@ -86,6 +88,6 @@ export function renderFlowForm(
     );
     return;
   }
-  container.replaceChildren(fluidSection(state, context), boundariesSection(state, boundaries, context));
+  container.replaceChildren(boundariesSection(state, boundaries, context));
   container.scrollTop = scrollTop;
 }

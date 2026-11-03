@@ -83,7 +83,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.CheckpointInputChanged": () =>
     "The input changed: Continue needs the input of the stopped run, and Meshing needs the number of families of the network. Generate the network again.",
 
-  "fehm.TemperatureRange": (f) => `Temperature (Flow tab) must be ${f.min} to ${f.max} °C.`,
+  "fehm.TemperatureRange": (f) => `Temperature (Settings, Fluid) must be ${f.min} to ${f.max} °C.`,
   "fehm.NoBoundaryDefined": () =>
     "The network has no point on an in-flow or out-flow surface. Change the roles of the surfaces (Domain tab), or generate another network.",
   "fehm.PressureRange": (f) => `The pressure of the boundary ${f.boundary} (Flow tab) must be ${f.min} to ${f.max} MPa.`,
