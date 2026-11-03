@@ -423,6 +423,8 @@ const PARTICLE_FRAGMENT_SHADER = `
 /** The moving particles of the flow, as trails which fade to their old end */
 class ParticleLines {
   readonly object: Mesh<InstancedBufferGeometry, ShaderMaterial>;
+  /** The bounds of the mesh points, in world coordinates: the geometry is only one quad */
+  readonly bounds: Box3;
   private readonly positions: Float32Array;
   private readonly opacities: Float32Array;
   private readonly positionBuffer: InstancedInterleavedBuffer;
@@ -431,6 +433,7 @@ class ParticleLines {
 
   constructor(private readonly particles: FlowParticles, points: ArrayLike<number>) {
     this.origin = localPositions(points).origin;
+    this.bounds = new Box3().setFromArray(points);
     const segmentCount = particles.segmentCount;
     this.positions = new Float32Array(6 * segmentCount);
     this.opacities = new Float32Array(2 * segmentCount);
@@ -921,8 +924,12 @@ export class NetworkViewer {
     const bounds = new Box3();
     this.scene.updateMatrixWorld();
     this.scene.traverseVisible((object) => {
+      if (object === this.particleLines?.object) {
+        bounds.union(this.particleLines.bounds);
+        return;
+      }
       const { geometry } = object as Partial<Mesh>;
-      if (geometry === undefined || object instanceof InstancedMesh || object === this.particleLines?.object) {
+      if (geometry === undefined || object instanceof InstancedMesh) {
         return;
       }
       if (geometry.boundingBox === null) {
