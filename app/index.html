@@ -177,15 +177,19 @@
       <dialog id="settings-dialog" class="panel settings-dialog" aria-labelledby="settings-title">
         <form class="settings-content" method="dialog">
           <h2 id="settings-title">Settings</h2>
-          <label class="field">
-            <span class="field-label">Orientation of the fractures</span>
-            <select id="orientation-option">
-              <option value="theta_phi">Theta and phi</option>
-              <option value="trend_plunge">Trend and plunge</option>
-              <option value="dip_strike">Dip and strike</option>
-            </select>
-            <span class="field-help">The pair of angles of the normal of each family and user fracture. A new choice changes the angles of each one to the same plane.</span>
-          </label>
+          <section class="form-section">
+            <h3 id="orientation-title">Orientation of the fractures</h3>
+            <label class="field">
+              <select id="orientation-option" aria-labelledby="orientation-title">
+                <option value="theta_phi">Theta and phi</option>
+                <option value="trend_plunge">Trend and plunge</option>
+                <option value="dip_strike">Dip and strike</option>
+              </select>
+              <span class="field-help">The pair of angles of the normal of each family and user fracture. A new choice changes the angles of each one to the same plane.</span>
+            </label>
+          </section>
+          <!-- The sections of the network input which are settings (form/index.ts) -->
+          <div id="settings-form"></div>
           <div class="dialog-buttons">
             <button class="button" value="close">Close</button>
           </div>

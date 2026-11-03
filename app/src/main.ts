@@ -111,6 +111,7 @@ const ui = {
   boundarySurfaces: byId<HTMLDivElement>("boundary-surfaces"),
   fracturesForm: byId<HTMLDivElement>("fractures-form"),
   form: byId<HTMLDivElement>("form"),
+  settingsForm: byId<HTMLDivElement>("settings-form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
@@ -316,7 +317,12 @@ const transportContext: FormContext = {
 };
 
 function render(): void {
-  renderForm({ domain: ui.domainForm, fractures: ui.fracturesForm, network: ui.form }, state, formContext, fileHandlers);
+  renderForm(
+    { domain: ui.domainForm, fractures: ui.fracturesForm, network: ui.form, settings: ui.settingsForm },
+    state,
+    formContext,
+    fileHandlers,
+  );
   updateUserFracturesInViewer();
 }
 
