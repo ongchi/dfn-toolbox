@@ -8,6 +8,8 @@
   --gap: 12px;
   --settings-width: 420px;
   --scalar-bar-width: 300px;
+  /* The icons of the layer rail, its padding and its border */
+  --rail-width: calc(36px + 2 * 6px + 2px);
   --surface: rgb(255 255 255 / 0.07);
   --surface-hover: rgb(255 255 255 / 0.13);
   --border: rgb(255 255 255 / 0.16);
@@ -87,7 +89,6 @@ pre {
   color: var(--muted);
 }
 
-.repository-link,
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -101,7 +102,6 @@ pre {
   cursor: pointer;
 }
 
-.repository-link:hover,
 .icon-button:hover {
   color: var(--text);
   background: var(--surface-hover);
@@ -150,6 +150,21 @@ pre {
   flex-direction: column;
   gap: 4px;
   padding: 6px;
+}
+
+/* The link to the source code: a round panel below the layers, as wide as their rail */
+.repository-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rail-width);
+  height: var(--rail-width);
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.repository-link:hover {
+  color: var(--text);
 }
 
 .rail-separator {
@@ -812,6 +827,7 @@ progress {
     --gap: 8px;
     --settings-width: 340px;
     --scalar-bar-width: 220px;
+    --rail-width: calc(44px + 2 * 6px + 2px);
   }
 
   .label-long {
@@ -826,7 +842,6 @@ progress {
     display: none;
   }
 
-  .repository-link,
   .icon-button {
     min-width: 44px;
     min-height: 44px;
@@ -1024,12 +1039,17 @@ progress {
     max-width: none;
   }
 
-  /* The view settings: one row at the top, the colors at the left of the layers */
+  /* The view settings at the top: the colors at the left of the layers, the link below the layers */
   .viewer-toolbar {
     left: calc(var(--gap) + env(safe-area-inset-left));
-    flex-direction: row;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, auto) auto;
+    align-items: start;
     justify-content: space-between;
+  }
+
+  .viewer-toolbar .repository-link {
+    grid-column: 2;
   }
 
   .color-panel {
@@ -1047,7 +1067,7 @@ progress {
   /* The icons have no label here: the rail can scroll */
   .layer-rail {
     flex: none;
-    max-height: calc(100dvh - var(--covered-bottom, 0px) - 2 * var(--gap) - env(safe-area-inset-top));
+    max-height: calc(100dvh - var(--covered-bottom, 0px) - 3 * var(--gap) - var(--rail-width) - env(safe-area-inset-top));
     overflow-y: auto;
   }
 

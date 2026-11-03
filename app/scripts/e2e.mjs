@@ -403,13 +403,18 @@ try {
   check(startTab === "domain", "start on the domain tab", startTab);
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
 
-  // The link to the repository is in the title of the settings panel
-  const repositoryLink = await page.$eval(".repository-link", (node) => ({
-    href: node.href,
-    isInPanelTitle: node.parentElement.matches("#settings-panel > .panel-header"),
-  }));
+  // The link to the repository is the last item of the view controls: below the layer rail, as wide as it
+  const repositoryLink = await page.$eval(".repository-link", (node) => {
+    const link = node.getBoundingClientRect();
+    const rail = document.querySelector(".layer-rail").getBoundingClientRect();
+    return {
+      href: node.href,
+      isLastInToolbar: node.parentElement.id === "viewer-toolbar" && node.parentElement.lastElementChild === node,
+      isBelowRail: link.top >= rail.bottom && link.right === rail.right && link.width === rail.width,
+    };
+  });
   check(
-    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.isInPanelTitle,
+    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.isLastInToolbar && repositoryLink.isBelowRail,
     "repository link",
     JSON.stringify(repositoryLink),
   );
