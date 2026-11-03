@@ -122,6 +122,8 @@ function apertureEntries(aperture: ApertureState): [string, string][] {
 
 /** The pair of angles of all orientation tables of `[network]` (dfnWorks `orientationOption`); not in the dfngen input */
 const ORIENTATION_OPTION_KEY = "orientation_option";
+/** The number of points of all fractures in `[network]`; dfngen has it in each family */
+const NUMBER_OF_POINTS_KEY = "number_of_points";
 
 function planeOrientationEntries(orientation: PlaneOrientationState, convention: OrientationConvention): [string, string][] {
   const [firstKey, secondKey] = ORIENTATION_KEYS[convention];
@@ -137,7 +139,6 @@ function orientationEntries(orientation: OrientationState, convention: Orientati
 
 function familyLines(family: FamilyState, isP32: boolean, convention: OrientationConvention): string[] {
   const lines = [
-    `number_of_points = ${integer(family.numberOfPoints)}`,
     `probability = ${float(family.probability)}`,
     `aspect_ratio = ${float(family.aspectRatio)}`,
   ];
@@ -160,7 +161,6 @@ function userFractureLines(fracture: UserFractureState, convention: OrientationC
   return [
     `region = ${string(fracture.region)}`,
     `center = [${fracture.center.map(float).join(", ")}]`,
-    `number_of_points = ${integer(fracture.numberOfPoints)}`,
     `radius = ${float(fracture.radius)}`,
     `aspect_ratio = ${float(fracture.aspectRatio)}`,
     `beta = ${float(fracture.beta)}`,
@@ -177,12 +177,11 @@ export function networkTables(state: FormState): TomlTable[] {
     `min_feature_size = ${float(state.minFeatureSize)}`,
     `domain = ${string(state.domain)}`,
     `${ORIENTATION_OPTION_KEY} = ${string(state.orientationConvention)}`,
+    `${NUMBER_OF_POINTS_KEY} = ${integer(state.numberOfPoints)}`,
   ];
   const tables: TomlTable[] = [{ name: "", isArray: false, lines: rootLines }];
 
   const generationLines = isP32 ? [] : [`n_poly = ${integer(state.generation.nPoly)}`];
-  generationLines.push(`force_large_fractures = ${state.generation.forceLargeFractures}`);
-  generationLines.push(`remove_fractures_less_than = ${float(state.generation.removeFracturesLessThan)}`);
   tables.push({ name: "generation", isArray: false, lines: generationLines });
 
   // Without FRAM, the section is not written: its other keys have no effect
@@ -239,8 +238,10 @@ export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): st
   const clustersLines = ["keep_isolated_fractures = false", clustersLine(roles)];
   const tables = networkTables(state).flatMap((table) => {
     if (table.name === "") {
-      // dfngen has the pair of keys in each orientation table, and no global option
-      const lines = table.lines.filter((line) => !line.startsWith(`${ORIENTATION_OPTION_KEY} =`));
+      // dfngen has the pair of keys in each orientation table and the number of points in each family: no global keys
+      const lines = table.lines.filter(
+        (line) => !line.startsWith(`${ORIENTATION_OPTION_KEY} =`) && !line.startsWith(`${NUMBER_OF_POINTS_KEY} =`),
+      );
       const fileLines = state.userFractures.length === 0 ? [] : [`user_fractures = ${string(USER_FRACTURES_FILE)}`];
       return [{ ...table, lines: [...lines, ...fileLines] }];
     }
@@ -249,6 +250,13 @@ export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): st
     }
     if (table.name === "clusters") {
       return [{ ...table, lines: [...table.lines, ...clustersLines] }];
+    }
+    // Not in the form (user decision): no forced large fractures, and no fracture is removed for its size
+    if (table.name === "generation") {
+      return [{ ...table, lines: [...table.lines, "force_large_fractures = false", "remove_fractures_less_than = 0.0"] }];
+    }
+    if (table.name === "family") {
+      return [{ ...table, lines: [`${NUMBER_OF_POINTS_KEY} = ${integer(state.numberOfPoints)}`, ...table.lines] }];
     }
     return table.name === "user_fracture" ? [] : [table];
   });
@@ -549,7 +557,6 @@ function readFamily(
     problems.push(`${path}: \`aperture\` is missing`);
   }
   const family: FamilyState = {
-    numberOfPoints: reader.integer("number_of_points", 0),
     probability: reader.float("probability", 0),
     aspectRatio: reader.float("aspect_ratio", 0),
     region: reader.optionalString("region"),
@@ -576,7 +583,6 @@ function readUserFracture(
   const fracture: UserFractureState = {
     region: reader.string("region", ""),
     center: reader.point("center"),
-    numberOfPoints: reader.integer("number_of_points", 0),
     radius: reader.float("radius", 0),
     aspectRatio: reader.float("aspect_ratio", 0),
     beta: reader.float("beta", 0),
@@ -605,8 +611,6 @@ export function readNetwork(table: Table, problems: string[]): FormState {
   const generation = {
     stopCondition: nPoly === null ? ("p32" as const) : ("n_poly" as const),
     nPoly: nPoly ?? 100,
-    forceLargeFractures: generationReader.boolean("force_large_fractures", false),
-    removeFracturesLessThan: generationReader.float("remove_fractures_less_than", 0),
   };
   generationReader.checkUnknownKeys();
 
@@ -654,6 +658,7 @@ export function readNetwork(table: Table, problems: string[]): FormState {
     minFeatureSize: reader.float("min_feature_size", 0),
     domain: reader.string("domain", ""),
     orientationConvention,
+    numberOfPoints: reader.integer(NUMBER_OF_POINTS_KEY, 0),
     userFractures: reader
       .tables("user_fracture")
       .map((table, index) => readUserFracture(table, `network user fracture ${index + 1}`, orientationConvention, problems)),

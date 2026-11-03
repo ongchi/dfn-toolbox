@@ -16,18 +16,18 @@
 //   min_feature_size = 0.4
 //   domain = "Box.vtu"                 # the name of a predefined mesh; no `user_fractures`
 //   orientation_option = "theta_phi"   # or "trend_plunge", "dip_strike": the pair of each orientation table; not in the dfngen input
-//   [network.generation]               # as [generation]
+//   number_of_points = 8               # of each family and user fracture: 3 or more, 4 = rectangle; the dfngen input has it in each family
+//   [network.generation]               # only n_poly (optional, as [generation]); the dfngen input has force_large_fractures = false, remove_fractures_less_than = 0.0
 //   [network.fram]                     # as [fram]; optional
 //   [network.mesh]                     # optional; no `enable` and no [network.region_boundaries]: always on
 //   max_size_factor = 5.0
 //   slope = 0.5
 //   [network.clusters]                 # only keep_only_largest
-//   [[network.family]]                 # as [[family]]; `aperture` is necessary
+//   [[network.family]]                 # as [[family]], without `number_of_points`; `aperture` is necessary
 //   [[network.user_fracture]]          # optional; a regular polygon, all keys necessary
 //   region = "box"                     # one region of the mesh
 //   center = [5.0, 5.0, 5.0]           # m; in the bounding box of the cells of the region
-//   number_of_points = 4               # as a family: 3 or more, 4 = rectangle
-//   radius = 7.78                      # m; of the circle of the points
+//   radius = 7.78                      # m; of the circle of the points (number_of_points of [network])
 //   aspect_ratio = 0.545               # y radius / x radius
 //   beta = 0.0                         # degrees; rotation in the plane of the fracture
 //   aperture = 3e-4                    # m; above 0

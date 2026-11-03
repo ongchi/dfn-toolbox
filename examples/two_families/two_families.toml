@@ -13,11 +13,10 @@ seed = 3
 min_feature_size = 0.4
 domain = "Box.vtu"
 orientation_option = "theta_phi"
+number_of_points = 8
 
 [network.generation]
 n_poly = 60
-force_large_fractures = false
-remove_fractures_less_than = 0.0
 
 [network.fram]
 enable = true
@@ -35,7 +34,6 @@ slope = 0.5
 keep_only_largest = true
 
 [[network.family]]
-number_of_points = 8
 probability = 0.4
 aspect_ratio = 1.0
 aperture = { distribution = "constant", value = 1e-4 }
@@ -43,7 +41,6 @@ radius = { distribution = "truncated_power_law", alpha = 2.0, min = 2.0, max = 5
 orientation = { theta = 90.0, phi = 0.0, kappa = 15.0 }
 
 [[network.family]]
-number_of_points = 8
 probability = 0.6
 aspect_ratio = 1.0
 aperture = { distribution = "correlated", alpha = 5e-5, beta = 0.5 }

@@ -14,11 +14,10 @@ seed = 1
 min_feature_size = 0.4
 domain = "Box.vtu"
 orientation_option = "theta_phi"
+number_of_points = 8
 
 [network.generation]
 n_poly = 50
-force_large_fractures = false
-remove_fractures_less_than = 0.0
 
 [network.fram]
 enable = true
@@ -36,7 +35,6 @@ slope = 0.5
 keep_only_largest = true
 
 [[network.family]]
-number_of_points = 8
 probability = 1.0
 aspect_ratio = 1.0
 aperture = { distribution = "constant", value = 1e-4 }

@@ -197,18 +197,6 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
     firstRow,
     row(
       numberField({
-        label: "Number of points",
-        key: "number_of_points",
-        help: "3 or more; 4 = rectangle",
-        value: family.numberOfPoints,
-        isInteger: true,
-        min: 3,
-        onInput: (value) => {
-          family.numberOfPoints = value;
-          context.changed();
-        },
-      }),
-      numberField({
         label: "Aspect ratio",
         key: "aspect_ratio",
         help: "y radius / x radius",

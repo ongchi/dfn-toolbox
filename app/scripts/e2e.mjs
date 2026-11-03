@@ -554,16 +554,21 @@ try {
   );
 
   // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
-  // The FRAM, clusters and mesh sections are in the settings dialog, not on the DFN tab
+  // The fracture shape, FRAM, clusters and mesh sections are in the settings dialog, not on the DFN tab;
+  // the forms have no number of points
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
   const networkSections = await sectionTitles("#form");
   const settingsSections = await sectionTitles("#settings-dialog");
+  const pointFields = await page.$$eval(".field-label", (nodes) =>
+    nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
+  );
   check(
     networkSections === "General, Generation, Fracture families" &&
-      settingsSections === "Orientation of the fractures, FRAM, Clusters, Triangle mesh for the flow",
-    "FRAM, clusters and mesh sections in the settings dialog",
-    `DFN tab: ${networkSections}; settings: ${settingsSections}`,
+      settingsSections === "Orientation of the fractures, Fracture shape, FRAM, Clusters, Triangle mesh for the flow" &&
+      pointFields.join(", ") === "settings-dialog",
+    "settings sections in the settings dialog",
+    `DFN tab: ${networkSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
   );
   const tabWalk = [];
   for (let step = 0; step < 2; step++) {

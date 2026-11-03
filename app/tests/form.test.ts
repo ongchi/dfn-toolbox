@@ -181,7 +181,6 @@ test("the user fracture of the example is read with all its keys", () => {
     {
       region: "box",
       center: [5, 5, 5],
-      numberOfPoints: 4,
       radius: 7.78,
       aspectRatio: 0.545,
       beta: 0,
@@ -215,6 +214,34 @@ test("another pair than the one of orientation_option is an error", () => {
 test("an unknown orientation_option is an error", () => {
   const toml = USER_FRACTURES.replace('orientation_option = "theta_phi"', 'orientation_option = "strike_dip"');
   expect(problemsOf(toml)).toContain('[network]: `orientation_option` must be "theta_phi", "trend_plunge", "dip_strike"');
+});
+
+test("number_of_points of [network] is the number of points of each dfngen family", () => {
+  const toml = USER_FRACTURES.replace("number_of_points = 8", "number_of_points = 5");
+  expect(tomlToWorkflow(toml).network.numberOfPoints).toBe(5);
+  const libraryToml = networkLibraryToml(toml);
+  expect(libraryToml).toMatch(/\[\[family\]\]\nnumber_of_points = 5\n/);
+  // Not at the top: dfngen has no such key there
+  expect(libraryToml.split("[")[0]).not.toMatch(/number_of_points/);
+});
+
+test("number_of_points in a family is an unknown key: one value for all fractures", () => {
+  const toml = USER_FRACTURES.replace("[[network.family]]", "[[network.family]]\nnumber_of_points = 4");
+  expect(problemsOf(toml)).toEqual(["network family 1: `number_of_points` is an unknown key"]);
+});
+
+test("the dfngen input has no forced large fractures and removes no fracture for its size", () => {
+  expect(networkLibraryToml(BOX)).toMatch(/\[generation\]\nn_poly = 50\nforce_large_fractures = false\nremove_fractures_less_than = 0\.0\n/);
+});
+
+test.each(["force_large_fractures = true", "remove_fractures_less_than = 1.0"])("%s in [network.generation] is an unknown key", (line) => {
+  const toml = BOX.replace("[network.generation]", `[network.generation]\n${line}`);
+  expect(problemsOf(toml)).toEqual([`[network.generation]: \`${line.split(" ")[0]}\` is an unknown key`]);
+});
+
+test("number_of_points is necessary", () => {
+  const toml = USER_FRACTURES.replace("number_of_points = 8\n", "");
+  expect(problemsOf(toml)).toEqual(["[network]: `number_of_points` is missing"]);
 });
 
 test("orientation_option is necessary", () => {

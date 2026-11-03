@@ -8,6 +8,12 @@ import type { OrientationConvention, PlaneOrientationState, UserFractureState } 
 import { dataArrayValues, pointValues } from "./inputFiles";
 import type { CellShapes } from "./viewerGeometry";
 
+/** The settings of the page which all user-defined fractures share (a `FormState` has them) */
+export interface FractureSettings {
+  orientationConvention: OrientationConvention;
+  numberOfPoints: number;
+}
+
 /** The name of the polygon file in the dfngen input */
 export const USER_FRACTURES_FILE = "user_fractures.vtp";
 
@@ -124,11 +130,11 @@ function rotationFromZ(to: Vector): (vector: Vector) => Vector {
  * the aspect ratio), `rotation_2d(beta)`, the rotation from +z to the
  * normal, and the translation to the center.
  */
-export function fractureVertices(fracture: UserFractureState, convention: OrientationConvention): Vector[] {
-  const angleStep = (2 * Math.PI) / fracture.numberOfPoints;
+export function fractureVertices(fracture: UserFractureState, settings: FractureSettings): Vector[] {
+  const angleStep = (2 * Math.PI) / settings.numberOfPoints;
   const beta = fracture.beta * DEGREES;
-  const rotate = rotationFromZ(planeNormal(fracture.orientation, convention));
-  return Array.from({ length: fracture.numberOfPoints }, (_, index): Vector => {
+  const rotate = rotationFromZ(planeNormal(fracture.orientation, settings.orientationConvention));
+  return Array.from({ length: settings.numberOfPoints }, (_, index): Vector => {
     // `Poly::new`: the first vertex is half a step from the x axis
     const angle = angleStep * (index + 0.5);
     const x = fracture.radius * Math.cos(angle);
@@ -152,19 +158,18 @@ function dataArray(name: string, type: string, components: number, values: (numb
  * The polygon file of the fractures (ASCII VTK PolyData, as dfngen-rs reads
  * it): one polygon cell for each fracture, the cell array `aperture`, and one
  * cell array `region__<name>` for each region of the mesh (1 for the region
- * of the fracture). The region of each fracture must be one of `regionNames`;
- * `convention` is the pair of angles of their orientations.
+ * of the fracture). The region of each fracture must be one of `regionNames`.
  */
 export function userFracturesToVtp(
   fractures: UserFractureState[],
-  convention: OrientationConvention,
+  settings: FractureSettings,
   regionNames: string[],
 ): string {
   const unknown = fractures.find((fracture) => !regionNames.includes(fracture.region));
   if (unknown !== undefined) {
     throw new Error(`the region ${unknown.region} of a user-defined fracture is not in the domain mesh`);
   }
-  const vertices = fractures.map((fracture) => fractureVertices(fracture, convention));
+  const vertices = fractures.map((fracture) => fractureVertices(fracture, settings));
   const points = vertices.flat();
   const offsets = vertices.map((_, index) => vertices.slice(0, index + 1).reduce((sum, polygon) => sum + polygon.length, 0));
   return [

@@ -75,18 +75,6 @@ function fractureCard(state: FormState, index: number, context: FormContext): HT
     row(...centerFields(fracture, context)),
     row(
       numberField({
-        label: "Number of points",
-        key: "number_of_points",
-        help: "3 or more; 4 = rectangle",
-        value: fracture.numberOfPoints,
-        isInteger: true,
-        min: 3,
-        onInput: (value) => {
-          fracture.numberOfPoints = value;
-          context.changed();
-        },
-      }),
-      numberField({
         label: "Radius (m)",
         key: "radius",
         help: "of the circle of the points",

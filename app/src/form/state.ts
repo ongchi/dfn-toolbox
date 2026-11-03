@@ -9,8 +9,6 @@ export type StopCondition = "n_poly" | "p32";
 export interface GenerationState {
   stopCondition: StopCondition;
   nPoly: number;
-  forceLargeFractures: boolean;
-  removeFracturesLessThan: number;
 }
 
 export interface FramState {
@@ -67,7 +65,6 @@ export interface OrientationState extends PlaneOrientationState {
 }
 
 export interface FamilyState {
-  numberOfPoints: number;
   probability: number;
   aspectRatio: number;
   /** Name of a region of the mesh; null = whole mesh (no key) */
@@ -91,7 +88,6 @@ export interface UserFractureState {
   region: string;
   /** x, y, z in the coordinates of the mesh; in the bounding box of the region */
   center: [number, number, number];
-  numberOfPoints: number;
   radius: number;
   aspectRatio: number;
   /** Rotation in the plane of the fracture, in degrees */
@@ -109,6 +105,8 @@ export interface FormState {
   domain: string;
   /** The pair of angles of all families and user-defined fractures (settings dialog) */
   orientationConvention: OrientationConvention;
+  /** The number of points of each family and user-defined fracture (settings dialog); 3 or more, 4 = rectangle */
+  numberOfPoints: number;
   userFractures: UserFractureState[];
   generation: GenerationState;
   fram: FramState;
@@ -167,7 +165,6 @@ export function defaultRadius(distribution: RadiusDistribution): RadiusState {
 
 export function defaultFamily(): FamilyState {
   return {
-    numberOfPoints: 8,
     probability: 1.0,
     aspectRatio: 1.0,
     region: null,
@@ -184,7 +181,6 @@ export function defaultUserFracture(region: string, center: [number, number, num
   return {
     region,
     center,
-    numberOfPoints: 4,
     radius: 1.0,
     aspectRatio: 1.0,
     beta: 0.0,
@@ -199,8 +195,9 @@ export function defaultFormState(): FormState {
     minFeatureSize: 0.1,
     domain: "",
     orientationConvention: "theta_phi",
+    numberOfPoints: 8,
     userFractures: [],
-    generation: { stopCondition: "n_poly", nPoly: 100, forceLargeFractures: false, removeFracturesLessThan: 0.0 },
+    generation: { stopCondition: "n_poly", nPoly: 100 },
     fram: { ...FRAM_DEFAULTS, enable: true },
     mesh: { ...MESH_DEFAULTS },
     clusters: { keepOnlyLargest: false },

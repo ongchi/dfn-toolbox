@@ -1,5 +1,5 @@
 import type { FormContext } from "./context";
-import { checkboxField, numberField, row, section, selectField } from "./fields";
+import { numberField, row, section, selectField } from "./fields";
 import type { FormState, StopCondition } from "./state";
 
 export function generationSection(state: FormState, context: FormContext): HTMLElement {
@@ -35,29 +35,5 @@ export function generationSection(state: FormState, context: FormContext): HTMLE
     );
   }
 
-  return section(
-    "Generation",
-    row(...stopFields),
-    numberField({
-      label: "Remove fractures smaller than",
-      key: "remove_fractures_less_than",
-      help: "after the generation, remove the fractures with `x_radius` below it; 0 = none",
-      value: generation.removeFracturesLessThan,
-      min: 0,
-      onInput: (value) => {
-        generation.removeFracturesLessThan = value;
-        context.changed();
-      },
-    }),
-    checkboxField({
-      label: "Force large fractures",
-      key: "force_large_fractures",
-      help: "each family first gets one fracture with its maximum radius",
-      value: generation.forceLargeFractures,
-      onInput: (value) => {
-        generation.forceLargeFractures = value;
-        context.changed();
-      },
-    }),
-  );
+  return section("Generation", row(...stopFields));
 }

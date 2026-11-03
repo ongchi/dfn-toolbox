@@ -469,7 +469,7 @@ function generationInput(): GenerationInput | string {
   return {
     toml: networkToLibraryToml(state, boundaryRoles),
     mesh: files.mesh.text,
-    userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, state.orientationConvention, regionNames),
+    userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, state, regionNames),
   };
 }
 
@@ -1028,7 +1028,7 @@ function updateUserFracturesInViewer(): void {
         return;
       }
       const fractures = state.userFractures.filter((fracture) => regionNames.includes(fracture.region));
-      viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, state.orientationConvention, regionNames)));
+      viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, state, regionNames)));
       applyLayerVisibility(viewer);
       viewer.render();
     })
