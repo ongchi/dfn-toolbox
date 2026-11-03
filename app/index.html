@@ -29,20 +29,35 @@
           </label>
         </div>
         <div class="panel layer-rail">
+          <label class="icon-toggle" title="Color bar">
+            <input id="show-color-bar" type="checkbox" checked aria-label="Color bar" />
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <linearGradient id="color-bar-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ff0000" />
+                <stop offset="0.33" stop-color="#ffff00" />
+                <stop offset="0.67" stop-color="#00ffff" />
+                <stop offset="1" stop-color="#0000ff" />
+              </linearGradient>
+              <rect x="8" y="3" width="7" height="18" rx="1" fill="url(#color-bar-gradient)" />
+              <path d="M17.5 7H20M17.5 12H20M17.5 17H20" />
+            </svg>
+            <span class="icon-label">Color bar</span>
+          </label>
+          <span class="rail-separator"></span>
           <label class="icon-toggle" title="Domain">
             <input id="show-domain" type="checkbox" checked aria-label="Domain" />
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5L12 12l8-4.5M12 12v9" /></svg>
             <span class="icon-label">Domain</span>
           </label>
-          <label class="icon-toggle" title="Mesh">
-            <input id="show-mesh" type="checkbox" checked aria-label="Mesh" />
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 17H2zM7 11.5h10L12 20z" /></svg>
-            <span class="icon-label">Mesh</span>
-          </label>
           <label class="icon-toggle" title="User fractures">
             <input id="show-user-fractures" type="checkbox" checked aria-label="User fractures" />
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19H7l-4-8 4-7h9l4 7-1 1.7M13.5 21l.7-2.8 5.3-5.3 2.1 2.1-5.3 5.3z" /></svg>
             <span class="icon-label">User fractures</span>
+          </label>
+          <label class="icon-toggle" title="Mesh">
+            <input id="show-mesh" type="checkbox" checked aria-label="Mesh" />
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 17H2zM7 11.5h10L12 20z" /></svg>
+            <span class="icon-label">Mesh</span>
           </label>
           <span class="rail-separator"></span>
           <label class="icon-toggle" title="Removed and rejected">
@@ -60,20 +75,6 @@
             <input id="show-trajectories" type="checkbox" disabled aria-label="Trajectories" />
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path stroke-dasharray="0.5 3.5" d="M3 20C9 20 7 6 14 6h4" /><path d="M16 3l4 3-4 3" /></svg>
             <span class="icon-label">Trajectories</span>
-          </label>
-          <label class="icon-toggle" title="Color bar">
-            <input id="show-color-bar" type="checkbox" checked aria-label="Color bar" />
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <linearGradient id="color-bar-gradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#ff0000" />
-                <stop offset="0.33" stop-color="#ffff00" />
-                <stop offset="0.67" stop-color="#00ffff" />
-                <stop offset="1" stop-color="#0000ff" />
-              </linearGradient>
-              <rect x="8" y="3" width="7" height="18" rx="1" fill="url(#color-bar-gradient)" />
-              <path d="M17.5 7H20M17.5 12H20M17.5 17H20" />
-            </svg>
-            <span class="icon-label">Color bar</span>
           </label>
           <span class="rail-separator"></span>
           <button id="reset-camera" class="icon-toggle" type="button" title="Reset view" aria-label="Reset view">

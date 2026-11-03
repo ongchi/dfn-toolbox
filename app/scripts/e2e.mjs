@@ -1020,7 +1020,7 @@ try {
     `${continuedStatus}; with no stop: ${fullRun}`,
   );
 
-  // The icons of the 3D view: each has a name, and a computer shows its label only at the pointer
+  // The icons of the 3D view, the color bar first: each has a name, and a computer shows its label only at the pointer
   await page.mouse.move(0, 0);
   const iconControls = await page.$$eval(".viewer-toolbar .icon-toggle", (nodes) =>
     nodes.map((node) => ({
@@ -1030,7 +1030,9 @@ try {
     })),
   );
   check(
-    iconControls.length === 8 && iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
+    iconControls.length === 8 &&
+      iconControls[0].name === "Color bar" &&
+      iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
   );
