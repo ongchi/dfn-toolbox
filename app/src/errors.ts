@@ -29,17 +29,18 @@ type Fields = Record<string, string>;
 
 const FAMILY = (fields: Fields) => `Family ${fields.family} (DFN tab)`;
 const USER_FRACTURE = (fields: Fields) => `Fracture ${fields.fracture} (User fractures tab)`;
-const MESH_SECTION = "DFN tab, Triangle mesh for the flow";
+const MESH_SECTION = "Settings, Triangle mesh for the flow";
 const APERTURE_VALUES =
   "the aperture values are not valid. The aperture and the factor α must be above 0, and the standard deviation must not be negative.";
 
 /** The text of each kind which the user can cause */
 const TEXTS: Record<string, (fields: Fields) => string> = {
-  "dfngen.MinFeatureSize": () => "Minimum feature size (DFN tab, General) must be greater than 0.",
+  "dfngen.MinFeatureSize": () => "Minimum feature size (Settings, Fracture shape) must be greater than 0.",
   "dfngen.Family.UnknownRegion": (f) => `${FAMILY(f)}: the domain has no region ${f.region}. Choose another region.`,
   "dfngen.Family.EmptyRegion": (f) =>
     `${FAMILY(f)}: the region ${f.region} has no cell in the domain. Choose another region.`,
-  "dfngen.Family.NumberOfPoints": (f) => `${FAMILY(f)}: Number of points must be 3 or more.`,
+  // One value for all fractures (settings dialog): the family is the first one which dfngen checks
+  "dfngen.Family.NumberOfPoints": () => "Number of points (Settings, Fracture shape) must be 3 or more.",
   "dfngen.Family.AspectRatio": (f) => `${FAMILY(f)}: Aspect ratio must be greater than 0.`,
   "dfngen.Family.OrientationPair": (f) => `${FAMILY(f)}: the orientation must have one pair of angles.`,
   "dfngen.Family.P32TargetMissing": (f) =>

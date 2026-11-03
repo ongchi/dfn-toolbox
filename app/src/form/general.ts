@@ -1,5 +1,5 @@
 import type { FormContext } from "./context";
-import { element, numberField, row, section, textField } from "./fields";
+import { element, section, textField } from "./fields";
 import type { FormState } from "./state";
 
 const MAX_RANDOM_SEED = 2 ** 32;
@@ -27,22 +27,5 @@ export function generalSection(state: FormState, context: FormContext): HTMLElem
     context.changed();
   });
 
-  return section(
-    "General",
-    row(
-      seed.field,
-      numberField({
-        label: "Minimum feature size",
-        key: "min_feature_size",
-        help: "> 0; FRAM length limit; minimum radius = 3 × it",
-        value: state.minFeatureSize,
-        min: 0,
-        isMinExclusive: true,
-        onInput: (value) => {
-          state.minFeatureSize = value;
-          context.changed();
-        },
-      }),
-    ),
-  );
+  return section("General", seed.field);
 }
