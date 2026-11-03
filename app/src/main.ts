@@ -9,7 +9,7 @@ import {
   surfacesWithPoints,
   type BoundaryRoles,
 } from "./boundaryRoles";
-import { boundarySurfaceCells, DEFAULT_SURFACE_COLORS, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
+import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
 import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { renderFlowForm, type FlowBoundary } from "./flow/form";
@@ -17,6 +17,7 @@ import { defaultFlowState, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
+import { clearPinnedSurface, getPinnedSurface } from "./form/fields";
 import { boundarySurfaceSection, type FileHandlers } from "./form/files";
 import { defaultFormState, type FormState } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
@@ -159,8 +160,6 @@ let regionBounds: RegionBounds[] = [];
 let boundarySurfaceNames: string[] = [];
 /** The roles of the boundary surfaces (Domain tab) */
 let boundaryRoles: BoundaryRoles = { inflow: [], outflow: [] };
-/** The colors which the user chose, by boundary surface name; they stay while the page is open */
-const boundarySurfaceColors = new Map<string, string>();
 let meshNames: string[] = [];
 /** The description (comment) of the workflow file */
 let description = "";
@@ -275,7 +274,6 @@ const formContext: FormContext = {
   get regionBounds() {
     return regionBounds;
   },
-  boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
   highlightBoundarySurface: (name) => highlightBoundarySurface(name),
   changed: () => updateUserFracturesInViewer(),
   rerender: () => render(),
@@ -300,7 +298,6 @@ const flowContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
-  boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
   highlightBoundarySurface: (name) => highlightBoundarySurface(name),
   changed: () => {},
   rerender: () => renderFlow(),
@@ -310,7 +307,6 @@ const transportContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
-  boundarySurfaceColor: (name) => knownBoundarySurfaceColor(name),
   highlightBoundarySurface: (name) => highlightBoundarySurface(name),
   changed: () => {},
   rerender: () => renderTransport(),
@@ -381,18 +377,7 @@ function updateDomainSource(): void {
   ui.boundarySurfaces.hidden = !isDomainTab || boundarySurfaceNames.length === 0;
 }
 
-/** The color of a boundary surface: the chosen one, else a default color from its position in the mesh */
-function boundarySurfaceColor(name: string): string {
-  const index = Math.max(0, boundarySurfaceNames.indexOf(name));
-  return boundarySurfaceColors.get(name) ?? DEFAULT_SURFACE_COLORS[index % DEFAULT_SURFACE_COLORS.length];
-}
-
-/** The color of a boundary surface of the domain mesh; null for another name */
-function knownBoundarySurfaceColor(name: string): string | null {
-  return boundarySurfaceNames.includes(name) ? boundarySurfaceColor(name) : null;
-}
-
-/** Shows the outline of a boundary surface in the 3D view (pointer over its row or field); null hides it */
+/** Highlights a boundary surface in the 3D view (pointer over its row or field, or its pin); null = no surface */
 function highlightBoundarySurface(name: string | null): void {
   void updateViewer((view) => view.highlightBoundarySurface(name));
 }
@@ -400,13 +385,6 @@ function highlightBoundarySurface(name: string | null): void {
 function renderBoundarySurfaces(): void {
   ui.boundarySurfaces.replaceChildren(
     boundarySurfaceSection(boundarySurfaceNames, {
-      colorOf: boundarySurfaceColor,
-      onColor: (name, color) => {
-        boundarySurfaceColors.set(name, color);
-        // The Flow tab shows the color before the name of the boundary
-        renderFlow();
-        void updateViewer((view) => view.setBoundarySurfaceColor(name, color));
-      },
       roleOf: (name) => roleOf(boundaryRoles, name),
       onRole: (name, role) => {
         setRole(boundaryRoles, name, role, boundarySurfaceNames);
@@ -426,9 +404,9 @@ function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["m
     boundarySurfaceNames.map((name) => ({
       name,
       cells: boundarySurfaceCells(mesh.text, name),
-      color: boundarySurfaceColor(name),
     })),
   );
+  view.highlightBoundarySurface(getPinnedSurface());
   view.setVisible("domain", ui.showDomain.checked);
 }
 
@@ -437,6 +415,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
   boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
+  clearPinnedSurface();
   ui.shapeDescription.textContent = mesh === null ? "" : meshDescription(mesh.text);
   renderBoundarySurfaces();
   clearOutput();

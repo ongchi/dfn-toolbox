@@ -1,7 +1,7 @@
 // The flow form: one field for each key of the fehm input file. The pressure
 // boundaries are the in-flow and out-flow surfaces of the Domain tab.
 import type { FormContext } from "../form/context";
-import { bindSurfaceOutline, checkboxField, element, numberField, row, section } from "../form/fields";
+import { bindSurfaceHighlight, checkboxField, element, numberField, row, section } from "../form/fields";
 import { pressureOf, type FlowState } from "./state";
 
 function fluidSection(state: FlowState, context: FormContext): HTMLElement {
@@ -46,14 +46,13 @@ function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context
     element(
       "p",
       "form-note",
-      "The in-flow and out-flow surfaces of the Domain tab, in their colors of the 3D view; the pointer over a field shows the outline of its surface. A point on two surfaces keeps the pressure of the first in this list.",
+      "The in-flow and out-flow surfaces of the Domain tab; the pointer over a field highlights its surface in the 3D view, and a click (a tap) on its name keeps it highlighted until a second click. A point on two surfaces keeps the pressure of the first in this list.",
     ),
   );
   for (const boundary of boundaries) {
     const role = boundary.isInflow ? "in-flow" : "out-flow";
     const field = numberField({
       label: `${boundary.name}: pressure (MPa)`,
-      labelColor: context.boundarySurfaceColor(boundary.name) ?? undefined,
       key: "pressure",
       help: boundary.hasPoints ? `${role}; 0.001 to 110` : `${role}; the network has no point on it: not used`,
       value: pressureOf(state, boundary.name),
@@ -63,7 +62,7 @@ function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context
         context.changed();
       },
     });
-    bindSurfaceOutline(field, boundary.name, context.highlightBoundarySurface);
+    bindSurfaceHighlight(field, boundary.name, context.highlightBoundarySurface);
     container.append(field);
   }
   return container;

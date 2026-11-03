@@ -8,9 +8,7 @@ export interface FormContext {
   meshNames: string[];
   /** The bounding boxes of the regions of the domain mesh */
   regionBounds: RegionBounds[];
-  /** The color of a boundary surface of the domain mesh in the 3D view; null = not a boundary surface */
-  boundarySurfaceColor(name: string): string | null;
-  /** Shows the outline of a boundary surface in the 3D view; null hides it */
+  /** Highlights a boundary surface in the 3D view; null = no surface */
   highlightBoundarySurface(name: string | null): void;
   /** Call after a change of a value */
   changed(): void;

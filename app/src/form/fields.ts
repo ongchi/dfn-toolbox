@@ -7,8 +7,6 @@ export interface FieldOptions {
   key?: string;
   help?: string;
   isDisabled?: boolean;
-  /** A swatch of this CSS color before the label */
-  labelColor?: string;
 }
 
 export interface NumberFieldOptions extends FieldOptions {
@@ -44,43 +42,61 @@ function fieldShell(options: FieldOptions, input: HTMLElement): HTMLElement {
   if (options.isDisabled) {
     field.classList.add("is-disabled");
   }
-  field.append(fieldLabel(options), input);
+  field.append(element("span", "field-label", options.label), input);
   appendHelp(field, options);
   return field;
 }
 
-function fieldLabel(options: FieldOptions): HTMLElement {
-  const title = element("span", "field-label", options.label);
-  if (options.labelColor !== undefined) {
-    const swatch = element("span", "label-swatch");
-    swatch.style.backgroundColor = options.labelColor;
-    title.prepend(swatch);
+/** The surface which a click on its row or field keeps highlighted (one for the page); null = none */
+let pinnedSurface: string | null = null;
+
+export function getPinnedSurface(): string | null {
+  return pinnedSurface;
+}
+
+/** Another domain mesh: its surfaces are other surfaces */
+export function clearPinnedSurface(): void {
+  pinnedSurface = null;
+}
+
+/** The rows and fields of the surfaces show the pin */
+function markPinnedTargets(): void {
+  for (const target of document.querySelectorAll<HTMLElement>("[data-highlight-surface]")) {
+    const isPinned = target.dataset.highlightSurface === pinnedSurface;
+    target.classList.toggle("is-pinned", isPinned);
+    target.setAttribute("aria-pressed", String(isPinned));
   }
-  return title;
+}
+
+/**
+ * Highlights a surface while the pointer is over `target`; then the pinned
+ * surface shows again. A click on `target` pins the surface, a second click
+ * unpins it; a click in a dropdown or an input only edits its value. On a
+ * touch screen the tap is the click, and the hover is not used: the mouse
+ * events which a browser makes from a tap must not change the highlight.
+ */
+export function bindSurfaceHighlight(target: HTMLElement, name: string, highlight: (name: string | null) => void): void {
+  target.dataset.highlightSurface = name;
+  target.classList.toggle("is-pinned", name === pinnedSurface);
+  target.setAttribute("aria-pressed", String(name === pinnedSurface));
+  target.addEventListener("click", (event) => {
+    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) {
+      return;
+    }
+    // The label does not focus its input: on a phone that opens the keyboard
+    event.preventDefault();
+    pinnedSurface = pinnedSurface === name ? null : name;
+    markPinnedTargets();
+    highlight(pinnedSurface);
+  });
+  if (globalThis.matchMedia?.("(hover: none)").matches) {
+    return;
+  }
+  target.addEventListener("mouseenter", () => highlight(name));
+  target.addEventListener("mouseleave", () => highlight(pinnedSurface));
 }
 
 /** Help text: the key and the help, with `code` in backticks; null without both */
-/** The surface whose outline a tap turned on; a touch screen has no pointer which leaves a row */
-let tappedSurface: string | null = null;
-
-/**
- * Shows the outline of a surface while the pointer is over `target`. On a
- * touch screen, a tap turns it on and a second tap turns it off: the mouse
- * events which a browser makes from a tap must not be used, and the form
- * covers the 3D view, thus the outline must stay.
- */
-export function bindSurfaceOutline(target: HTMLElement, name: string, showOutline: (name: string | null) => void): void {
-  if (globalThis.matchMedia?.("(hover: none)").matches) {
-    target.addEventListener("pointerup", () => {
-      tappedSurface = tappedSurface === name ? null : name;
-      showOutline(tappedSurface);
-    });
-    return;
-  }
-  target.addEventListener("mouseenter", () => showOutline(name));
-  target.addEventListener("mouseleave", () => showOutline(null));
-}
-
 export function helpText(key: string | undefined, text: string | undefined): HTMLElement | null {
   const parts = [key ? `\`${key}\`` : "", text ?? ""].filter((part) => part !== "");
   if (parts.length === 0) {
@@ -208,7 +224,7 @@ export function checkboxField(options: FieldOptions & { value: boolean; onInput:
   input.checked = options.value;
   input.disabled = options.isDisabled ?? false;
   input.addEventListener("change", () => options.onInput(input.checked));
-  field.append(input, fieldLabel(options));
+  field.append(input, element("span", "field-label", options.label));
   appendHelp(field, options);
   return field;
 }

@@ -106,11 +106,6 @@ export function cellEdges(shapes: Omit<CellShapes, "points">, pointCount: number
   return edgesUsed(shapes, pointCount, () => true);
 }
 
-/** The edges of only one cell, as pairs of point numbers: the outline of a surface */
-export function boundaryEdges(shapes: Omit<CellShapes, "points">, pointCount: number): Uint32Array {
-  return edgesUsed(shapes, pointCount, (useCount) => useCount === 1);
-}
-
 function edgesUsed(
   shapes: Omit<CellShapes, "points">,
   pointCount: number,

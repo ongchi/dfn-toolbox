@@ -456,14 +456,6 @@ input[type="radio"] {
   padding: 0 16px 16px;
 }
 
-.boundary-surfaces input[type="color"] {
-  width: 48px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border);
-  background: none;
-}
-
 .form-section {
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
@@ -491,16 +483,6 @@ input[type="radio"] {
 .field-label {
   font-weight: 600;
   font-size: 13px;
-}
-
-/* The color of a boundary surface before its name (Flow and Transport tabs) */
-.label-swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 6px;
-  border: 1px solid var(--border);
-  border-radius: 2px;
 }
 
 .field-help {
@@ -586,6 +568,24 @@ input[type="radio"] {
 
 .file-status {
   margin-bottom: 2px;
+}
+
+/* A row or field of a boundary surface (Domain and Flow tabs): a click keeps
+   its surface highlighted. The padding is in the margin: the text does not move. */
+[data-highlight-surface] {
+  margin-inline: -8px;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+[data-highlight-surface]:hover {
+  background: var(--surface);
+}
+
+[data-highlight-surface].is-pinned {
+  background: var(--accent-background);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* ---------------------------------------------------------------- run bar */
@@ -877,10 +877,6 @@ progress {
 
   .field-checkbox {
     min-height: 44px;
-  }
-
-  .boundary-surfaces input[type="color"] {
-    height: 44px;
   }
 
   .file-row-header {

@@ -1,7 +1,7 @@
 import type { SurfaceRole } from "../boundaryRoles";
 import { meshDisplayName } from "../meshes";
 import type { FormContext } from "./context";
-import { bindSurfaceOutline, element, helpText, section } from "./fields";
+import { bindSurfaceHighlight, element, helpText, section } from "./fields";
 import type { FormState } from "./state";
 
 export interface FileHandlers {
@@ -39,17 +39,15 @@ const ROLE_CHOICES: [SurfaceRole, string][] = [
   ["noflow", "no-flow"],
 ];
 
-/** The boundary surfaces of the domain mesh: their roles, and their colors in the 3D view */
+/** The boundary surfaces of the domain mesh: their roles */
 export interface BoundarySurfaceHandlers {
-  colorOf(name: string): string;
-  onColor(name: string, color: string): void;
   roleOf(name: string): SurfaceRole;
   onRole(name: string, role: SurfaceRole): void;
-  /** The outline of a surface shows (`bindSurfaceOutline`); null = it no longer shows */
+  /** A surface is highlighted in the 3D view (`bindSurfaceHighlight`); null = no surface */
   onHover(name: string | null): void;
 }
 
-/** A role and a color chooser for each boundary surface of the domain mesh */
+/** A role for each boundary surface of the domain mesh */
 export function boundarySurfaceSection(names: string[], handlers: BoundarySurfaceHandlers): HTMLElement {
   const rows = names.map((name) => {
     const role = element("select");
@@ -61,18 +59,14 @@ export function boundarySurfaceSection(names: string[], handlers: BoundarySurfac
       role.append(option);
     }
     role.addEventListener("change", () => handlers.onRole(name, role.value as SurfaceRole));
-    const color = element("input");
-    color.type = "color";
-    color.value = handlers.colorOf(name);
-    color.addEventListener("input", () => handlers.onColor(name, color.value));
     const label = element("label", "file-row-header");
-    label.append(element("span", "field-label", name), role, color);
-    bindSurfaceOutline(label, name, handlers.onHover);
+    label.append(element("span", "field-label", name), role);
+    bindSurfaceHighlight(label, name, handlers.onHover);
     return label;
   });
   const help = helpText(
     undefined,
-    "The role of each boundary surface and its color in the 3D view; the pointer over a row, or a tap on it, shows the outline of the surface. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
+    "The role of each boundary surface; the pointer over a row highlights the surface in the 3D view, and a click (a tap) on the row keeps it highlighted until a second click. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
   );
   return section("Boundary surfaces", ...rows, ...(help ? [help] : []));
 }

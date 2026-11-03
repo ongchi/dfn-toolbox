@@ -1,7 +1,6 @@
 // The shapes of the 3D view, as arrays.
 import { expect, test } from "vitest";
 import {
-  boundaryEdges,
   boundsDiagonal,
   cellEdges,
   cellTriangles,
@@ -46,13 +45,6 @@ test("the triangles of a concave polygon stay in the polygon", () => {
 test("an edge of two cells is one line", () => {
   const cells = { vertexCounts: [3, 3], connectivity: [0, 1, 2, 2, 1, 3] };
   expect(cellEdges(cells, 4).length).toBe(2 * 5);
-});
-
-test("the outline has only the edges of one cell", () => {
-  const cells = { vertexCounts: [3, 3], connectivity: [0, 1, 2, 2, 1, 3] };
-  const pairs = boundaryEdges(cells, 4);
-  expect(pairs.length).toBe(2 * 4);
-  expect(Array.from({ length: pairs.length / 2 }, (_, index) => [pairs[2 * index], pairs[2 * index + 1]])).not.toContainEqual([1, 2]);
 });
 
 test.each([

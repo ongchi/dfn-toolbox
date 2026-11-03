@@ -18,8 +18,8 @@ const BOX_ROLES = "west: inflow, east: outflow, south: noflow, north: noflow, bo
 const FLOAT_BUFFER_EXTENSIONS = ["EXT_color_buffer_float", "EXT_color_buffer_half_float", "EXT_float_blend"];
 // Largest minus smallest of red, green and blue (0 to 255)
 const COLORED_PIXEL_CONTRAST = 30;
-// The boundary surfaces of the default example fill a large part of the view
-const MINIMUM_SURFACE_PIXEL_SHARE = 0.1;
+// The highlighted south surface of the default example (the face to the camera) fills a part of the view
+const MINIMUM_SURFACE_PIXEL_SHARE = 0.05;
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -120,19 +120,14 @@ async function setRole(page, surface, role) {
   await page.select(`#boundary-surfaces select[data-surface="${surface}"]`, role);
 }
 
-/**
- * The boundary names of a section of a form (the label up to ":"); "(no
- * color)" after a name without a color swatch
- */
+/** The boundary names of a section of a form (the label up to ":") */
 async function boundaryLabels(page, formSelector, sectionTitle) {
   return page.$eval(
     formSelector,
     (form, title) => {
       const section = [...form.querySelectorAll(".form-section")].find((node) => node.querySelector("h3")?.textContent === title);
       const labels = [...(section?.querySelectorAll(".field-label") ?? [])];
-      return labels
-        .map((node) => `${node.textContent.split(":")[0]}${node.querySelector(".label-swatch") ? "" : " (no color)"}`)
-        .join(", ");
+      return labels.map((node) => node.textContent.split(":")[0]).join(", ");
     },
     sectionTitle,
   );
@@ -220,7 +215,7 @@ async function checkPhone() {
     return Buffer.from(await page.screenshot({ clip: { x: 0, y: 0, width: 390, height: top } }));
   };
 
-  // The outline of a surface stays after a tap in the form, until a second tap
+  // The highlight of a surface stays after a tap in the form, until a second tap
   const viewBeforeTap = await freeViewShot();
   await page.tap("#boundary-surfaces .file-row-header .field-label");
   const viewAfterTap = await freeViewShot();
@@ -228,7 +223,7 @@ async function checkPhone() {
   const viewAfterSecondTap = await freeViewShot();
   check(
     !viewAfterTap.equals(viewBeforeTap) && viewAfterSecondTap.equals(viewBeforeTap),
-    "phone: a tap shows the outline, a second tap removes it",
+    "phone: a tap highlights the surface, a second tap removes it",
     `tap ${viewAfterTap.equals(viewBeforeTap) ? "unchanged" : "changed"}, second tap ${viewAfterSecondTap.equals(viewBeforeTap) ? "same" : "different"}`,
   );
 
@@ -354,7 +349,7 @@ async function coloredPixelShare(page, pngImage) {
   }, Buffer.from(pngImage).toString("base64"), COLORED_PIXEL_CONTRAST);
 }
 
-/** A device without float color buffers in WebGL (iOS) shows the translucent boundary surfaces */
+/** A device without float color buffers in WebGL (iOS) shows the translucent boundary surfaces: the highlighted one has a color */
 async function checkTranslucentShapesWithoutFloatBuffers() {
   const page = await browser.newPage();
   await page.setViewport({ width: 1400, height: 900 });
@@ -372,6 +367,8 @@ async function checkTranslucentShapesWithoutFloatBuffers() {
   await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
   await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
   await new Promise((resolve) => setTimeout(resolve, 3000));
+  await (await page.evaluateHandle(() => document.querySelector('#boundary-surfaces select[data-surface="south"]').closest("label"))).hover();
+  await new Promise((resolve) => setTimeout(resolve, 300));
   const canvas = await page.$("#viewer-canvas");
   const share = await coloredPixelShare(page, await canvas.screenshot());
   check(share > MINIMUM_SURFACE_PIXEL_SHARE, "translucent shapes without float color buffers", share.toFixed(3));
@@ -430,21 +427,15 @@ try {
     `${isLogShownAtStart} → "${startLogText}" → ${isLogShownAfterReturn}`,
   );
 
-  // A color chooser for each boundary surface of the domain mesh; a new color changes the 3D view
+  // A row for each boundary surface of the domain mesh, with no color chooser
   const surfaceNames = await page.$$eval("#boundary-surfaces:not([hidden]) .field-label", (nodes) =>
     nodes.map((node) => node.textContent).join(", "),
   );
-  const canvasBefore = Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
-  await page.$eval("#boundary-surfaces input[type=color]", (node) => {
-    node.value = "#000000";
-    node.dispatchEvent(new Event("input"));
-  });
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  const canvasAfter = Buffer.from(await (await page.$("#viewer-canvas")).screenshot());
+  const colorInputCount = await page.$$eval("input[type=color]", (nodes) => nodes.length);
   check(
-    surfaceNames === "west, east, south, north, bottom, top" && !canvasBefore.equals(canvasAfter),
-    "boundary surface colors",
-    `${surfaceNames}; view ${canvasBefore.equals(canvasAfter) ? "unchanged" : "changed"}`,
+    surfaceNames === "west, east, south, north, bottom, top" && colorInputCount === 0,
+    "boundary surface rows",
+    `${surfaceNames}; ${colorInputCount} color choosers`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surfaces.png` });
 
@@ -452,7 +443,7 @@ try {
   const exampleRoles = await domainRoles(page);
   check(exampleRoles === BOX_ROLES, "boundary surface roles", exampleRoles);
 
-  // The pointer over the row of a surface shows its outline; the view is the same again after it leaves.
+  // The pointer over the row of a surface highlights it; the view is the same again after it leaves.
   // The screenshots have the part of the view at the right of the settings panel.
   const viewerScreenshot = async () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -462,8 +453,20 @@ try {
     });
     return Buffer.from(await page.screenshot({ clip }));
   };
+  // The panels blur the view behind them: after the clicks on the Log button, wait until it does not change
+  const stableViewerScreenshot = async () => {
+    let previous = await viewerScreenshot();
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const next = await viewerScreenshot();
+      if (next.equals(previous)) {
+        return next;
+      }
+      previous = next;
+    }
+    return previous;
+  };
   await page.mouse.move(0, 0);
-  const viewBeforeHover = await viewerScreenshot();
+  const viewBeforeHover = await stableViewerScreenshot();
   const surfaceRow = await page.evaluateHandle(() =>
     document.querySelector('#boundary-surfaces select[data-surface="south"]').closest("label"),
   );
@@ -474,8 +477,40 @@ try {
   const viewAfterHover = await viewerScreenshot();
   check(
     !viewOnHover.equals(viewBeforeHover) && viewAfterHover.equals(viewBeforeHover),
-    "boundary surface outline on hover",
+    "boundary surface highlight on hover",
     `hover ${viewOnHover.equals(viewBeforeHover) ? "unchanged" : "changed"}, after ${viewAfterHover.equals(viewBeforeHover) ? "same" : "different"}`,
+  );
+
+  // A click on a row keeps its surface highlighted: the pointer over another row shows that surface, then
+  // the kept one again; a second click removes it. A click in the dropdown does not change it.
+  const pinnedTargets = () => page.$$eval(".is-pinned", (nodes) => nodes.map((node) => node.dataset.highlightSurface).join(", "));
+  await page.click('[data-highlight-surface="south"] .field-label');
+  await page.mouse.move(0, 0);
+  const viewPinned = await viewerScreenshot();
+  const pinnedAfterClick = await pinnedTargets();
+  await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surface_pinned.png` });
+  await page.hover('[data-highlight-surface="north"] .field-label');
+  const viewOtherHover = await viewerScreenshot();
+  await page.mouse.move(0, 0);
+  const viewAfterOtherHover = await viewerScreenshot();
+  await page.click('[data-highlight-surface="north"] select');
+  await page.keyboard.press("Escape");
+  await page.mouse.move(0, 0);
+  const pinnedAfterSelect = await pinnedTargets();
+  await page.click('[data-highlight-surface="south"] .field-label');
+  await page.mouse.move(0, 0);
+  const viewUnpinned = await viewerScreenshot();
+  const pinnedAfterSecondClick = await pinnedTargets();
+  check(
+    viewPinned.equals(viewOnHover) &&
+      pinnedAfterClick === "south" &&
+      !viewOtherHover.equals(viewPinned) &&
+      viewAfterOtherHover.equals(viewPinned) &&
+      pinnedAfterSelect === "south" &&
+      viewUnpinned.equals(viewBeforeHover) &&
+      pinnedAfterSecondClick === "",
+    "a click keeps the surface highlighted",
+    `kept ${viewPinned.equals(viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${viewOtherHover.equals(viewPinned) ? "unchanged" : "changed"}, back ${viewAfterOtherHover.equals(viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${viewUnpinned.equals(viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
@@ -557,7 +592,7 @@ try {
     const exampleSurfaces = await flowSurfaceNames(page);
     const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
     check(exampleSurfaces !== "" && flowBoundaries === exampleSurfaces, `${name}: flow boundaries`, flowBoundaries);
-    // The pointer over a pressure field shows the outline of its surface
+    // The pointer over a pressure field highlights its surface
     await page.mouse.move(0, 0);
     const flowViewBefore = await viewerScreenshot();
     const pressureField = await page.evaluateHandle(() =>
@@ -574,9 +609,36 @@ try {
     const flowViewAfter = await viewerScreenshot();
     check(
       !flowViewOnHover.equals(flowViewBefore) && flowViewAfter.equals(flowViewBefore),
-      `${name}: pressure boundary outline on hover`,
+      `${name}: pressure boundary highlight on hover`,
       `hover ${flowViewOnHover.equals(flowViewBefore) ? "unchanged" : "changed"}, after ${flowViewAfter.equals(flowViewBefore) ? "same" : "different"}`,
     );
+    // A click on the label of a pressure field keeps its surface highlighted, also on the Domain tab (one for the page)
+    if (name === "box_west_east") {
+      // The pinned rows of one tab (the hidden tabs also have their rows)
+      const pinnedTargets = (container) =>
+        page.$$eval(`${container} .is-pinned`, (nodes) => nodes.map((node) => node.dataset.highlightSurface).join(", "));
+      await page.click('#flow-form [data-highlight-surface="west"] .field-label');
+      const isInputFocused = await page.$eval('#flow-form [data-highlight-surface="west"] input', (node) => node === document.activeElement);
+      await page.mouse.move(0, 0);
+      const flowViewPinned = await viewerScreenshot();
+      const pinnedOnFlow = await pinnedTargets("#flow-form");
+      await page.click('[data-sidebar-tab="domain"]');
+      const pinnedOnDomain = await pinnedTargets("#boundary-surfaces");
+      await page.click('[data-sidebar-tab="flow"]');
+      await page.click('#flow-form [data-highlight-surface="west"] .field-label');
+      await page.mouse.move(0, 0);
+      const flowViewUnpinned = await viewerScreenshot();
+      check(
+        !flowViewPinned.equals(flowViewBefore) &&
+          !isInputFocused &&
+          pinnedOnFlow === "west" &&
+          pinnedOnDomain === "west" &&
+          flowViewUnpinned.equals(flowViewBefore) &&
+          (await pinnedTargets("#layout")) === "",
+        `${name}: a click on a pressure field keeps its surface highlighted`,
+        `${flowViewPinned.equals(flowViewBefore) ? "unchanged" : "kept"}, input focus ${isInputFocused}, flow "${pinnedOnFlow}", domain "${pinnedOnDomain}", second click ${flowViewUnpinned.equals(flowViewBefore) ? "removed" : "different"}`,
+      );
+    }
     const isFlowNextDisabled = await isNextDisabled();
     const flowStatus = await runStep(page, "flow");
     // The moving particles change the view between two frames

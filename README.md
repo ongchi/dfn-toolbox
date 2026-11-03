@@ -19,7 +19,9 @@ The tabs follow the steps of the workflow. "Next" goes to the next tab. All
 input is in the page: the app does not save the input or the output.
 
 - **Domain**: select an example, or a predefined domain shape. Give each
-  boundary surface a role (in-flow, out-flow or no-flow) and a color for the 3D view.
+  boundary surface a role (in-flow, out-flow or no-flow). The pointer over the
+  row of a surface highlights it in the 3D view; a click on the row keeps it
+  highlighted until a second click.
 - **User fractures**: add fractures, each with a region, center, shape,
   aperture and orientation.
 - **DFN**: set the fracture families. "Generate" makes the fractures, and
@@ -40,7 +42,8 @@ The 3D view fills the page, and the controls float over it: the settings at the
 left (a button hides them), the colors and the layers at the top right, the run
 buttons and the Log at the bottom. On a phone, the settings are a sheet at the
 bottom with two heights. One finger turns the model, two fingers zoom it, and a
-tap on a boundary surface shows its outline.
+tap on the row of a boundary surface keeps the surface highlighted until a
+second tap.
 
 For the same input and seed, the network and the mesh are those of the `dfngen`
 binary. The flow agrees with the `fehm` binary within 1e-9. The particles of

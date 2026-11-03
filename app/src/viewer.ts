@@ -43,13 +43,9 @@ import {
   WebGLRenderer,
 } from "three";
 import { TrackballControls } from "three/addons/controls/TrackballControls.js";
-import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
-import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { FlowParticles, type FlowField } from "./flowParticles";
 import type { FractureBatch, ShapeArrays } from "./generationClient";
 import {
-  boundaryEdges,
   boundsDiagonal,
   cellEdges,
   cellTriangles,
@@ -108,10 +104,11 @@ const TRAJECTORY_COLOR = [0.85, 0.1, 0.85] as const;
 // The boundary surfaces of the domain do not hide the fractures behind them: three.js sorts them, thus
 // all surfaces in front of a fracture add their colors
 const BOUNDARY_SURFACE_OPACITY = 0.25;
-/** Pixels: the outline of a highlighted boundary surface */
-const BOUNDARY_OUTLINE_WIDTH = 15;
-/** Yellow: one color for the outline of each surface, which stands out from the surface colors */
-const BOUNDARY_OUTLINE_COLOR = [1.0, 0.85, 0.0] as const;
+/** Light gray: one color for all boundary surfaces */
+const BOUNDARY_SURFACE_COLOR = [0.75, 0.77, 0.8] as const;
+/** The highlighted boundary surface: the accent orange of the panels (`--accent` of `style.css`), more opaque */
+const HIGHLIGHT_COLOR = [1.0, 0.54, 0.36] as const;
+const HIGHLIGHT_OPACITY = 0.6;
 // The x, y, z axes in the top-left corner of the free part of the view: their part of the shorter side of the view, and their scene
 const AXES_VIEW_PART = 0.2;
 const AXES_CAMERA_DISTANCE = 3;
@@ -172,11 +169,10 @@ const SCALAR_BARS = new Map<string, { title: string; label: (value: number) => s
   [TRANSPORT_VELOCITY_ARRAY.name, { title: "transport velocity (m/s)", label: velocityLabel }],
 ]);
 
-/** A boundary surface of the domain mesh: its polygons, and its color as "#rrggbb" */
+/** A boundary surface of the domain mesh: its polygons */
 export interface BoundarySurface {
   name: string;
   cells: CellShapes;
-  color: string;
 }
 
 /** The edges of the cells of the domain mesh */
@@ -529,8 +525,6 @@ export class NetworkViewer {
   private domain: LineSegments | null = null;
   /** The boundary surfaces of the domain mesh, by name; part of the layer "domain" */
   private readonly boundarySurfaces = new Map<string, Mesh<BufferGeometry, MeshLambertMaterial>>();
-  /** The outline of each boundary surface, by name; visible only while highlighted */
-  private readonly boundaryOutlines = new Map<string, LineSegments2>();
   /** Tubes and cones */
   private trajectories: Group | null = null;
   private particleLines: ParticleLines | null = null;
@@ -637,51 +631,27 @@ export class NetworkViewer {
     }
   }
 
-  /**
-   * Shows the boundary surfaces of the domain mesh, each with its color;
-   * replaces the old ones. Each surface also gets its outline (the edges of
-   * only one cell), hidden until `highlightBoundarySurface`.
-   */
+  /** Shows the boundary surfaces of the domain mesh in one color; replaces the old ones */
   setBoundarySurfaces(surfaces: BoundarySurface[]): void {
-    for (const object of [...this.boundarySurfaces.values(), ...this.boundaryOutlines.values()]) {
+    for (const object of this.boundarySurfaces.values()) {
       this.removeObject(object);
     }
     this.boundarySurfaces.clear();
-    this.boundaryOutlines.clear();
-    for (const { name, cells, color } of surfaces) {
-      const pointCount = cells.points.length / 3;
+    for (const { name, cells } of surfaces) {
       const { geometry, origin } = triangleGeometry(cells.points, cellTriangles(cells));
-      const mesh = placed(new Mesh(geometry, surfaceMaterial([0, 0, 0], BOUNDARY_SURFACE_OPACITY)), origin);
-      mesh.material.color.set(color);
+      const mesh = placed(new Mesh(geometry, surfaceMaterial(BOUNDARY_SURFACE_COLOR, BOUNDARY_SURFACE_OPACITY)), origin);
       this.scene.add(mesh);
       this.boundarySurfaces.set(name, mesh);
-
-      const { origin: lineOrigin, positions } = localPositions(cells.points);
-      const segments = [...boundaryEdges(cells, pointCount)].flatMap((point) => [...positions.subarray(3 * point, 3 * point + 3)]);
-      const outline = placed(
-        new LineSegments2(
-          new LineSegmentsGeometry().setPositions(segments),
-          // Transparent: drawn after the surface, which goes through the middle of the line
-          new LineMaterial({ color: new Color(...BOUNDARY_OUTLINE_COLOR), linewidth: BOUNDARY_OUTLINE_WIDTH, transparent: true }),
-        ),
-        lineOrigin,
-      );
-      outline.visible = false;
-      outline.renderOrder = 1;
-      this.scene.add(outline);
-      this.boundaryOutlines.set(name, outline);
     }
   }
 
-  /** A new color ("#rrggbb") of a boundary surface of the domain mesh */
-  setBoundarySurfaceColor(name: string, color: string): void {
-    this.boundarySurfaces.get(name)?.material.color.set(color);
-  }
-
-  /** Shows the outline of one boundary surface; null hides all outlines */
+  /** Fills one boundary surface with the highlight color; null = no surface */
   highlightBoundarySurface(name: string | null): void {
-    for (const [surface, outline] of this.boundaryOutlines) {
-      outline.visible = surface === name;
+    for (const [surface, mesh] of this.boundarySurfaces) {
+      const isHighlighted = surface === name;
+      const [red, green, blue] = isHighlighted ? HIGHLIGHT_COLOR : BOUNDARY_SURFACE_COLOR;
+      mesh.material.color.setRGB(red, green, blue);
+      mesh.material.opacity = isHighlighted ? HIGHLIGHT_OPACITY : BOUNDARY_SURFACE_OPACITY;
     }
   }
 
