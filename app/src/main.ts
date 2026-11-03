@@ -129,8 +129,8 @@ const ui = {
   showDomain: byId<HTMLInputElement>("show-domain"),
   showMesh: byId<HTMLInputElement>("show-mesh"),
   showUserFractures: byId<HTMLInputElement>("show-user-fractures"),
-  showRemoved: byId<HTMLInputElement>("show-removed"),
-  showRejected: byId<HTMLInputElement>("show-rejected"),
+  /** The removed and the rejected fractures: one layer button */
+  showDiscarded: byId<HTMLInputElement>("show-discarded"),
   showParticles: byId<HTMLInputElement>("show-particles"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
   showColorBar: byId<HTMLInputElement>("show-color-bar"),
@@ -833,7 +833,6 @@ async function showOutput(result: GenerationOutput): Promise<void> {
     ["Seed", result.seed],
   ]);
 
-  ui.showRejected.disabled = result.shapes?.rejected == null;
   await showOutputInViewer();
 }
 
@@ -912,8 +911,9 @@ async function showTransportInViewer(): Promise<void> {
 function applyLayerVisibility(view: NetworkViewer): void {
   view.setVisible("final", ui.showMesh.checked);
   view.setVisible("user", ui.showUserFractures.checked);
-  view.setVisible("removed", ui.showRemoved.checked);
-  view.setVisible("rejected", ui.showRejected.checked);
+  // A network without rejected fractures (FRAM keeps none) shows only the removed ones
+  view.setVisible("removed", ui.showDiscarded.checked);
+  view.setVisible("rejected", ui.showDiscarded.checked);
   view.setVisible("trajectories", ui.showTrajectories.checked);
   view.setVisible("particles", ui.showParticles.checked);
 }
@@ -1195,7 +1195,7 @@ function bindEvents(): void {
     control.addEventListener("change", () => updateViewer(applyColorChoice));
   }
   ui.showDomain.addEventListener("change", () => updateViewer((view) => view.setVisible("domain", ui.showDomain.checked)));
-  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showRemoved, ui.showRejected, ui.showTrajectories, ui.showParticles]) {
+  for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showDiscarded, ui.showTrajectories, ui.showParticles]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
   ui.showColorBar.addEventListener("change", () => updateViewer((view) => view.setScalarBarShown(ui.showColorBar.checked)));

@@ -53,7 +53,7 @@ export function framSection(state: FormState, context: FormContext): HTMLElement
     checkboxField({
       label: "Write rejected fractures",
       key: "write_rejected_fractures",
-      help: "keep the rejected fractures (Rejected in the 3D view); they can use much memory",
+      help: "keep the rejected fractures (Removed and rejected in the 3D view); they can use much memory",
       value: fram.writeRejectedFractures,
       isDisabled: isOff,
       onInput: (value) => {

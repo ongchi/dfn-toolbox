@@ -1030,9 +1030,27 @@ try {
     })),
   );
   check(
-    iconControls.length === 9 && iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
+    iconControls.length === 8 && iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
+  );
+  // One button shows the removed fractures (the network of the last run has some) and the rejected ones
+  const removedCount = await page.$eval("#results-stats", (node) => {
+    const values = Object.fromEntries([...node.querySelectorAll("dt")].map((term) => [term.textContent, Number(term.nextElementSibling?.textContent)]));
+    return values["Accepted fractures"] - values["Final fractures"];
+  });
+  await page.mouse.move(0, 0);
+  const viewWithoutDiscarded = await viewerScreenshot();
+  await page.click("#show-discarded");
+  await page.mouse.move(0, 0);
+  const viewWithDiscarded = await viewerScreenshot();
+  await page.click("#show-discarded");
+  await page.mouse.move(0, 0);
+  const viewAfterDiscarded = await viewerScreenshot();
+  check(
+    removedCount > 0 && !viewWithDiscarded.equals(viewWithoutDiscarded) && viewAfterDiscarded.equals(viewWithoutDiscarded),
+    "the button of the removed and rejected fractures",
+    `${removedCount} removed; view ${viewWithDiscarded.equals(viewWithoutDiscarded) ? "unchanged" : "changed"}, after ${viewAfterDiscarded.equals(viewWithoutDiscarded) ? "same" : "different"}`,
   );
   await page.hover("#reset-camera");
   await new Promise((resolve) => setTimeout(resolve, 300));
