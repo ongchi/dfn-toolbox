@@ -198,7 +198,7 @@ export function defaultFormState(): FormState {
     numberOfPoints: 8,
     userFractures: [],
     generation: { stopCondition: "n_poly", nPoly: 100 },
-    fram: { ...FRAM_DEFAULTS, enable: true },
+    fram: { ...FRAM_DEFAULTS },
     mesh: { ...MESH_DEFAULTS },
     clusters: { keepOnlyLargest: false },
     families: [defaultFamily()],

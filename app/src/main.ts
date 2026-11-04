@@ -197,6 +197,8 @@ let generatedNetwork: {
   /** The checkpoint with all accepted fractures; null: "Meshing" runs the generation again from the seed */
   checkpoint: Uint8Array | null;
   isWithoutConnectingCluster: boolean;
+  /** FRAM was on: the network can have rejected fractures */
+  isFramOn: boolean;
 } | null = null;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
@@ -495,6 +497,7 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
     showStatus(input, true);
     return;
   }
+  const isFramOn = state.fram.enable;
   const stopped = restartMode === null ? null : stoppedGeneration;
   if (restartMode !== null && stopped === null) {
     return;
@@ -567,7 +570,9 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
       seed: result.seed,
       checkpoint: checkpoint?.acceptedCount === lastAcceptedCount ? (checkpoint?.checkpoint ?? null) : null,
       isWithoutConnectingCluster: result.isWithoutConnectingCluster,
+      isFramOn,
     };
+    showDiscardedLabel();
     await showOutput(result);
   } catch (error) {
     if (!(error instanceof CancelledError)) {
@@ -727,6 +732,7 @@ async function runTransport(): Promise<void> {
 function clearOutput(): void {
   output = null;
   generatedNetwork = null;
+  showDiscardedLabel();
   updateStepButtons();
   ui.results.hidden = true;
   ui.logEmpty.hidden = false;
@@ -906,6 +912,22 @@ async function showTransportInViewer(): Promise<void> {
   });
   applyLayerVisibility(viewer);
   viewer.render();
+}
+
+/** The layer button of the discarded fractures: the rejected ones only after a network with FRAM on */
+function showDiscardedLabel(): void {
+  const label = generatedNetwork?.isFramOn ? "Removed and rejected" : "Removed";
+  const toggle = ui.showDiscarded.closest("label");
+  if (toggle === null) {
+    return;
+  }
+  toggle.title = label;
+  ui.showDiscarded.setAttribute("aria-label", label);
+  const text = toggle.querySelector(".icon-label");
+  if (text !== null) {
+    text.textContent = label;
+  }
+  toggle.classList.toggle("is-without-rejected", !generatedNetwork?.isFramOn);
 }
 
 function applyLayerVisibility(view: NetworkViewer): void {

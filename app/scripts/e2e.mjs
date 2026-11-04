@@ -86,6 +86,20 @@ async function selectExample(page, name) {
   await page.waitForFunction((exampleName) => document.querySelector("#form").dataset.example === exampleName, {}, name);
 }
 
+/** Sets the FRAM checkbox of the settings dialog (the examples and the default forms have FRAM off) */
+async function setFram(page, isOn) {
+  await page.click("#settings-button");
+  await page.evaluate((isFramOn) => {
+    const input = [...document.querySelectorAll("#settings-dialog .field-checkbox")]
+      .find((field) => field.querySelector(".field-label")?.textContent === "FRAM on")
+      .querySelector("input");
+    if (input.checked !== isFramOn) {
+      input.click();
+    }
+  }, isOn);
+  await page.keyboard.press("Escape");
+}
+
 /** Sets the number of fractures (n_poly) of the DFN tab */
 async function setFractureCount(page, count) {
   await page.evaluate((value) => {
@@ -570,7 +584,7 @@ try {
   }));
   const shapeNPoly = await nPolyValue(page);
   check(
-    shapeReset.shape === "Box.vtu" && shapeReset.families === 1 && exampleNPoly === "50" && shapeNPoly === "100",
+    shapeReset.shape === "Box.vtu" && shapeReset.families === 1 && exampleNPoly === "10" && shapeNPoly === "100",
     "shape resets the input",
     `${shapeReset.shape}, ${shapeReset.families} family, n_poly ${exampleNPoly} → ${shapeNPoly}`,
   );
@@ -579,7 +593,7 @@ try {
   const exampleAgain = await page.$eval("#form", (node) => node.dataset.example);
   const exampleAgainNPoly = await nPolyValue(page);
   check(
-    exampleAgain === "box_west_east" && exampleAgainNPoly === "50",
+    exampleAgain === "box_west_east" && exampleAgainNPoly === "10",
     "example loads again",
     `${exampleAgain}, n_poly ${exampleAgainNPoly}`,
   );
@@ -934,9 +948,10 @@ try {
     badInputStatus,
   );
 
-  // No cluster connects west and east (Box, default forms, this seed): the network shows, with a warning
+  // No cluster connects west and east (Box, default forms with FRAM on, this seed): the network shows, with a warning
   await selectDomainSource(page, "example");
   await selectDomainSource(page, "shape");
+  await setFram(page, true);
   await page.evaluate(() => {
     const input = [...document.querySelectorAll("#form input")].find(
       (node) => node.closest(".field")?.querySelector(".field-label")?.textContent === "Seed",
@@ -974,8 +989,10 @@ try {
     `${isNetworkCleared ? "cleared" : "not cleared"}; ${noOutflowStatus}`,
   );
 
-  // A large run: the view shows the new fractures during the run; then a cancel
+  // A large run: the view shows the new fractures during the run; then a cancel. FRAM on: a slow run (with FRAM off
+  // the intersections soon need more memory than WebAssembly has)
   await selectExample(page, "box_west_east");
+  await setFram(page, true);
   await setFractureCount(page, 100000);
   await page.click("#run-button");
   await page.waitForFunction(() => document.querySelector("#status").textContent.includes("fractures accepted"), {
@@ -1028,8 +1045,9 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
 
   // Stop and keep the fractures after the first checkpoint (5 s), then continue:
-  // the network is that of a run with no stop
+  // the network is that of a run with no stop. FRAM on: the run is longer than the first checkpoint
   await selectExample(page, "box_west_east");
+  await setFram(page, true);
   await setFractureCount(page, 80);
   const fullRun = await runStep(page, "network");
   await page.click("#run-button");
@@ -1088,6 +1106,27 @@ try {
     removedCount > 0 && !isSameView(viewWithDiscarded, viewWithoutDiscarded) && isSameView(viewAfterDiscarded, viewWithoutDiscarded),
     "the button of the removed and rejected fractures",
     `${removedCount} removed; view ${isSameView(viewWithDiscarded, viewWithoutDiscarded) ? "unchanged" : "changed"}, after ${isSameView(viewAfterDiscarded, viewWithoutDiscarded) ? "same" : "different"}`,
+  );
+  // The label of that button: the rejected fractures only after a network with FRAM on (the last run); the
+  // checkbox changes it only at the next run
+  const discardedLabel = () =>
+    page.$eval("#show-discarded", (node) => {
+      const toggle = node.closest("label");
+      const isCrossShown = getComputedStyle(toggle.querySelector(".icon-reject")).display !== "none";
+      return `${toggle.querySelector(".icon-label").textContent} (${toggle.title}, ${node.getAttribute("aria-label")}, cross ${isCrossShown})`;
+    });
+  const labelWithFram = await discardedLabel();
+  await setFram(page, false);
+  const labelBeforeRun = await discardedLabel();
+  await setFractureCount(page, 10);
+  await runStep(page, "network");
+  const labelWithoutFram = await discardedLabel();
+  check(
+    labelWithFram === "Removed and rejected (Removed and rejected, Removed and rejected, cross true)" &&
+      labelBeforeRun === labelWithFram &&
+      labelWithoutFram === "Removed (Removed, Removed, cross false)",
+    "the label of the removed fractures button",
+    `FRAM on: ${labelWithFram}; FRAM off, before the run: ${labelBeforeRun}; after: ${labelWithoutFram}`,
   );
   await page.hover("#reset-camera");
   await new Promise((resolve) => setTimeout(resolve, 300));

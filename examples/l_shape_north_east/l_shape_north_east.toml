@@ -15,22 +15,14 @@ inflow = ["north"]
 outflow = ["east"]
 
 [network]
-seed = 376
+seed = 11
 min_feature_size = 0.3
 domain = "L-shape.vtu"
 orientation_option = "theta_phi"
 number_of_points = 8
 
 [network.generation]
-n_poly = 100
-
-[network.fram]
-enable = true
-relaxed = false
-triple_intersections = true
-check_user_fractures = false
-write_rejected_fractures = false
-rejects_per_fracture = 10
+n_poly = 35
 
 [network.mesh]
 max_size_factor = 5.0

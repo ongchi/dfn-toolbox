@@ -286,6 +286,10 @@ pre {
   stroke: var(--error);
 }
 
+.is-without-rejected .icon-reject {
+  display: none;
+}
+
 .icon-label {
   position: absolute;
   right: calc(100% + 10px);

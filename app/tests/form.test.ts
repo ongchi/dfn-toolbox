@@ -231,7 +231,7 @@ test("number_of_points in a family is an unknown key: one value for all fracture
 });
 
 test("the dfngen input has no forced large fractures and removes no fracture for its size", () => {
-  expect(networkLibraryToml(BOX)).toMatch(/\[generation\]\nn_poly = 50\nforce_large_fractures = false\nremove_fractures_less_than = 0\.0\n/);
+  expect(networkLibraryToml(BOX)).toMatch(/\[generation\]\nn_poly = 10\nforce_large_fractures = false\nremove_fractures_less_than = 0\.0\n/);
 });
 
 test.each(["force_large_fractures = true", "remove_fractures_less_than = 1.0"])("%s in [network.generation] is an unknown key", (line) => {
