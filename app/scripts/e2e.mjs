@@ -858,9 +858,13 @@ try {
     const limits = `${input.value} in ${input.min} to ${input.max}`;
     input.value = "20";
     input.dispatchEvent(new Event("input"));
-    return { limits, isOutsideInvalid: input.classList.contains("is-invalid") };
+    return { limits, valueAboveMax: input.closest(".field").querySelector(".slider-value").textContent };
   });
-  check(center.limits === "5 in 0 to 10" && center.isOutsideInvalid, "user fracture center in its region", center.limits);
+  check(
+    center.limits === "5 in 0 to 10" && center.valueAboveMax === "10",
+    "user fracture center in its region",
+    `${center.limits}; 20 → ${center.valueAboveMax}`,
+  );
   // The 3D view shows the polygon at once: a larger radius for the screenshot
   await page.evaluate(() => {
     const input = [...document.querySelectorAll("#fractures-form .field")]

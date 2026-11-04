@@ -153,6 +153,55 @@ export function numberField(options: NumberFieldOptions): HTMLElement {
   return fieldShell(options, inputRow);
 }
 
+export interface SliderFieldOptions extends FieldOptions {
+  value: number;
+  /** The limits of the value; with `isLogScale` above 0 */
+  min: number;
+  max: number;
+  /** Step of the slider: of the value, or of its base-10 exponent with `isLogScale` */
+  step: number;
+  isLogScale?: boolean;
+  onInput: (value: number) => void;
+}
+
+/** The value at a slider position, without the rounding noise of the steps */
+export function sliderValue(position: number, isLogScale: boolean): number {
+  const value = isLogScale ? 10 ** position : position;
+  return Number(value.toPrecision(isLogScale ? 3 : 12));
+}
+
+/** The slider position of a value */
+export function sliderPosition(value: number, isLogScale: boolean): number {
+  return isLogScale ? Math.log10(value) : value;
+}
+
+/**
+ * Range input with the value as text at its right. A value of the state
+ * outside the limits (a loaded file) is invalid until the slider moves.
+ */
+export function sliderField(options: SliderFieldOptions): HTMLElement {
+  const isLogScale = options.isLogScale ?? false;
+  const input = element("input");
+  input.type = "range";
+  input.min = String(sliderPosition(options.min, isLogScale));
+  input.max = String(sliderPosition(options.max, isLogScale));
+  input.step = String(options.step);
+  input.value = String(sliderPosition(options.value, isLogScale));
+  input.disabled = options.isDisabled ?? false;
+  const valueText = element("output", "slider-value", String(options.value));
+  const isOutside = options.value < options.min || options.value > options.max;
+  valueText.classList.toggle("is-invalid", isOutside);
+  input.addEventListener("input", () => {
+    const value = sliderValue(input.valueAsNumber, isLogScale);
+    valueText.textContent = String(value);
+    valueText.classList.remove("is-invalid");
+    options.onInput(value);
+  });
+  const sliderRow = element("span", "slider-row");
+  sliderRow.append(input, valueText);
+  return fieldShell(options, sliderRow);
+}
+
 /** Number input which can be empty (an optional key) */
 export function optionalNumberField(
   options: Omit<NumberFieldOptions, "value" | "onInput"> & {

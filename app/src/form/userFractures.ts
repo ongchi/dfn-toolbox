@@ -1,7 +1,7 @@
 // The user-defined fractures: one card for each `[[network.user_fracture]]`.
 import type { RegionBounds } from "../inputFiles";
 import type { FormContext } from "./context";
-import { element, numberField, row, section, selectField } from "./fields";
+import { element, row, section, selectField, sliderField } from "./fields";
 import { angleFields } from "./orientation";
 import { defaultUserFracture, type FormState, type UserFractureState } from "./state";
 
@@ -34,26 +34,55 @@ function regionField(fracture: UserFractureState, context: FormContext): HTMLEle
   });
 }
 
-/** x, y and z of the center, limited to the bounding box of the region */
-function centerFields(fracture: UserFractureState, context: FormContext): HTMLElement[] {
-  const bounds = context.regionBounds.find((candidate) => candidate.name === fracture.region);
-  return AXES.map((axis, index) =>
-    numberField({
+/** A step of the sliders of lengths: the power of 10 near a thousandth of the size */
+function lengthStep(size: number): number {
+  return 10 ** Math.floor(Math.log10(size / 1000));
+}
+
+/** x, y and z of the center, in the bounding box of the region */
+function centerFields(fracture: UserFractureState, bounds: RegionBounds | undefined, context: FormContext): HTMLElement[] {
+  return AXES.map((axis, index) => {
+    const min = bounds?.min[index] ?? fracture.center[index];
+    const max = bounds?.max[index] ?? fracture.center[index];
+    return sliderField({
       label: `Center ${axis} (m)`,
-      help: bounds ? `${bounds.min[index]} to ${bounds.max[index]}` : undefined,
+      help: bounds ? `${min} to ${max}` : "the region is not in the mesh",
       value: fracture.center[index],
-      min: bounds?.min[index],
-      max: bounds?.max[index],
+      min,
+      max,
+      step: bounds ? lengthStep(max - min) : 1,
+      isDisabled: !bounds,
       onInput: (value) => {
         fracture.center[index] = value;
         context.changed();
       },
-    }),
-  );
+    });
+  });
+}
+
+/** Radius up to the largest side of the bounding box of the region */
+function radiusField(fracture: UserFractureState, bounds: RegionBounds | undefined, context: FormContext): HTMLElement {
+  const largestSide = bounds ? Math.max(...AXES.map((_axis, index) => bounds.max[index] - bounds.min[index])) : fracture.radius;
+  const step = bounds ? lengthStep(largestSide) : 1;
+  return sliderField({
+    label: "Radius (m)",
+    key: "radius",
+    help: "of the circle of the points",
+    value: fracture.radius,
+    min: step,
+    max: largestSide,
+    step,
+    isDisabled: !bounds,
+    onInput: (value) => {
+      fracture.radius = value;
+      context.changed();
+    },
+  });
 }
 
 function fractureCard(state: FormState, index: number, context: FormContext): HTMLElement {
   const fracture = state.userFractures[index];
+  const bounds = context.regionBounds.find((candidate) => candidate.name === fracture.region);
   const card = element("div", "family-card");
 
   const header = element("div", "family-header");
@@ -72,39 +101,30 @@ function fractureCard(state: FormState, index: number, context: FormContext): HT
 
   card.append(
     row(regionField(fracture, context)),
-    row(...centerFields(fracture, context)),
+    ...centerFields(fracture, bounds, context).map((field) => row(field)),
+    row(radiusField(fracture, bounds, context)),
     row(
-      numberField({
-        label: "Radius (m)",
-        key: "radius",
-        help: "of the circle of the points",
-        value: fracture.radius,
-        min: 0,
-        isMinExclusive: true,
-        onInput: (value) => {
-          fracture.radius = value;
-          context.changed();
-        },
-      }),
-    ),
-    row(
-      numberField({
+      sliderField({
         label: "Aspect ratio",
         key: "aspect_ratio",
         help: "y radius / x radius",
         value: fracture.aspectRatio,
-        min: 0,
-        isMinExclusive: true,
+        min: 0.1,
+        max: 1,
+        step: 0.01,
         onInput: (value) => {
           fracture.aspectRatio = value;
           context.changed();
         },
       }),
-      numberField({
+      sliderField({
         label: "Rotation β (°)",
         key: "beta",
         help: "in the plane of the fracture",
         value: fracture.beta,
+        min: 0,
+        max: 360,
+        step: 1,
         onInput: (value) => {
           fracture.beta = value;
           context.changed();
@@ -112,13 +132,15 @@ function fractureCard(state: FormState, index: number, context: FormContext): HT
       }),
     ),
     row(
-      numberField({
+      sliderField({
         label: "Aperture (m)",
         key: "aperture",
-        help: "for the flow; above 0",
+        help: "for the flow",
         value: fracture.aperture,
-        min: 0,
-        isMinExclusive: true,
+        min: 1e-6,
+        max: 1e-2,
+        step: 0.01,
+        isLogScale: true,
         onInput: (value) => {
           fracture.aperture = value;
           context.changed();
