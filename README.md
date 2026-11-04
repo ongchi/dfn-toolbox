@@ -137,6 +137,11 @@ npm run dev & npm run e2e -- http://localhost:5173/
 
 `npm test` runs the `vitest` tests of `app/tests`. `npm run e2e` runs
 `app/scripts/e2e.mjs` in the local Chrome (headless) and saves screenshots.
+`E2E_REMOTE_HOST=<ssh host> E2E_REMOTE_ROOT=<folder> npm run e2e:remote` runs
+the same check on another computer with node, npm, Google Chrome and the tools
+of `build-wasm.sh` (`app/scripts/e2e-remote.sh`: it copies the root folder
+there with rsync, builds the WebAssembly, runs its own dev server, and copies
+the screenshots back).
 
 ## License
 

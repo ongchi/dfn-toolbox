@@ -6,6 +6,7 @@
 // input, the choice of a predefined mesh, a new user-defined fracture, a bad
 // input, the fractures in the view during a run, a cancel, and a stop with
 // the fractures kept and a continue, and the phone layout; it saves screenshots.
+import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
 const url = process.argv[2] ?? "http://localhost:5173/";
@@ -20,6 +21,10 @@ const FLOAT_BUFFER_EXTENSIONS = ["EXT_color_buffer_float", "EXT_color_buffer_hal
 const COLORED_PIXEL_CONTRAST = 30;
 // The highlighted south surface of the default example (the face to the camera) fills a part of the view
 const MINIMUM_SURFACE_PIXEL_SHARE = 0.05;
+// Two pictures of the view are the same with a small noise (the blur of the panels behind them):
+// a few pixels which differ by at most this value in each channel (0 to 255)
+const MAXIMUM_NOISE = 2;
+const MAXIMUM_NOISY_PIXEL_SHARE = 0.0001;
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -222,9 +227,9 @@ async function checkPhone() {
   await page.tap("#boundary-surfaces .file-row-header .field-label");
   const viewAfterSecondTap = await freeViewShot();
   check(
-    !viewAfterTap.equals(viewBeforeTap) && viewAfterSecondTap.equals(viewBeforeTap),
+    !isSameView(viewAfterTap, viewBeforeTap) && isSameView(viewAfterSecondTap, viewBeforeTap),
     "phone: a tap highlights the surface, a second tap removes it",
-    `tap ${viewAfterTap.equals(viewBeforeTap) ? "unchanged" : "changed"}, second tap ${viewAfterSecondTap.equals(viewBeforeTap) ? "same" : "different"}`,
+    `tap ${isSameView(viewAfterTap, viewBeforeTap) ? "unchanged" : "changed"}, second tap ${isSameView(viewAfterSecondTap, viewBeforeTap) ? "same" : "different"}`,
   );
 
   for (const tab of ["domain", "fractures", "network", "flow", "transport"]) {
@@ -276,7 +281,7 @@ async function checkPhone() {
   const viewBeforeColor = await viewShot();
   await page.select("#color-select", colorOption);
   const viewAfterColor = await viewShot();
-  check(!viewAfterColor.equals(viewBeforeColor), "phone: a new color changes the view", "changed");
+  check(!isSameView(viewAfterColor, viewBeforeColor), "phone: a new color changes the view", "changed");
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_color.png` });
 
   // One finger turns the model, two fingers zoom it
@@ -291,7 +296,7 @@ async function checkPhone() {
   }
   await touch("touchEnd", []);
   const viewAfterDrag = await viewShot();
-  check(!viewAfterDrag.equals(viewBeforeDrag), "phone: one finger turns the model", "changed");
+  check(!isSameView(viewAfterDrag, viewBeforeDrag), "phone: one finger turns the model", "changed");
   await touch("touchStart", [
     { x: centerX - 30, y: centerY, id: 0 },
     { x: centerX + 30, y: centerY, id: 1 },
@@ -304,7 +309,7 @@ async function checkPhone() {
   }
   await touch("touchEnd", []);
   const viewAfterPinch = await viewShot();
-  check(!viewAfterPinch.equals(viewAfterDrag), "phone: two fingers zoom", viewAfterPinch.equals(viewAfterDrag) ? "unchanged" : "changed");
+  check(!isSameView(viewAfterPinch, viewAfterDrag), "phone: two fingers zoom", isSameView(viewAfterPinch, viewAfterDrag) ? "unchanged" : "changed");
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_pinch.png` });
 
   // Landscape: the settings panel at the left of the view, as on a computer
@@ -328,6 +333,32 @@ async function checkPhone() {
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_landscape.png` });
   await page.close();
+}
+
+/** The two PNG pictures differ only by noise: few pixels, each by at most MAXIMUM_NOISE in each channel */
+function isSameView(firstImage, secondImage) {
+  if (firstImage.equals(secondImage)) {
+    return true;
+  }
+  const first = PNG.sync.read(firstImage);
+  const second = PNG.sync.read(secondImage);
+  if (first.width !== second.width || first.height !== second.height) {
+    return false;
+  }
+  let noisyPixelCount = 0;
+  for (let start = 0; start < first.data.length; start += 4) {
+    let difference = 0;
+    for (let channel = start; channel < start + 4; channel++) {
+      difference = Math.max(difference, Math.abs(first.data[channel] - second.data[channel]));
+    }
+    if (difference > MAXIMUM_NOISE) {
+      return false;
+    }
+    if (difference > 0) {
+      noisyPixelCount++;
+    }
+  }
+  return noisyPixelCount <= MAXIMUM_NOISY_PIXEL_SHARE * first.width * first.height;
 }
 
 /** The part of the pixels of a PNG image with a color (not white, gray or black) */
@@ -463,7 +494,7 @@ try {
     let previous = await viewerScreenshot();
     for (let attempt = 0; attempt < 10; attempt++) {
       const next = await viewerScreenshot();
-      if (next.equals(previous)) {
+      if (isSameView(next, previous)) {
         return next;
       }
       previous = next;
@@ -481,9 +512,9 @@ try {
   await page.mouse.move(0, 0);
   const viewAfterHover = await viewerScreenshot();
   check(
-    !viewOnHover.equals(viewBeforeHover) && viewAfterHover.equals(viewBeforeHover),
+    !isSameView(viewOnHover, viewBeforeHover) && isSameView(viewAfterHover, viewBeforeHover),
     "boundary surface highlight on hover",
-    `hover ${viewOnHover.equals(viewBeforeHover) ? "unchanged" : "changed"}, after ${viewAfterHover.equals(viewBeforeHover) ? "same" : "different"}`,
+    `hover ${isSameView(viewOnHover, viewBeforeHover) ? "unchanged" : "changed"}, after ${isSameView(viewAfterHover, viewBeforeHover) ? "same" : "different"}`,
   );
 
   // A click on a row keeps its surface highlighted: the pointer over another row shows that surface, then
@@ -507,15 +538,15 @@ try {
   const viewUnpinned = await viewerScreenshot();
   const pinnedAfterSecondClick = await pinnedTargets();
   check(
-    viewPinned.equals(viewOnHover) &&
+    isSameView(viewPinned, viewOnHover) &&
       pinnedAfterClick === "south" &&
-      !viewOtherHover.equals(viewPinned) &&
-      viewAfterOtherHover.equals(viewPinned) &&
+      !isSameView(viewOtherHover, viewPinned) &&
+      isSameView(viewAfterOtherHover, viewPinned) &&
       pinnedAfterSelect === "south" &&
-      viewUnpinned.equals(viewBeforeHover) &&
+      isSameView(viewUnpinned, viewBeforeHover) &&
       pinnedAfterSecondClick === "",
     "a click keeps the surface highlighted",
-    `kept ${viewPinned.equals(viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${viewOtherHover.equals(viewPinned) ? "unchanged" : "changed"}, back ${viewAfterOtherHover.equals(viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${viewUnpinned.equals(viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
+    `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
   // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
@@ -619,7 +650,7 @@ try {
     );
     // The pointer over a pressure field highlights its surface
     await page.mouse.move(0, 0);
-    const flowViewBefore = await viewerScreenshot();
+    const flowViewBefore = await stableViewerScreenshot();
     const pressureField = await page.evaluateHandle(() =>
       [...document.querySelectorAll("#flow-form .form-section")]
         .find((node) => node.querySelector("h3")?.textContent === "Pressure boundaries")
@@ -631,11 +662,11 @@ try {
       await page.screenshot({ path: `${screenshotDir}/e2e_pressure_boundary_hover.png` });
     }
     await page.mouse.move(0, 0);
-    const flowViewAfter = await viewerScreenshot();
+    const flowViewAfter = await stableViewerScreenshot();
     check(
-      !flowViewOnHover.equals(flowViewBefore) && flowViewAfter.equals(flowViewBefore),
+      !isSameView(flowViewOnHover, flowViewBefore) && isSameView(flowViewAfter, flowViewBefore),
       `${name}: pressure boundary highlight on hover`,
-      `hover ${flowViewOnHover.equals(flowViewBefore) ? "unchanged" : "changed"}, after ${flowViewAfter.equals(flowViewBefore) ? "same" : "different"}`,
+      `hover ${isSameView(flowViewOnHover, flowViewBefore) ? "unchanged" : "changed"}, after ${isSameView(flowViewAfter, flowViewBefore) ? "same" : "different"}`,
     );
     // A click on the label of a pressure field keeps its surface highlighted, also on the Domain tab (one for the page)
     if (name === "box_west_east") {
@@ -652,16 +683,16 @@ try {
       await page.click('[data-sidebar-tab="flow"]');
       await page.click('#flow-form [data-highlight-surface="west"] .field-label');
       await page.mouse.move(0, 0);
-      const flowViewUnpinned = await viewerScreenshot();
+      const flowViewUnpinned = await stableViewerScreenshot();
       check(
-        !flowViewPinned.equals(flowViewBefore) &&
+        !isSameView(flowViewPinned, flowViewBefore) &&
           !isInputFocused &&
           pinnedOnFlow === "west" &&
           pinnedOnDomain === "west" &&
-          flowViewUnpinned.equals(flowViewBefore) &&
+          isSameView(flowViewUnpinned, flowViewBefore) &&
           (await pinnedTargets("#layout")) === "",
         `${name}: a click on a pressure field keeps its surface highlighted`,
-        `${flowViewPinned.equals(flowViewBefore) ? "unchanged" : "kept"}, input focus ${isInputFocused}, flow "${pinnedOnFlow}", domain "${pinnedOnDomain}", second click ${flowViewUnpinned.equals(flowViewBefore) ? "removed" : "different"}`,
+        `${isSameView(flowViewPinned, flowViewBefore) ? "unchanged" : "kept"}, input focus ${isInputFocused}, flow "${pinnedOnFlow}", domain "${pinnedOnDomain}", second click ${isSameView(flowViewUnpinned, flowViewBefore) ? "removed" : "different"}`,
       );
     }
     const isFlowNextDisabled = await isNextDisabled();
@@ -670,7 +701,7 @@ try {
     await page.click("#show-particles");
     const particleFrame = await viewerScreenshot();
     await new Promise((resolve) => setTimeout(resolve, 300));
-    check(!particleFrame.equals(await viewerScreenshot()), `${name}: moving particles`, "view changed");
+    check(!isSameView(particleFrame, await viewerScreenshot()), `${name}: moving particles`, "view changed");
     if (name === "two_families") {
       await page.screenshot({ path: `${screenshotDir}/e2e_particles.png` });
     }
@@ -696,7 +727,7 @@ try {
     await page.click("#log-scale");
     const logLabels = await scalarBarLabels();
     const logView = await viewerScreenshot();
-    check(logLabels !== linearLabels && !logView.equals(linearView), `${name}: log scale`, `${linearLabels} → ${logLabels}`);
+    check(logLabels !== linearLabels && !isSameView(logView, linearView), `${name}: log scale`, `${linearLabels} → ${logLabels}`);
     if (name === "two_families") {
       await page.screenshot({ path: `${screenshotDir}/e2e_log_scale.png` });
     }
@@ -752,7 +783,7 @@ try {
 
   // The Log panel has the three sections and does not change the 3D view
   await page.mouse.move(0, 0);
-  const viewBeforeLog = await viewerScreenshot();
+  const viewBeforeLog = await stableViewerScreenshot();
   const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
   const canvasSizeBeforeLog = await canvasSize();
   await page.click("#log-button");
@@ -788,8 +819,8 @@ try {
 
   await page.click("#log-button");
   await page.mouse.move(0, 0);
-  const viewAfterLog = await viewerScreenshot();
-  check(viewAfterLog.equals(viewBeforeLog), "3D view after the Log panel", viewAfterLog.equals(viewBeforeLog) ? "same" : "different");
+  const viewAfterLog = await stableViewerScreenshot();
+  check(isSameView(viewAfterLog, viewBeforeLog), "3D view after the Log panel", isSameView(viewAfterLog, viewBeforeLog) ? "same" : "different");
 
   // A new run of an earlier step removes the "Color by" options of the later
   // outputs; the new mesh is not colored by an array which it does not have
@@ -966,9 +997,9 @@ try {
   );
   const secondView = await viewDuringRun();
   check(
-    !firstView.equals(secondView),
+    !isSameView(firstView, secondView),
     "fractures in the view during the run",
-    `view ${firstView.equals(secondView) ? "unchanged" : "changed"}`,
+    `view ${isSameView(firstView, secondView) ? "unchanged" : "changed"}`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_generation_live.png` });
   await page.click("#cancel-button");
@@ -1054,9 +1085,9 @@ try {
   await page.mouse.move(0, 0);
   const viewAfterDiscarded = await viewerScreenshot();
   check(
-    removedCount > 0 && !viewWithDiscarded.equals(viewWithoutDiscarded) && viewAfterDiscarded.equals(viewWithoutDiscarded),
+    removedCount > 0 && !isSameView(viewWithDiscarded, viewWithoutDiscarded) && isSameView(viewAfterDiscarded, viewWithoutDiscarded),
     "the button of the removed and rejected fractures",
-    `${removedCount} removed; view ${viewWithDiscarded.equals(viewWithoutDiscarded) ? "unchanged" : "changed"}, after ${viewAfterDiscarded.equals(viewWithoutDiscarded) ? "same" : "different"}`,
+    `${removedCount} removed; view ${isSameView(viewWithDiscarded, viewWithoutDiscarded) ? "unchanged" : "changed"}, after ${isSameView(viewAfterDiscarded, viewWithoutDiscarded) ? "same" : "different"}`,
   );
   await page.hover("#reset-camera");
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -1077,9 +1108,9 @@ try {
   const viewAgainWithoutColorBar = await viewerScreenshot();
   await page.click("#show-color-bar");
   check(
-    !viewWithoutColorBar.equals(viewWithColorBar) &&
-      !viewNewColor.equals(viewWithoutColorBarNewColor) &&
-      viewAgainWithoutColorBar.equals(viewWithoutColorBarNewColor),
+    !isSameView(viewWithoutColorBar, viewWithColorBar) &&
+      !isSameView(viewNewColor, viewWithoutColorBarNewColor) &&
+      isSameView(viewAgainWithoutColorBar, viewWithoutColorBarNewColor),
     "color bar toggle",
     "changed",
   );
