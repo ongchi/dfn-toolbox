@@ -130,7 +130,7 @@ dependencies = [
 [[package]]
 name = "dfntrans-rs"
 version = "0.1.0"
-source = "git+https://github.com/ongchi/dfntrans-rs?branch=master#a9da5fb3cd7a97848466e8f8ffae52f86bd0afd7"
+source = "git+https://github.com/ongchi/dfntrans-rs?branch=master#6b145b7a2ae789cbfbc71607f3d5de11704d9b50"
 dependencies = [
  "fehm-rs",
  "serde",
