@@ -788,12 +788,33 @@ progress {
   border-radius: 3px;
 }
 
-/* The values come from the largest to the smallest: the smallest is at the left */
+/* Each tick at its place (`left` from the viewer): a mark under the ramp and its label */
+.scalar-bar-marks,
 .scalar-bar-labels {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: space-between;
+  position: relative;
+}
+
+.scalar-bar-marks {
+  height: 4px;
+}
+
+.scalar-bar-marks span {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  margin-left: -0.5px;
+  background: var(--muted);
+}
+
+.scalar-bar-labels {
+  height: 1.3em;
   font-variant-numeric: tabular-nums;
+}
+
+.scalar-bar-labels span {
+  position: absolute;
+  white-space: nowrap;
 }
 
 .viewer-message {

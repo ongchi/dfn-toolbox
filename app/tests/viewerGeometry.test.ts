@@ -9,7 +9,9 @@ import {
   domainEdges,
   localPositions,
   pathTubes,
-  scalarBarValues,
+  powerOfTenText,
+  scalarBarTicks,
+  scalarBarTitle,
   tableColor,
 } from "../src/viewerGeometry";
 
@@ -77,13 +79,57 @@ test("the colors stay in the range 0 to 1", () => {
   expect(Math.max(...components)).toBeLessThanOrEqual(1);
 });
 
-test("the scalar bar has evenly spaced values from the largest value", () => {
-  expect(scalarBarValues(colorRange([0, 4, 2], false), 5)).toEqual([4, 3, 2, 1, 0]);
+const tickTexts = (values: number[], isLog: boolean) => scalarBarTicks(colorRange(values, isLog), 5).ticks.map(({ text }) => text);
+
+test("a linear scale has round ticks at their places", () => {
+  expect(scalarBarTicks(colorRange([0, 4.5], false), 5).ticks).toEqual([
+    { fraction: 0, text: "0" },
+    { fraction: 1 / 4.5, text: "1" },
+    { fraction: 2 / 4.5, text: "2" },
+    { fraction: 3 / 4.5, text: "3" },
+    { fraction: 4 / 4.5, text: "4" },
+  ]);
 });
 
-test("the labels of a log scale have equal ratios", () => {
-  const labels = scalarBarValues(colorRange([1, 10, 10000], true), 5);
-  [10000, 1000, 100, 10, 1].forEach((label, index) => expect(labels[index]).toBeCloseTo(label, 6));
+test("the labels of a linear scale have the decimals of the step", () => {
+  expect(tickTexts([10.0, 10.1], false)).toEqual(["10.00", "10.05", "10.10"]);
+});
+
+test("small values of a linear scale share a power of 10 in the title", () => {
+  const { factorExponent, ticks } = scalarBarTicks(colorRange([1.1e-8, 3.97e-4], false), 5);
+  expect([factorExponent, ticks.map(({ text }) => text)]).toEqual([-4, ["1", "2", "3"]]);
+});
+
+test("values from 0.001 to 0.1 have no shared power", () => {
+  expect(tickTexts([1e-8, 0.0397], false)).toEqual(["0.01", "0.02", "0.03"]);
+});
+
+test("a log scale has a tick at each power of 10", () => {
+  expect(tickTexts([1.1e-6, 3.97e-2], true)).toEqual(["10⁻⁵", "10⁻⁴", "10⁻³", "10⁻²"]);
+});
+
+test("a log scale of many powers of 10 has a tick at every second one", () => {
+  expect(tickTexts([1.1e-8, 3.97e-2], true)).toEqual(["10⁻⁶", "10⁻⁴", "10⁻²"]);
+});
+
+test("a log scale within one decade has ticks 1, 2 and 5 times a power of 10", () => {
+  expect(tickTexts([1.5e-3, 9e-3], true)).toEqual(["2×10⁻³", "5×10⁻³"]);
+});
+
+test("one value gives one tick", () => {
+  expect(scalarBarTicks(colorRange([7, 7], false), 5).ticks).toEqual([{ fraction: 0, text: "7" }]);
+});
+
+test("the title has the power of 10 before the unit", () => {
+  expect([scalarBarTitle("flow velocity", "m/s", -4), scalarBarTitle("aperture", null, -4), scalarBarTitle("pressure", "MPa", null)]).toEqual([
+    "flow velocity (×10⁻⁴ m/s)",
+    "aperture (×10⁻⁴)",
+    "pressure (MPa)",
+  ]);
+});
+
+test("the powers 0 and 1 are 1 and 10", () => {
+  expect([0, 1, 2, -12].map(powerOfTenText)).toEqual(["1", "10", "10²", "10⁻¹²"]);
 });
 
 test("a linear scale places a value in proportion", () => {

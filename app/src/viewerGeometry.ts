@@ -217,12 +217,122 @@ export function colorFraction(value: number, { min, max, isLog }: ColorRange): n
   return isLog ? Math.log(value / min) / Math.log(max / min) : (value - min) / (max - min);
 }
 
-/** The values of the labels of a scalar bar, in equal steps of the scale, from the largest to the smallest */
-export function scalarBarValues({ min, max, isLog }: ColorRange, count: number): number[] {
-  return Array.from({ length: count }, (_, index) => {
-    const part = index / (count - 1);
-    return isLog ? max * (min / max) ** part : max - (max - min) * part;
-  });
+/** A tick of a scalar bar: its place (0 to 1) and its label */
+export interface ScalarBarTick {
+  fraction: number;
+  text: string;
+}
+
+/** The ticks of a scalar bar, from the smallest value; the labels are the values / 10^`factorExponent` */
+export interface ScalarBarTicks {
+  /** null: the labels are the values */
+  factorExponent: number | null;
+  ticks: ScalarBarTick[];
+}
+
+/** A linear scale shows a power of 10 in the title from this exponent (absolute) of its largest tick */
+const SMALLEST_FACTOR_EXPONENT = 3;
+/** Rounding of the multiples of a step at the ends of the range */
+const STEP_TOLERANCE = 1e-9;
+const SUPERSCRIPT_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+
+/** 10ⁿ as text: `10⁻⁸`; `1` and `10` for 10⁰ and 10¹ */
+export function powerOfTenText(exponent: number): string {
+  if (exponent === 0 || exponent === 1) {
+    return String(10 ** exponent);
+  }
+  const digits = [...String(Math.abs(exponent))].map((digit) => SUPERSCRIPT_DIGITS[Number(digit)]).join("");
+  return `10${exponent < 0 ? "⁻" : ""}${digits}`;
+}
+
+/** The title of a scalar bar: `name (×10⁻² unit)`, without the parts which it does not have */
+export function scalarBarTitle(name: string, unit: string | null, factorExponent: number | null): string {
+  const parts = [factorExponent === null ? "" : `×${powerOfTenText(factorExponent)}`, unit ?? ""].filter((part) => part !== "");
+  return parts.length === 0 ? name : `${name} (${parts.join(" ")})`;
+}
+
+/** A value with 3 significant digits, without trailing zeros */
+function shortText(value: number): string {
+  return String(Number(value.toPrecision(3)));
+}
+
+/** The multiples of `step` in [min, max] */
+function multiples(min: number, max: number, step: number): number[] {
+  const first = Math.ceil(min / step - STEP_TOLERANCE);
+  const last = Math.floor(max / step + STEP_TOLERANCE);
+  return Array.from({ length: Math.max(0, last - first + 1) }, (_, index) => (first + index) * step);
+}
+
+/** The ticks of the smallest and the largest value */
+function endTicks(range: ColorRange): ScalarBarTicks {
+  return {
+    factorExponent: null,
+    ticks: [
+      { fraction: 0, text: shortText(range.min) },
+      { fraction: 1, text: shortText(range.max) },
+    ],
+  };
+}
+
+/** Linear scale: the multiples of the smallest step 1, 2 or 5 × 10^k with at most `maximumCount` of them */
+function linearTicks(range: ColorRange, maximumCount: number): ScalarBarTicks {
+  const { min, max } = range;
+  for (let stepExponent = Math.floor(Math.log10((max - min) / maximumCount)); ; stepExponent++) {
+    for (const mantissa of [1, 2, 5]) {
+      const step = mantissa * 10 ** stepExponent;
+      const values = multiples(min, max, step);
+      if (values.length > maximumCount) {
+        continue;
+      }
+      if (values.length < 2) {
+        return endTicks(range);
+      }
+      const largestExponent = Math.floor(Math.log10(Math.max(...values.map(Math.abs))));
+      const factorExponent = Math.abs(largestExponent) >= SMALLEST_FACTOR_EXPONENT ? largestExponent : null;
+      const shift = factorExponent ?? 0;
+      const decimals = Math.max(0, shift - stepExponent);
+      return {
+        factorExponent,
+        ticks: values.map((value) => ({ fraction: colorFraction(value, range), text: (value / 10 ** shift).toFixed(decimals) })),
+      };
+    }
+  }
+}
+
+/** Log scale: the powers of 10 (every n-th of them for more than `maximumCount`); in less than one decade 1, 2 and 5 × 10^k */
+function logTicks(range: ColorRange, maximumCount: number): ScalarBarTicks {
+  const { min, max } = range;
+  const lowest = Math.ceil(Math.log10(min) - STEP_TOLERANCE);
+  const highest = Math.floor(Math.log10(max) + STEP_TOLERANCE);
+  if (highest > lowest) {
+    const every = Math.ceil((highest - lowest + 1) / maximumCount);
+    const exponents = multiples(lowest, highest, every);
+    if (exponents.length >= 2) {
+      return {
+        factorExponent: null,
+        ticks: exponents.map((exponent) => ({ fraction: colorFraction(10 ** exponent, range), text: powerOfTenText(exponent) })),
+      };
+    }
+  }
+  const ticks: ScalarBarTick[] = [];
+  for (let exponent = Math.floor(Math.log10(min)); exponent <= highest; exponent++) {
+    for (const mantissa of [1, 2, 5]) {
+      const value = mantissa * 10 ** exponent;
+      if (value >= min * (1 - STEP_TOLERANCE) && value <= max * (1 + STEP_TOLERANCE)) {
+        const text = exponent === 0 || exponent === 1 ? String(value) : `${mantissa === 1 ? "" : `${mantissa}×`}${powerOfTenText(exponent)}`;
+        ticks.push({ fraction: colorFraction(value, range), text });
+      }
+    }
+  }
+  return ticks.length >= 2 ? { factorExponent: null, ticks } : endTicks(range);
+}
+
+/** The ticks of a scalar bar: round values at their place (at most `maximumCount`); one value: one tick */
+export function scalarBarTicks(range: ColorRange, maximumCount: number): ScalarBarTicks {
+  if (!(range.max > range.min)) {
+    return { factorExponent: null, ticks: [{ fraction: 0, text: shortText(range.min) }] };
+  }
+  return range.isLog ? logTicks(range, maximumCount) : linearTicks(range, maximumCount);
 }
 
 /** A merged tube around each path */

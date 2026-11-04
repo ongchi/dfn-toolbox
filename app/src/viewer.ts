@@ -53,11 +53,13 @@ import {
   colorRange,
   localPositions,
   pathTubes,
-  scalarBarValues,
+  scalarBarTicks,
+  scalarBarTitle,
   smallestPositiveValue,
   tableColor,
   type CellShapes,
   type CellTriangles,
+  type ScalarBarTick,
 } from "./viewerGeometry";
 
 // The vertical angle of the view (degrees), and the direction from the center to the camera at the start
@@ -73,7 +75,7 @@ const MINIMUM_NEAR_PART = 0.001;
 // Panels which leave less than this part of the width or height: the model has the center of all of the view
 const MINIMUM_FREE_PART = 0.25;
 
-const SCALAR_BAR_LABEL_COUNT = 5;
+const SCALAR_BAR_TICK_COUNT = 5;
 const SCALAR_BAR_RAMP_STOPS = 33;
 const FRACTURE_COLOR = [0.95, 0.75, 0.3] as const;
 // The final fractures: translucent, thus the particles on all fractures are visible
@@ -158,15 +160,11 @@ export const FLOW_VELOCITY_ARRAY: ColorArray = { name: "flow_velocity", associat
 /** The mean speed of the particle tracking at each point */
 export const TRANSPORT_VELOCITY_ARRAY: ColorArray = { name: "transport_velocity", association: "point" };
 
-const defaultLabel = (value: number) => value.toPrecision(3);
-const velocityLabel = (value: number) => value.toExponential(3);
-
-/** The title and the label text of the scalar bar of the arrays which the app adds; other arrays: their name */
-const SCALAR_BARS = new Map<string, { title: string; label: (value: number) => string }>([
-  // The pressure differences are small against the pressure
-  [PRESSURE_ARRAY.name, { title: "pressure (MPa)", label: (value) => value.toPrecision(6) }],
-  [FLOW_VELOCITY_ARRAY.name, { title: "flow velocity (m/s)", label: velocityLabel }],
-  [TRANSPORT_VELOCITY_ARRAY.name, { title: "transport velocity (m/s)", label: velocityLabel }],
+/** The name and the unit in the scalar bar of the arrays which the app adds; other arrays: their name, no unit */
+const SCALAR_BARS = new Map<string, { name: string; unit: string }>([
+  [PRESSURE_ARRAY.name, { name: "pressure", unit: "MPa" }],
+  [FLOW_VELOCITY_ARRAY.name, { name: "flow velocity", unit: "m/s" }],
+  [TRANSPORT_VELOCITY_ARRAY.name, { name: "transport velocity", unit: "m/s" }],
 ]);
 
 /** A boundary surface of the domain mesh: its polygons */
@@ -343,6 +341,7 @@ interface ShapeLayer {
 class ScalarBar {
   private readonly root = document.createElement("div");
   private readonly title = document.createElement("div");
+  private readonly marks = document.createElement("div");
   private readonly labels = document.createElement("div");
 
   constructor(parent: HTMLElement) {
@@ -359,19 +358,33 @@ class ScalarBar {
       return `rgb(${[red, green, blue].map((component) => Math.round(255 * component)).join(" ")})`;
     });
     ramp.style.background = `linear-gradient(to right, ${stops.join(", ")})`;
+    this.marks.className = "scalar-bar-marks";
     this.labels.className = "scalar-bar-labels";
-    body.append(ramp, this.labels);
+    body.append(ramp, this.marks, this.labels);
     this.root.append(this.title, body);
     parent.append(this.root);
   }
 
-  show(title: string, values: number[], label: (value: number) => string): void {
+  /**
+   * Each tick has a mark under the ramp at its place; its label moves from
+   * centered by its fraction, thus the labels at the ends stay in the bar
+   */
+  show(title: string, ticks: ScalarBarTick[]): void {
     this.title.textContent = title;
+    this.marks.replaceChildren(
+      ...ticks.map(({ fraction }) => {
+        const mark = document.createElement("span");
+        mark.style.left = `${100 * fraction}%`;
+        return mark;
+      }),
+    );
     this.labels.replaceChildren(
-      ...values.map((value) => {
-        const line = document.createElement("span");
-        line.textContent = label(value);
-        return line;
+      ...ticks.map(({ fraction, text }) => {
+        const label = document.createElement("span");
+        label.textContent = text;
+        label.style.left = `${100 * fraction}%`;
+        label.style.transform = `translateX(${-100 * fraction}%)`;
+        return label;
       }),
     );
     this.root.hidden = false;
@@ -763,18 +776,18 @@ export class NetworkViewer {
     return values;
   }
 
-  /** The scalar bar of the color array; the arrays of `SCALAR_BARS` have their title and label text */
+  /** The scalar bar of the color array; the arrays of `SCALAR_BARS` have their name and unit */
   private updateScalarBar(): void {
     if (this.colorArray === null || !this.layers.has("final") || !this.isScalarBarShown) {
       this.scalarBar.hide();
       return;
     }
     const style = SCALAR_BARS.get(this.colorArray.name);
-    this.scalarBar.show(
-      style?.title ?? this.colorArray.name,
-      scalarBarValues(colorRange(this.colorValues(this.colorArray), this.isLogScale), SCALAR_BAR_LABEL_COUNT),
-      style?.label ?? defaultLabel,
+    const { factorExponent, ticks } = scalarBarTicks(
+      colorRange(this.colorValues(this.colorArray), this.isLogScale),
+      SCALAR_BAR_TICK_COUNT,
     );
+    this.scalarBar.show(scalarBarTitle(style?.name ?? this.colorArray.name, style?.unit ?? null, factorExponent), ticks);
   }
 
   /** The next `colorBy` uses a log scale of the values */
