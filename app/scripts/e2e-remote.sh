@@ -2,8 +2,9 @@
 # Runs the end-to-end check (scripts/e2e.mjs) on a remote computer, with its
 # own dev server, and copies the screenshots back.
 #   E2E_REMOTE_HOST=<ssh host> E2E_REMOTE_ROOT=<folder> scripts/e2e-remote.sh [screenshot folder]
-# E2E_REMOTE_ROOT is the copy of the root folder (the parent of web) on the
-# remote computer, relative to its home folder; rsync replaces its content.
+# E2E_REMOTE_ROOT is the copy of the root folder (the parent of this
+# repository) on the remote computer, relative to its home folder; rsync
+# replaces the content of the four project folders in it.
 # The remote computer needs node, npm, Google Chrome, and the tools of
 # ../build-wasm.sh (it builds the WebAssembly there). Without a screenshot
 # folder, the screenshots go to a new temporary folder. The exit code is that
@@ -18,6 +19,8 @@ remote_screenshots="$remote_root-e2e-screenshots"
 port=5174
 
 root_dir="$(cd "$(dirname "$0")/../../.." && pwd)"
+# The folder of this repository (dfn-toolbox), in the root folder
+project_name="$(basename "$(cd "$(dirname "$0")/../.." && pwd)")"
 screenshot_dir="${1:-$(mktemp -d -t dfn-e2e)}"
 mkdir -p "$screenshot_dir"
 
@@ -26,11 +29,15 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" true; then
     exit 2
 fi
 
-# No slash after the names: the local target folders are symlinks
-rsync -az --delete --exclude target --exclude node_modules --exclude dist "$root_dir/" "$host:$remote_root/"
+# Only the projects of the app: the root folder also has other projects.
+# No slash after the names: each folder goes into the remote root, and the
+# local target folders are symlinks.
+ssh "$host" mkdir -p "$remote_root"
+(cd "$root_dir" && rsync -az --delete --exclude target --exclude node_modules --exclude dist \
+    dfngen-rs fehm-rs dfntrans-rs "$project_name" "$host:$remote_root/")
 
 status=0
-ssh "$host" bash -s -- "$remote_root/web/app" "$remote_screenshots" "$port" <<'REMOTE' || status=$?
+ssh "$host" bash -s -- "$remote_root/$project_name/app" "$remote_screenshots" "$port" <<'REMOTE' || status=$?
 set -euo pipefail
 app_dir="$1"
 screenshot_dir="$2"
