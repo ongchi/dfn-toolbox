@@ -209,6 +209,40 @@ async function statusesDuring(page, action) {
 }
 
 /**
+ * The frames of the 3D view during `statusesDuring(page, action)`: for each render, the part of colored pixels
+ * (as `coloredPixelShare`, on a small copy) and the "Color by" value. The copy is made in the task of the render,
+ * thus the drawing buffer still has the frame.
+ */
+async function framesDuring(page, action) {
+  await page.evaluate((minimumContrast) => {
+    const canvas = document.querySelector("#viewer-canvas");
+    const copy = new OffscreenCanvas(Math.ceil(canvas.width / 10), Math.ceil(canvas.height / 10)).getContext("2d", {
+      willReadFrequently: true,
+    });
+    window.e2eFrames = [];
+    window.e2eFrameObserver = new MutationObserver(() => {
+      copy.drawImage(canvas, 0, 0, copy.canvas.width, copy.canvas.height);
+      const { data } = copy.getImageData(0, 0, copy.canvas.width, copy.canvas.height);
+      let coloredCount = 0;
+      for (let start = 0; start < data.length; start += 4) {
+        const channels = [data[start], data[start + 1], data[start + 2]];
+        if (Math.max(...channels) - Math.min(...channels) > minimumContrast) {
+          coloredCount++;
+        }
+      }
+      window.e2eFrames.push({ share: coloredCount / (data.length / 4), color: document.querySelector("#color-select").value });
+    });
+    window.e2eFrameObserver.observe(canvas, { attributes: true, attributeFilter: ["data-geometry-count"] });
+  }, COLORED_PIXEL_CONTRAST);
+  const statuses = await statusesDuring(page, action);
+  const frames = await page.evaluate(() => {
+    window.e2eFrameObserver.disconnect();
+    return window.e2eFrames;
+  });
+  return { statuses, frames };
+}
+
+/**
  * With the live run on and the Transport tab open: "Pick points", then clicks on the points of a grid around the
  * middle of the free part of the view until one adds a release point (a click on the boundary surfaces only adds
  * none), then "Stop picking". Returns the statuses of the transport which the point starts.
@@ -947,13 +981,21 @@ try {
   );
   // A new user-defined fracture: the stochastic fractures of the last run stay, without a new generation
   await page.click('[data-sidebar-tab="fractures"]');
-  const fractureStatuses = await statusesDuring(page, async () => {
+  const { statuses: fractureStatuses, frames: fractureFrames } = await framesDuring(page, async () => {
     await page.evaluate(() =>
       [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
     );
     await page.waitForFunction(() => [...document.querySelectorAll("#fractures-form h4")].some((node) => node.textContent === "Fracture 1"));
     await setField(page, "#fractures-form", "Radius (m)", 4);
   });
+  // The view keeps the old mesh with its pressure colors until the new flow: no empty frame, no other colors
+  const shares = fractureFrames.map((frame) => frame.share);
+  const otherColors = [...new Set(fractureFrames.map((frame) => frame.color))].filter((color) => color !== "point:pressure");
+  check(
+    fractureFrames.length > 0 && Math.min(...shares) >= 0.5 * shares[0] && otherColors.length === 0,
+    "live run: the view keeps the mesh and its pressure colors during the steps of a new user fracture",
+    `${fractureFrames.length} frames, colored part ${Math.min(...shares).toFixed(3)} to ${Math.max(...shares).toFixed(3)} (first ${shares[0]?.toFixed(3)}), other colors [${otherColors.join(", ")}]`,
+  );
   const acceptedAfter = Number(await resultValue(page, "Accepted fractures"));
   check(
     isFlowDone(fractureStatuses) &&

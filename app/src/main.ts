@@ -218,7 +218,13 @@ const client = new GenerationClient();
 const liveRun = new LiveRun({
   runStep: (step) => runChainStep(step),
   cancel: () => client.cancel(),
-  onStateChange: () => updateRunButtons(),
+  onStateChange: () => {
+    updateRunButtons();
+    // The chain stopped (an error, "Pause"): the view shows the results which it has
+    if (liveRun.isIdle) {
+      void releaseView();
+    }
+  },
 });
 
 // ---------------------------------------------------------------- status
@@ -558,16 +564,71 @@ function generationInput(): GenerationInput | string {
   };
 }
 
+/**
+ * True while the steps run again from the network of the view (a new user
+ * fracture, new mesh values): the view keeps its mesh and colors, with the
+ * placeholder polygon of the changed fracture, until the new flow or the end
+ * of the chain changes it at once (user decision: no blink)
+ */
+let isViewHeld = false;
+
+/** The viewer for the output layers; null while the view is held */
+function outputViewer(): NetworkViewer | null {
+  return isViewHeld ? null : viewer;
+}
+
+/** Holds the view if it shows a mesh */
+function holdView(): void {
+  isViewHeld ||= output?.shapes?.mesh != null;
+}
+
+/** Shows the results of now in one frame: the layers, the colors, then the layer "user" without the placeholder */
+async function releaseView(): Promise<void> {
+  if (!isViewHeld) {
+    return;
+  }
+  isViewHeld = false;
+  if (!viewer) {
+    return;
+  }
+  if (output === null) {
+    for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
+      viewer.setLayer(layer, null);
+    }
+    removeColorOptions([PRESSURE_OPTION, FLOW_VELOCITY_OPTION, TRANSPORT_VELOCITY_OPTION]);
+  }
+  viewer.setFlowParticles(null);
+  viewer.setTrajectories(null);
+  await showOutputInViewer(flowOutput === null ? null : PRESSURE_OPTION);
+  showParticlesInViewer();
+  await showTransportInViewer();
+  updateUserFracturesInViewer();
+}
+
 /** The steps of the live run (`liveRun.ts`) */
 async function runChainStep(step: ChainStep): Promise<StepResult> {
+  // The steps after a change of the network of the view: the view waits for the new flow
+  if (step === "userFractures" || step === "mesh") {
+    holdView();
+  }
+  // A new generation from the seed shows its fractures during the run
+  if (step === "generation") {
+    await releaseView();
+  }
   switch (step) {
     case "generation":
     case "userFractures":
       return runFractureStep();
     case "mesh":
       return runMeshing();
-    case "flow":
-      return runFlow();
+    case "flow": {
+      const result = await runFlow();
+      // A cancel by a change runs the flow again; the end of the chain releases the view in the other cases
+      if (result === "done") {
+        await releaseView();
+      }
+      return result;
+    }
     case "transport":
       return runTransport();
   }
@@ -631,11 +692,12 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
   // The view shows the new fractures during the run, not the old network;
   // a restart shows the fractures until its checkpoint again
   clearOutput();
-  viewer?.clearGenerationFractures();
+  outputViewer()?.clearGenerationFractures();
   const fractures: FractureBatch[] = from === null ? [] : [from.fractures];
-  if (from !== null) {
-    viewer?.addGenerationFractures(from.fractures);
-    viewer?.render();
+  const runViewer = outputViewer();
+  if (from !== null && runViewer) {
+    runViewer.addGenerationFractures(from.fractures);
+    runViewer.render();
   }
   let checkpoint: GenerationCheckpoint | null = from?.checkpoint ?? null;
   let lastAcceptedCount = checkpoint?.acceptedCount ?? null;
@@ -651,14 +713,15 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
           : `Generating… ${acceptedCount} fractures accepted`,
       );
       fractures.push(batch);
-      if (!viewer) {
+      const view = outputViewer();
+      if (!view) {
         return;
       }
-      viewer.addGenerationFractures(batch);
+      view.addGenerationFractures(batch);
       const now = performance.now();
       if (now - lastRenderTime >= GENERATION_RENDER_INTERVAL_MS || fraction >= 1) {
         lastRenderTime = now;
-        viewer.render();
+        view.render();
       }
     },
     onCheckpoint: (newCheckpoint) => {
@@ -702,9 +765,11 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
     };
     meshedInput = null;
     showDiscardedLabel();
-    // The network shows the user-defined fractures, in the domain
+    // The network shows the user-defined fractures, in the domain; a held view keeps the placeholder until its new mesh
     previewedUserFracture = null;
-    updateUserFracturesInViewer();
+    if (!isViewHeld) {
+      updateUserFracturesInViewer();
+    }
     await showOutput(result);
     return "done";
   } catch (error) {
@@ -715,9 +780,10 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
     return failedStep(error);
   } finally {
     // The final layers replace the fractures of the run; after an error or a cancel, nothing does
-    if (viewer) {
-      viewer.clearGenerationFractures();
-      viewer.render();
+    const endViewer = outputViewer();
+    if (endViewer) {
+      endViewer.clearGenerationFractures();
+      endViewer.render();
     }
     setBusy(false);
     await keepStoppedFractures();
@@ -890,11 +956,12 @@ function clearOutput(): void {
   ui.logEmpty.hidden = false;
   ui.colorSelect.disabled = true;
   ui.logScale.disabled = true;
-  if (viewer) {
+  const view = outputViewer();
+  if (view) {
     for (const layer of ["final", "removed", "rejected"] as FractureLayer[]) {
-      viewer.setLayer(layer, null);
+      view.setLayer(layer, null);
     }
-    viewer.render();
+    view.render();
   }
   clearFlowOutput();
   renderFlow();
@@ -906,6 +973,10 @@ function clearOutput(): void {
  * array which it does not have.
  */
 function removeColorOptions(optionValues: string[]): void {
+  // The release of a held view makes all options again
+  if (isViewHeld) {
+    return;
+  }
   const isSelected = optionValues.includes(ui.colorSelect.value);
   for (const option of [...ui.colorSelect.options]) {
     if (optionValues.includes(option.value)) {
@@ -914,8 +985,9 @@ function removeColorOptions(optionValues: string[]): void {
   }
   if (isSelected) {
     ui.colorSelect.value = DEFAULT_COLOR_OPTION;
-    if (viewer) {
-      applyColorChoice(viewer);
+    const view = outputViewer();
+    if (view) {
+      applyColorChoice(view);
     }
   }
 }
@@ -928,7 +1000,7 @@ function clearFlowOutput(): void {
   removeColorOptions([PRESSURE_OPTION, FLOW_VELOCITY_OPTION]);
   ui.showParticles.checked = false;
   ui.showParticles.disabled = true;
-  viewer?.setFlowParticles(null);
+  outputViewer()?.setFlowParticles(null);
   clearTransportOutput();
   renderTransport();
 }
@@ -940,9 +1012,10 @@ function clearTransportOutput(): void {
   ui.transportResults.hidden = true;
   ui.showTrajectories.checked = false;
   ui.showTrajectories.disabled = true;
-  if (viewer) {
-    viewer.setTrajectories(null);
-    viewer.render();
+  const view = outputViewer();
+  if (view) {
+    view.setTrajectories(null);
+    view.render();
   }
 }
 
@@ -1018,12 +1091,13 @@ async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
 /** The moving particles of the flow; the page can have a flow before the viewer is ready */
 function showParticlesInViewer(): void {
   const mesh = flowMesh();
-  if (!viewer || flowOutput === null || mesh === null) {
+  const view = outputViewer();
+  if (!view || flowOutput === null || mesh === null) {
     return;
   }
-  viewer.setFlowParticles({ points: mesh.points, triangles: mesh.triangles, velocities: flowOutput.darcyVelocities });
-  applyLayerVisibility(viewer);
-  viewer.render();
+  view.setFlowParticles({ points: mesh.points, triangles: mesh.triangles, velocities: flowOutput.darcyVelocities });
+  applyLayerVisibility(view);
+  view.render();
 }
 
 function volumeFluxText(volumeFlux: number): string {
@@ -1051,16 +1125,17 @@ async function showTransportOutput(result: TransportOutput, timeUnit: TimeUnit):
 }
 
 async function showTransportInViewer(): Promise<void> {
-  if (!viewer || transportOutput === null || transportOutput.pathPointCounts.length === 0) {
+  const view = outputViewer();
+  if (!view || transportOutput === null || transportOutput.pathPointCounts.length === 0) {
     return;
   }
-  viewer.setTrajectories({
+  view.setTrajectories({
     points: transportOutput.pathPoints,
     velocities: transportOutput.pathVelocities,
     pointCounts: transportOutput.pathPointCounts,
   });
-  applyLayerVisibility(viewer);
-  viewer.render();
+  applyLayerVisibility(view);
+  view.render();
 }
 
 /** The layer button of the discarded fractures: the rejected ones only after a network with FRAM on */
@@ -1147,18 +1222,19 @@ function meshWithFlowArrays(mesh: ShapeArrays): LayerShapes {
  * new mesh has it; else `fracture_id`.
  */
 async function showOutputInViewer(selected: string | null = null): Promise<void> {
-  if (!viewer || !output) {
+  const view = outputViewer();
+  if (!view || !output) {
     return;
   }
   const shapes = output.shapes;
   // Before the mesh step, the polygons of the final fractures
-  viewer.setLayer("final", shapes?.mesh ? meshWithFlowArrays(shapes.mesh) : layerShapes(shapes?.fractures));
-  viewer.setLayer("removed", layerShapes(shapes?.removed));
-  viewer.setLayer("rejected", layerShapes(shapes?.rejected));
-  applyLayerVisibility(viewer);
+  view.setLayer("final", shapes?.mesh ? meshWithFlowArrays(shapes.mesh) : layerShapes(shapes?.fractures));
+  view.setLayer("removed", layerShapes(shapes?.removed));
+  view.setLayer("rejected", layerShapes(shapes?.rejected));
+  applyLayerVisibility(view);
 
   const previous = ui.colorSelect.value;
-  const options = viewer
+  const options = view
     .cellArrayNames()
     .filter((name) => name !== FLOW_VELOCITY_ARRAY.name)
     .map((name) => new Option(name, colorOptionValue({ name, association: "cell" })));
@@ -1173,8 +1249,8 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
   ui.colorSelect.value =
     [selected, previous, DEFAULT_COLOR_OPTION].find((value) => value !== null && values.includes(value)) ?? "";
   ui.colorSelect.disabled = false;
-  applyColorChoice(viewer);
-  viewer.render();
+  applyColorChoice(view);
+  view.render();
 }
 
 // ---------------------------------------------------------------- viewer
