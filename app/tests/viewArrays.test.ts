@@ -63,14 +63,16 @@ describe.each(exampleNames)("%s", (exampleName) => {
   let flow: FlowResult;
   let transport: TransportResult;
   let flowToml: string;
+  let domainMesh: string;
 
   beforeAll(() => {
     const workflow = tomlToWorkflow(readExample(exampleName).toml);
     const network = workflow.network;
     const roles = workflow.boundaries;
+    domainMesh = readMesh(network.domain);
     generation = run_generation(
       networkToLibraryToml(network, roles),
-      readMesh(network.domain),
+      domainMesh,
       userFracturesFile(network),
       1n,
       MeshStep.Make,
@@ -88,12 +90,28 @@ describe.each(exampleNames)("%s", (exampleName) => {
     transport = runTransport(transportToml, flowToml, mesh, 1, TrajectoryDetail.View);
   }, WORKFLOW_TIMEOUT);
 
-  test("the fractures are those of the file", () => {
-    const shapes = generation.fracture_shapes;
+  test("the fractures before the mesh are in the bounds of the domain", () => {
+    const points = [...(generation.fracture_shapes?.points ?? [])];
+    const domainPoints = pointValues(domainMesh);
+    const outside = [0, 1, 2].filter((axis) => {
+      const domainValues = domainPoints.filter((_, index) => index % 3 === axis);
+      const values = points.filter((_, index) => index % 3 === axis);
+      return Math.min(...values) < Math.min(...domainValues) - 1e-9 || Math.max(...values) > Math.max(...domainValues) + 1e-9;
+    });
+    expect([points.length > 0, outside]).toEqual([true, []]);
+  });
+
+  test("each part of a fracture has the values of its fracture in the file", () => {
+    const shapes = generation.fracture_shapes as ViewShapes;
     const text = generation.file("fractures.vtp") ?? "";
-    expect(shapes).toBeDefined();
-    expectSameCells(shapes as ViewShapes, text);
-    expectSameCellArrays(shapes as ViewShapes, text);
+    // The fracture of each part: fracture_id is its number in the file, from 1
+    const fractureOfPart = [...(shapes.cell_array("fracture_id") ?? [])].map((id) => id - 1);
+    // Each final fracture has a part in the domain
+    expect(new Set(fractureOfPart).size).toBe(fileArray(text, "fracture_id").length);
+    for (const name of shapes.cell_array_names) {
+      const fileValues = fileArray(text, name);
+      expect([...(shapes.cell_array(name) ?? [])], name).toEqual(fractureOfPart.map((fracture) => fileValues[fracture]));
+    }
   });
 
   test("the removed and rejected fractures are those of the files", () => {

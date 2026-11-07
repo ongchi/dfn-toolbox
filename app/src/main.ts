@@ -327,6 +327,9 @@ const formContext: FormContext = {
     updateUserFracturesInViewer();
     networkChanged();
   },
+  previewUserFracture: (index) => {
+    previewedUserFracture = index;
+  },
   rerender: () => {
     render();
     networkChanged();
@@ -498,6 +501,7 @@ function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["m
 
 async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   files.mesh = mesh;
+  previewedUserFracture = null;
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
   boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
@@ -698,6 +702,9 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
     };
     meshedInput = null;
     showDiscardedLabel();
+    // The network shows the user-defined fractures, in the domain
+    previewedUserFracture = null;
+    updateUserFracturesInViewer();
     await showOutput(result);
     return "done";
   } catch (error) {
@@ -1175,6 +1182,11 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
 // The updates of the layer "user" run one after the other: two updates at the
 // same time could both add their polygons
 let userFracturesUpdate: Promise<void> = Promise.resolve();
+/**
+ * The user-defined fracture whose card changed: the layer "user" shows only
+ * its polygon, until the next network shows the fractures (user decision)
+ */
+let previewedUserFracture: number | null = null;
 
 /** The polygons of a polygon file as a layer */
 function polygonLayerShapes(vtpText: string): LayerShapes {
@@ -1188,14 +1200,15 @@ function polygonLayerShapes(vtpText: string): LayerShapes {
   };
 }
 
-/** Shows the polygons of the user-defined fractures of the form (those with a region of the mesh) */
+/** Shows the polygon of the previewed user-defined fracture, if it has a region of the mesh */
 function updateUserFracturesInViewer(): void {
   userFracturesUpdate = userFracturesUpdate
     .then(async () => {
       if (!viewer) {
         return;
       }
-      const fractures = state.userFractures.filter((fracture) => regionNames.includes(fracture.region));
+      const previewed = previewedUserFracture === null ? undefined : state.userFractures[previewedUserFracture];
+      const fractures = previewed !== undefined && regionNames.includes(previewed.region) ? [previewed] : [];
       viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, state, regionNames)));
       applyLayerVisibility(viewer);
       viewer.render();

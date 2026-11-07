@@ -33,13 +33,18 @@ class FractureCollector {
   private points: number[] = [];
   private vertexCounts: number[] = [];
   private families: number[] = [];
+  private partCounts: number[] = [];
 
-  add(vertices: Float64Array, family: number): void {
+  /** A fracture: the polygons of its parts in the domain */
+  add(vertices: Float64Array, vertexCounts: Uint32Array, family: number): void {
     for (const value of vertices) {
       this.points.push(value);
     }
-    this.vertexCounts.push(vertices.length / 3);
-    this.families.push(family);
+    for (const vertexCount of vertexCounts) {
+      this.vertexCounts.push(vertexCount);
+      this.families.push(family);
+    }
+    this.partCounts.push(vertexCounts.length);
   }
 
   /** The collected fractures; the collector is then empty */
@@ -48,10 +53,12 @@ class FractureCollector {
       points: Float64Array.from(this.points),
       vertexCounts: Int32Array.from(this.vertexCounts),
       families: Int32Array.from(this.families),
+      partCounts: Int32Array.from(this.partCounts),
     };
     this.points = [];
     this.vertexCounts = [];
     this.families = [];
+    this.partCounts = [];
     return batch;
   }
 }
@@ -225,8 +232,14 @@ function handle(request: WorkerRequest): void {
   let lastCheckpointTime = performance.now();
   const fractures = new FractureCollector();
   /** Returns true to ask for a checkpoint after the fracture */
-  const onProgress = (acceptedCount: number, fraction: number, vertices: Float64Array, family: number): boolean => {
-    fractures.add(vertices, family);
+  const onProgress = (
+    acceptedCount: number,
+    fraction: number,
+    vertices: Float64Array,
+    vertexCounts: Uint32Array,
+    family: number,
+  ): boolean => {
+    fractures.add(vertices, vertexCounts, family);
     const now = performance.now();
     // The last checkpoint has all of the insertion: a stop during the mesh keeps the fractures
     const isCheckpointDue = now - lastCheckpointTime >= CHECKPOINT_INTERVAL_MS || fraction >= 1;
@@ -238,6 +251,7 @@ function handle(request: WorkerRequest): void {
         batch.points.buffer,
         batch.vertexCounts.buffer,
         batch.families.buffer,
+        batch.partCounts.buffer,
       ]);
     }
     if (isCheckpointDue) {

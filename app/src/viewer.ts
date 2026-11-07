@@ -747,9 +747,9 @@ export class NetworkViewer {
   addGenerationFractures(batch: FractureBatch): void {
     const changed = new Set<GenerationFamily>();
     let pointIndex = 0;
-    batch.vertexCounts.forEach((vertexCount, fractureIndex) => {
+    batch.vertexCounts.forEach((vertexCount, polygonIndex) => {
       const polygon = batch.points.subarray(3 * pointIndex, 3 * (pointIndex + vertexCount));
-      const family = this.generationFamily(batch.families[fractureIndex], polygon);
+      const family = this.generationFamily(batch.families[polygonIndex], polygon);
       family.add(polygon);
       pointIndex += vertexCount;
       changed.add(family);

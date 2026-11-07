@@ -145,20 +145,28 @@ export interface TransportOutput {
   sectorVelocities: Float64Array;
 }
 
-/** The fractures which the generation accepted since the last progress message */
+/**
+ * The fractures which the generation accepted since the last progress
+ * message, as the polygons of their parts in the domain (a fracture can have
+ * several parts, or none)
+ */
 export interface FractureBatch {
-  /** x, y, z of each vertex of each fracture, in the coordinates of the mesh file */
+  /** x, y, z of each vertex of each polygon, in the coordinates of the mesh file */
   points: Float64Array;
-  /** Number of vertices of each fracture */
+  /** Number of vertices of each polygon */
   vertexCounts: Int32Array;
-  /** Family number of each fracture (from 1) */
+  /** Family number of each polygon (from 1) */
   families: Int32Array;
+  /** Number of polygons of each fracture */
+  partCounts: Int32Array;
 }
 
 /** The first `count` fractures of the batches, in their order, as one batch */
 export function firstFractures(batches: FractureBatch[], count: number): FractureBatch {
-  const vertexCounts = Int32Array.from(batches.flatMap((batch) => [...batch.vertexCounts])).slice(0, count);
-  const families = Int32Array.from(batches.flatMap((batch) => [...batch.families])).slice(0, count);
+  const partCounts = Int32Array.from(batches.flatMap((batch) => [...batch.partCounts])).slice(0, count);
+  const polygonCount = partCounts.reduce((sum, partCount) => sum + partCount, 0);
+  const vertexCounts = Int32Array.from(batches.flatMap((batch) => [...batch.vertexCounts])).slice(0, polygonCount);
+  const families = Int32Array.from(batches.flatMap((batch) => [...batch.families])).slice(0, polygonCount);
   const pointCount = vertexCounts.reduce((sum, vertexCount) => sum + vertexCount, 0);
   const points = new Float64Array(3 * pointCount);
   let offset = 0;
@@ -167,7 +175,7 @@ export function firstFractures(batches: FractureBatch[], count: number): Fractur
     points.set(batch.points.subarray(0, length), offset);
     offset += length;
   }
-  return { points, vertexCounts, families };
+  return { points, vertexCounts, families, partCounts };
 }
 
 /** The checkpoint of a generation after `acceptedCount` accepted stochastic fractures */

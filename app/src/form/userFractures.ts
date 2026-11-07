@@ -80,8 +80,20 @@ function radiusField(fracture: UserFractureState, bounds: RegionBounds | undefin
   });
 }
 
-function fractureCard(state: FormState, index: number, context: FormContext): HTMLElement {
+function fractureCard(state: FormState, index: number, formContext: FormContext): HTMLElement {
   const fracture = state.userFractures[index];
+  // A change of a value of the card shows the polygon of this fracture
+  const context: FormContext = {
+    ...formContext,
+    changed: () => {
+      formContext.previewUserFracture?.(index);
+      formContext.changed();
+    },
+    rerender: () => {
+      formContext.previewUserFracture?.(index);
+      formContext.rerender();
+    },
+  };
   const bounds = context.regionBounds.find((candidate) => candidate.name === fracture.region);
   const card = element("div", "family-card");
 
@@ -93,7 +105,8 @@ function fractureCard(state: FormState, index: number, context: FormContext): HT
   removeButton.title = "Remove this fracture";
   removeButton.addEventListener("click", () => {
     state.userFractures.splice(index, 1);
-    context.rerender();
+    formContext.previewUserFracture?.(null);
+    formContext.rerender();
   });
   actions.append(removeButton);
   header.append(actions);
@@ -169,6 +182,7 @@ export function userFracturesSection(state: FormState, context: FormContext): HT
   addButton.addEventListener("click", () => {
     const bounds = context.regionBounds[0];
     state.userFractures.push(defaultUserFracture(bounds.name, boxCenter(bounds)));
+    context.previewUserFracture?.(state.userFractures.length - 1);
     context.rerender();
   });
   container.append(addButton);

@@ -1,9 +1,11 @@
 //! The results for the 3D view of the app, as arrays. They have the numbers
 //! of the output files, in the coordinates of the mesh file.
 
+use dfngen::domain_mesh::DomainMesh;
 use dfngen::fracture::poly::Poly;
 use dfngen::io::output::to_output_coordinates;
 use dfngen::io::vtk::{mesh_boundary_arrays, BoundaryNames};
+use dfngen::region_boundaries::{region_parts, RegionPart};
 use dfngen::Network;
 use dfntrans::Transport;
 use wasm_bindgen::prelude::*;
@@ -155,8 +157,7 @@ impl NetworkShapes {
             .as_ref()
             .is_some_and(|fram| fram.write_rejected_fractures);
 
-        let mut fractures = polygon_shapes(&final_polys, network);
-        fractures.cell_arrays = final_fracture_arrays(&final_polys, &network.final_fractures);
+        let fractures = region_part_shapes(&final_polys, network);
         Self {
             fractures,
             removed: (!removed_polys.is_empty()).then(|| polygon_shapes(&removed_polys, network)),
@@ -183,6 +184,52 @@ fn polygon_shapes(polys: &[&Poly], network: &Network) -> ViewShapes {
             .map(|poly| poly.vertices.len() as u32)
             .collect(),
         cell_arrays: Vec::new(),
+    }
+}
+
+/// The parts of a fracture in the cells of its regions (the mesh has the same
+/// shape), in the coordinates of the generation. The view uses only their
+/// outlines: no predefined domain mesh has a hole.
+pub(crate) fn fracture_parts(poly: &Poly, mesh: &DomainMesh) -> Vec<RegionPart> {
+    region_parts(&poly.vertices, &poly.normal, mesh, &poly.region_ids)
+}
+
+/// The final fractures before the mesh: a cell for each part of a fracture
+/// in the domain, with the values of `fractures.vtp` of its fracture
+fn region_part_shapes(polys: &[&Poly], network: &Network) -> ViewShapes {
+    let domain_mesh = &network.input.domain_mesh;
+    let center = domain_mesh.center();
+    let parts: Vec<Vec<RegionPart>> = polys
+        .iter()
+        .map(|poly| fracture_parts(poly, domain_mesh))
+        .collect();
+    let points: Vec<f64> = parts
+        .iter()
+        .flatten()
+        .flat_map(|part| &part.outline)
+        .map(|vertex| to_output_coordinates(vertex, &center))
+        .flat_map(|point| [point.x, point.y, point.z])
+        .collect();
+    let fracture_arrays = final_fracture_arrays(polys, &network.final_fractures);
+    ViewShapes {
+        connectivity: (0..(points.len() / 3) as u32).collect(),
+        points,
+        vertex_counts: parts
+            .iter()
+            .flatten()
+            .map(|part| part.outline.len() as u32)
+            .collect(),
+        cell_arrays: fracture_arrays
+            .into_iter()
+            .map(|(name, values)| {
+                let part_values = values
+                    .iter()
+                    .zip(&parts)
+                    .flat_map(|(&value, fracture)| std::iter::repeat_n(value, fracture.len()))
+                    .collect();
+                (name, part_values)
+            })
+            .collect(),
     }
 }
 

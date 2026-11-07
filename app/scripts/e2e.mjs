@@ -1060,6 +1060,23 @@ try {
   });
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture.png` });
+  // The network shows the user fracture in the domain (half of it is outside), without the polygon of the
+  // change; a new change shows that polygon again, until the next network
+  await runAll(page);
+  await page.mouse.move(0, 0);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture_network.png` });
+  const networkGeometries = await viewGeometryCount(page);
+  await setField(page, "#fractures-form", "Radius (m)", 3);
+  await page.waitForFunction((count) => Number(document.querySelector("#viewer-canvas").dataset.geometryCount) !== count, {}, networkGeometries);
+  const previewGeometries = await viewGeometryCount(page);
+  await runAll(page);
+  const nextNetworkGeometries = await viewGeometryCount(page);
+  check(
+    previewGeometries > networkGeometries && nextNetworkGeometries === networkGeometries,
+    "the polygon of a changed user fracture shows until the next network",
+    `network ${networkGeometries}, change ${previewGeometries}, next network ${nextNetworkGeometries} geometries`,
+  );
 
   // Bad input: a family region of the L-shape mesh is not in the Box mesh: an error of the library
   await selectDomainSource(page, "shape");

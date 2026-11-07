@@ -14,4 +14,6 @@ export interface FormContext {
   changed(): void;
   /** Call after a change which shows or hides fields */
   rerender(): void;
+  /** Shows the polygon of the user-defined fracture with this index, after a change of it; null: none */
+  previewUserFracture?(index: number | null): void;
 }

@@ -11,7 +11,7 @@ use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 use crate::errors::{dfngen_report, ErrorReport};
-use crate::view::{FileOutput, NetworkShapes, ViewShapes};
+use crate::view::{fracture_parts, FileOutput, NetworkShapes, ViewShapes};
 use crate::{find_file, with_log, write_files_to_memory};
 
 /// The files which an input file needs, from its text
@@ -236,9 +236,11 @@ struct Callbacks<'a> {
 /// * `seed_if_zero` - Seed for an input with `seed = 0` (the binary uses the clock)
 /// * `mesh_step` - Whether the run makes the triangle mesh
 /// * `on_progress` - Called as `on_progress(accepted_count, fraction,
-///   vertices, family)` after each accepted stochastic fracture. `vertices`
-///   is a `Float64Array` (x, y, z of each vertex, in the coordinates of the
-///   mesh file), `family` the family number (from 1). A return value `true`
+///   vertices, vertex_counts, family)` after each accepted stochastic
+///   fracture. `vertices` is a `Float64Array` (x, y, z of each vertex, in the
+///   coordinates of the mesh file) of the outlines of the parts of the
+///   fracture in the domain, `vertex_counts` a `Uint32Array` (the vertices of
+///   each part), `family` the family number (from 1). A return value `true`
 ///   asks for a checkpoint after the fracture.
 /// * `on_checkpoint` - Called as `on_checkpoint(bytes, accepted_count)`
 ///   with the checkpoint (`Uint8Array`) which `on_progress` asked for
@@ -438,24 +440,28 @@ fn run(
             let Some(on_progress) = callbacks.on_progress else {
                 return;
             };
-            let vertices: Vec<f64> = update
-                .fracture
-                .vertices
+            // The parts of the fracture in the domain, as the final fractures
+            let parts = fracture_parts(update.fracture, update.domain_mesh());
+            let vertices: Vec<f64> = parts
                 .iter()
+                .flat_map(|part| &part.outline)
                 .flat_map(|vertex| {
                     let point = to_output_coordinates(vertex, &mesh_center);
                     [point.x, point.y, point.z]
                 })
                 .collect();
+            let vertex_counts: Vec<u32> =
+                parts.iter().map(|part| part.outline.len() as u32).collect();
+            let arguments = js_sys::Array::of5(
+                &JsValue::from(update.accepted_count as f64),
+                &JsValue::from(update.fraction),
+                &js_sys::Float64Array::from(vertices.as_slice()),
+                &js_sys::Uint32Array::from(vertex_counts.as_slice()),
+                &JsValue::from(update.fracture.origin.output_number() as f64),
+            );
             // A failed call of the JS callback does not stop the generation
             let is_checkpoint_asked = on_progress
-                .call4(
-                    &JsValue::NULL,
-                    &JsValue::from(update.accepted_count as f64),
-                    &JsValue::from(update.fraction),
-                    &js_sys::Float64Array::from(vertices.as_slice()),
-                    &JsValue::from(update.fracture.origin.output_number() as f64),
-                )
+                .apply(&JsValue::NULL, &arguments)
                 .is_ok_and(|answer| answer.is_truthy());
             if let (true, Some(on_checkpoint)) = (is_checkpoint_asked, callbacks.on_checkpoint) {
                 send_checkpoint(update, on_checkpoint);

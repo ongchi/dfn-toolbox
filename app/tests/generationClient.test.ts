@@ -2,12 +2,17 @@
 import { expect, test, vi } from "vitest";
 import { firstFractures, GenerationClient, type FractureBatch } from "../src/generationClient";
 
-/** A batch of fractures with 3 or 4 vertices; each coordinate is the number of its fracture */
+/**
+ * A batch of fractures with one polygon of 3 or 4 vertices, or no polygon
+ * (vertex count 0); each coordinate is the number of its fracture
+ */
 function batch(fractureNumbers: number[], vertexCounts: number[]): FractureBatch {
+  const polygons = fractureNumbers.flatMap((_, index) => (vertexCounts[index] === 0 ? [] : [index]));
   return {
     points: Float64Array.from(fractureNumbers.flatMap((number, index) => Array(3 * vertexCounts[index]).fill(number))),
-    vertexCounts: Int32Array.from(vertexCounts),
-    families: Int32Array.from(fractureNumbers.map((number) => number % 2)),
+    vertexCounts: Int32Array.from(polygons.map((index) => vertexCounts[index])),
+    families: Int32Array.from(polygons.map((index) => fractureNumbers[index] % 2)),
+    partCounts: Int32Array.from(vertexCounts.map((count) => (count === 0 ? 0 : 1))),
   };
 }
 
@@ -15,6 +20,23 @@ test("the first fractures of two batches are one batch, in their order", () => {
   const fractures = firstFractures([batch([1, 2], [3, 4]), batch([3, 4], [4, 3])], 3);
 
   expect(fractures).toEqual(batch([1, 2, 3], [3, 4, 4]));
+});
+
+test("a fracture with no part in the domain counts as a fracture", () => {
+  const fractures = firstFractures([batch([1, 2], [3, 0]), batch([3, 4], [4, 3])], 3);
+
+  expect(fractures).toEqual(batch([1, 2, 3], [3, 0, 4]));
+});
+
+test("a fracture with two parts gives both polygons", () => {
+  const twoParts: FractureBatch = {
+    points: Float64Array.from(Array(3 * 7).fill(1)),
+    vertexCounts: Int32Array.from([3, 4]),
+    families: Int32Array.from([1, 1]),
+    partCounts: Int32Array.from([2]),
+  };
+
+  expect(firstFractures([twoParts, batch([2], [3])], 1)).toEqual(twoParts);
 });
 
 test("all fractures stay when the count is that of the batches", () => {

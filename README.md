@@ -52,7 +52,9 @@ output.
   no release point, the run ends after the flow. Only the paths of the
   particles which exit show.
 
-The 3D view shows the fractures during a generation. Color the mesh by a
+The 3D view shows the fractures during a generation, cut at the domain (the
+mesh has the same shape). A change of a user-defined fracture shows its
+whole polygon until the next network. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,
 user fractures, removed and rejected fractures, and particle paths.
 
