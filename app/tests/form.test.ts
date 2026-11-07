@@ -296,11 +296,9 @@ test("a pressure which is not a number is an error", () => {
   expect(problemsOf(toml)).toEqual(["[flow]: pressure: `west` must be a number"]);
 });
 
-test("an unknown seeding method is an error", () => {
-  const toml = BOX.replace('method = "uniform_per_line"', 'method = "everywhere"');
-  expect(problemsOf(toml)).toContain(
-    '[transport.seeding]: `method` must be "uniform_per_line", "equidistant", "random", "flux_weighted", "at_nodes", "points"',
-  );
+test("a seeding method is an unknown key: the release points are the only seeding", () => {
+  const toml = BOX.replace("[transport.seeding]", '[transport.seeding]\nmethod = "uniform_per_line"');
+  expect(problemsOf(toml)).toEqual(["[transport.seeding]: `method` is an unknown key"]);
 });
 
 test("a seed larger than 2^53 is kept", () => {

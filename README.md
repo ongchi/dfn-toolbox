@@ -46,9 +46,11 @@ output.
   cluster, a warning shows, and the run stops after the fractures.
 - **Flow**: set a pressure for each in-flow and out-flow surface (the
   temperature and the gravity are in the settings).
-- **Transport**: set the seeding of the particles (the routing is in the
-  settings). With the method "at the clicked points", click "Pick points",
-  then click on a fracture of the 3D view: each click adds a release point.
+- **Transport**: the particles start only at release points (the routing is
+  in the settings). Click "Pick points", then click on a fracture of the 3D
+  view: each click adds a release point and runs the particle tracking. With
+  no release point, the run ends after the flow. Only the paths of the
+  particles which exit show.
 
 The 3D view shows the fractures during a generation. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,

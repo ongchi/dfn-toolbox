@@ -1,12 +1,13 @@
 // End-to-end check of the web app in the local Chrome (headless).
 // Start the dev server first (npm run dev), then:
 //   node scripts/e2e.mjs [url] [screenshot folder]
-// It checks the default example, runs all steps (network, mesh, flow,
-// transport) of each example, the live run (a pressure change, a new
-// user-defined fracture, a release point clicked on a fracture, "Reset"), the
-// choice of a predefined mesh, a bad input, the fractures in the view during a
-// run, "Pause" during the mesh, and "Pause" with the fractures kept and a new
-// "Run", and the phone layout; it saves screenshots.
+// It checks the default example, runs all steps (network, mesh, flow, and the
+// transport at a point clicked on a fracture) of each example, the live run (a
+// pressure change, a new user-defined fracture, a release point, "Clear
+// points", "Reset"), the choice of a predefined mesh, a bad input, the
+// fractures in the view during a run, "Pause" during the mesh, and "Pause"
+// with the fractures kept and a new "Run", and the phone layout; it saves
+// screenshots.
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
@@ -26,6 +27,8 @@ const MINIMUM_SURFACE_PIXEL_SHARE = 0.05;
 // a few pixels which differ by at most this value in each channel (0 to 255)
 const MAXIMUM_NOISE = 2;
 const MAXIMUM_NOISY_PIXEL_SHARE = 0.0001;
+// The end of the status of a run with no release point: the transport runs only with one
+const NO_POINT_HINT = "To track particles, click “Pick points” (Transport tab), then click on a fracture.";
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -203,6 +206,37 @@ async function statusesDuring(page, action) {
     window.e2eStatusObserver.disconnect();
     return window.e2eStatuses;
   });
+}
+
+/**
+ * With the live run on and the Transport tab open: "Pick points", then clicks on the points of a grid around the
+ * middle of the free part of the view until one adds a release point (a click on the boundary surfaces only adds
+ * none), then "Stop picking". Returns the statuses of the transport which the point starts.
+ */
+async function pickReleasePoint(page) {
+  await page.click("#pick-points");
+  const pointCount = () => page.$$eval("#release-points li", (nodes) => nodes.length);
+  const countBefore = await pointCount();
+  const statuses = await statusesDuring(page, async () => {
+    const { first, last, top, bottom } = await page.evaluate(() => ({
+      first: Math.ceil(document.querySelector("#settings-panel").getBoundingClientRect().right),
+      last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
+      top: window.innerHeight / 3,
+      bottom: (2 * window.innerHeight) / 3,
+    }));
+    const middle = { x: (first + last) / 2, y: (top + bottom) / 2 };
+    for (let ring = 0; ring < 10 && (await pointCount()) === countBefore; ring++) {
+      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        await page.mouse.click(middle.x + 20 * ring * dx, middle.y + 20 * ring * dy);
+        if ((await pointCount()) > countBefore) {
+          break;
+        }
+      }
+    }
+  });
+  await page.mouse.move(0, 0);
+  await page.click("#pick-points");
+  return statuses;
 }
 
 /** A value of the Log view */
@@ -678,7 +712,7 @@ try {
   for (const name of examples) {
     await page.click('[data-sidebar-tab="network"]');
     await selectExample(page, name);
-    // "Run" runs all steps: the network, its mesh, the flow and the transport
+    // "Run" runs the network, its mesh and the flow; the examples have no release point, thus no transport
     // The results of the Log view show only with a result
     const hasResults = () => page.$eval("#results", (node) => !node.hidden);
     const hasResultsBefore = await hasResults();
@@ -687,7 +721,7 @@ try {
       ["#results", "#flow-results", "#transport-results"].filter((selector) => !document.querySelector(selector).hidden).length,
     );
     check(
-      /^Done in .*particles exited/.test(runStatus) && !(await isStatusError(page)) && shownResults === 3,
+      /^Done in .*Newton iterations\.\n/.test(runStatus) && runStatus.endsWith(NO_POINT_HINT) && !(await isStatusError(page)) && shownResults === 2,
       `${name}: run of all steps`,
       `${runStatus}; ${shownResults} result sections`,
     );
@@ -787,8 +821,17 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow_velocity.png` });
 
-    // The trajectories and the velocities of the transport are always on
+    // A click on a fracture runs the transport; the trajectories and the velocities of the transport are always on
     await page.click('[data-sidebar-tab="transport"]');
+    await page.click("#run-button");
+    await waitIdle(page);
+    const transportStatuses = await pickReleasePoint(page);
+    await page.click("#run-button");
+    check(
+      /^Done in .*of 1 particles/.test(transportStatuses.at(-1)) && !(await page.$eval("#transport-results", (node) => node.hidden)),
+      `${name}: transport at a clicked point`,
+      transportStatuses.join(" | "),
+    );
     // The Domain tab gives the in-flow and out-flow boundaries: the Transport tab has no section for them, and
     // the routing is in the settings dialog
     const hasTransportBoundaries = await page.$$eval("#transport-form .form-section h3", (nodes) =>
@@ -802,8 +845,14 @@ try {
       `${name}: no transport boundaries and no routing`,
       `boundaries ${hasTransportBoundaries}, routing ${hasTransportRouting}`,
     );
+    // dfntrans gives only the paths of the particles which exit: a point in a fracture with no exit has none
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
-    check(areTrajectoriesShown, `${name}: trajectories shown`, String(areTrajectoriesShown));
+    const hasExit = !/: 0 of \d+ particles exited/.test(transportStatuses.at(-1));
+    check(
+      areTrajectoriesShown === hasExit,
+      `${name}: trajectories shown if a particle exits`,
+      `exit ${hasExit}, trajectories ${areTrajectoriesShown}`,
+    );
     const hasTransportVelocity = (await colorOptions(page)).includes("point:transport_velocity");
     check(hasTransportVelocity, `${name}: transport velocity in Color by`, String(hasTransportVelocity));
     await page.select("#color-select", "point:transport_velocity");
@@ -875,6 +924,8 @@ try {
   await waitIdle(page);
   const isUpToDate = (await statusText(page)) === "All results are up to date.";
   const isDone = (statuses) => /^Done in .*particles exited/.test(statuses.at(-1) ?? "");
+  // No release point: the run ends after the flow
+  const isFlowDone = (statuses) => (statuses.at(-1) ?? "").endsWith(NO_POINT_HINT);
   const startsStep = (statuses, text) => statuses.some((status) => status.startsWith(text));
   const acceptedBefore = Number(await resultValue(page, "Accepted fractures"));
   await page.click('[data-sidebar-tab="flow"]');
@@ -886,11 +937,12 @@ try {
   });
   check(
     isUpToDate &&
-      isDone(pressureStatuses) &&
+      isFlowDone(pressureStatuses) &&
       startsStep(pressureStatuses, "Solving the flow") &&
+      !startsStep(pressureStatuses, "Tracking") &&
       !startsStep(pressureStatuses, "Generating") &&
       !startsStep(pressureStatuses, "Meshing"),
-    "live run: a pressure change runs the flow and the transport again",
+    "live run: a pressure change runs the flow again, and no transport without a release point",
     pressureStatuses.join(" | "),
   );
   // A new user-defined fracture: the stochastic fractures of the last run stay, without a new generation
@@ -904,7 +956,7 @@ try {
   });
   const acceptedAfter = Number(await resultValue(page, "Accepted fractures"));
   check(
-    isDone(fractureStatuses) &&
+    isFlowDone(fractureStatuses) &&
       fractureStatuses[0].startsWith("Making the network of the") &&
       startsStep(fractureStatuses, "Meshing") &&
       acceptedAfter === acceptedBefore + 1,
@@ -915,44 +967,27 @@ try {
 
   // A click on a fracture of the 3D view adds a release point, and the particles start there
   await page.click('[data-sidebar-tab="transport"]');
-  const noPointStatuses = await statusesDuring(page, () => setField(page, "#transport-form", "Method", "points"));
-  check(
-    (await isStatusError(page)) && noPointStatuses.at(-1).startsWith("The seeding has no release point"),
-    "live run: points seeding without a point",
-    noPointStatuses.at(-1),
-  );
-  await page.click("#pick-points");
-  const isPickingOn = await page.$eval("#pick-points", (node) => node.getAttribute("aria-pressed") === "true");
-  const pointCount = () => page.$$eval("#release-points li", (nodes) => nodes.length);
-  const pointStatuses = await statusesDuring(page, async () => {
-    // A click on the boundary surfaces only (no fracture) adds no point: the points of a grid around the middle of
-    // the free part of the view, until one is on a fracture
-    const { first, last, top, bottom } = await page.evaluate(() => ({
-      first: Math.ceil(document.querySelector("#settings-panel").getBoundingClientRect().right),
-      last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
-      top: window.innerHeight / 3,
-      bottom: (2 * window.innerHeight) / 3,
-    }));
-    const middle = { x: (first + last) / 2, y: (top + bottom) / 2 };
-    for (let ring = 0; ring < 10 && (await pointCount()) === 0; ring++) {
-      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
-        await page.mouse.click(middle.x + 20 * ring * dx, middle.y + 20 * ring * dy);
-        if ((await pointCount()) > 0) {
-          break;
-        }
-      }
-    }
-  });
+  const pointStatuses = await pickReleasePoint(page);
+  const pointCount = await page.$$eval("#release-points li", (nodes) => nodes.length);
   const pointParticles = /of (\d+) particles/.exec(pointStatuses.at(-1) ?? "")?.[1];
   check(
-    isPickingOn && (await pointCount()) === 1 && isDone(pointStatuses) && pointParticles === "1",
+    pointCount === 1 && isDone(pointStatuses) && pointParticles === "1",
     "live run: a click on a fracture adds a release point",
-    `${await pointCount()} points; ${pointStatuses.join(" | ")}`,
+    `${pointCount} points; ${pointStatuses.join(" | ")}`,
   );
-  await page.mouse.move(0, 0);
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_release_point.png` });
-  await page.click("#pick-points");
+  // "Clear points" removes the trajectories
+  const clearStatuses = await statusesDuring(page, () =>
+    page.evaluate(() => [...document.querySelectorAll("#transport-form button")].find((node) => node.textContent === "Clear points").click()),
+  );
+  const hasTransportAfterClear = await page.$eval("#transport-results", (node) => !node.hidden);
+  check(
+    isFlowDone(clearStatuses) && !hasTransportAfterClear,
+    "live run: clear points removes the transport",
+    `${clearStatuses.join(" | ")}; transport ${hasTransportAfterClear ? "shown" : "removed"}`,
+  );
+  await pickReleasePoint(page);
 
   // "Reset" removes all results; the next run starts from the seed
   await page.mouse.move(0, 0);
@@ -1151,7 +1186,7 @@ try {
   const statusesAfterMeshStop = await statusesDuring(page, () => page.click("#run-button"));
   await page.click("#run-button");
   check(
-    statusesAfterMeshStop[0] === "Meshing…" && /^Done in .*particles exited/.test(statusesAfterMeshStop.at(-1)),
+    statusesAfterMeshStop[0] === "Meshing…" && statusesAfterMeshStop.at(-1).endsWith(NO_POINT_HINT),
     "run after a stop during the mesh",
     statusesAfterMeshStop.join(" | "),
   );
@@ -1177,7 +1212,7 @@ try {
   const continuedStatus = await runAll(page);
   const continuedCount = await resultValue(page, "Final fractures");
   check(
-    /^Done in .*particles exited/.test(continuedStatus) && continuedCount !== undefined && continuedCount === fullRunCount,
+    continuedStatus.endsWith(NO_POINT_HINT) && continuedCount !== undefined && continuedCount === fullRunCount,
     "run after the stop gives the network of a run with no stop",
     `${continuedCount} final fractures, with no stop ${fullRunCount}; ${continuedStatus}`,
   );

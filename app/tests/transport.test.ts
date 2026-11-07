@@ -9,11 +9,19 @@ import { flowSurfaces, type BoundaryRoles } from "../src/boundaryRoles";
 import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_transport_input, TrajectoryDetail } from "../src/pkg/dfn_wasm.js";
-import { defaultTransportState, TRANSPORT_FLOW_FILE, type TransportState } from "../src/transport/state";
+import { defaultTransportState, TRANSPORT_FLOW_FILE, type ReleasePoint, type TransportState } from "../src/transport/state";
 import { parseToml, tablesToToml } from "../src/form/toml";
 import { readTransport, transportTables, transportToLibraryToml } from "../src/transport/toml";
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
-import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans, runTransport } from "./cases";
+import {
+  compareOutputFolders,
+  generateExample,
+  initWasm,
+  meshPoints,
+  runNativeDfntrans,
+  runTransport,
+  withInflowReleasePoints,
+} from "./cases";
 
 // The example with the boundary surfaces north and east
 const EXAMPLE_NAME = "l_shape_north_east";
@@ -31,12 +39,9 @@ beforeAll(() => {
   flowToml = flowToLibraryToml(example.workflow.flow, flowSurfaces(ROLES));
 });
 
-/** The transport state with one particle on each in-flow line (a few particles) */
+/** The transport state with one particle at each of a few points on the in-flow surface */
 function transportState(): TransportState {
-  const state = defaultTransportState();
-  state.seeding.method = "uniform_per_line";
-  state.seeding.particlesPerLine = 1;
-  return state;
+  return withInflowReleasePoints(defaultTransportState(), mesh, ROLES.inflow);
 }
 
 /** The dfntrans input of a transport state and roles */
@@ -134,15 +139,13 @@ test("the transport velocities give a speed at the points of the mesh", () => {
 });
 
 /** The first point of the triangle mesh: it is on a fracture */
-function firstMeshPoint(): [number, number, number] {
-  const numbers = /<Points>\s*<DataArray[^>]*>\s*([^<]*)/.exec(mesh)?.[1].trim().split(/\s+/).map(Number) ?? [];
-  return [numbers[0], numbers[1], numbers[2]];
+function firstMeshPoint(): ReleasePoint {
+  return meshPoints(mesh)[0];
 }
 
 /** The transport state with particles at release points */
-function pointState(points: [number, number, number][]): TransportState {
+function pointState(points: ReleasePoint[]): TransportState {
   const state = defaultTransportState();
-  state.seeding.method = "points";
   state.seeding.points = points;
   state.seeding.particlesPerPoint = 2;
   return state;

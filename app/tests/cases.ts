@@ -23,6 +23,7 @@ import {
 import type { MeshBoundary } from "../src/generationClient";
 import { dataArrayValues } from "../src/inputFiles";
 import type { FormState } from "../src/form/state";
+import type { ReleasePoint, TransportState } from "../src/transport/state";
 import { meshRegionNames } from "../src/inputFiles";
 import { userFracturesToVtp } from "../src/userFractures";
 import { tomlToWorkflow, type Workflow } from "../src/workflow";
@@ -48,6 +49,37 @@ export function textBoundaries(meshText: string): MeshBoundary[] {
     const nodes = values.flatMap((value, point) => (value > 0 ? [point] : []));
     return [name, Uint32Array.from(nodes)];
   });
+}
+
+/** The coordinates of the points of a `dfn_mesh.vtu` text */
+export function meshPoints(meshText: string): ReleasePoint[] {
+  const numbers = /<Points>\s*<DataArray[^>]*>\s*([^<]*)/.exec(meshText)?.[1].trim().split(/\s+/).map(Number) ?? [];
+  return Array.from({ length: numbers.length / 3 }, (_, point) => [
+    numbers[3 * point],
+    numbers[3 * point + 1],
+    numbers[3 * point + 2],
+  ]);
+}
+
+/**
+ * Release points for the tests (the user clicks them in the app): at most
+ * `count` points of the mesh on the in-flow surfaces, spread over their list
+ */
+export function inflowReleasePoints(meshText: string, inflow: string[], count = 3): ReleasePoint[] {
+  const points = meshPoints(meshText);
+  const nodes = textBoundaries(meshText)
+    .filter(([name]) => inflow.includes(name))
+    .flatMap(([, boundaryNodes]) => [...boundaryNodes]);
+  const step = Math.max(1, Math.floor(nodes.length / count));
+  return nodes
+    .filter((_, index) => index % step === 0)
+    .slice(0, count)
+    .map((node) => points[node]);
+}
+
+/** A transport state with release points on the in-flow surfaces: the examples have none */
+export function withInflowReleasePoints(state: TransportState, meshText: string, inflow: string[]): TransportState {
+  return { ...state, seeding: { ...state.seeding, points: inflowReleasePoints(meshText, inflow) } };
 }
 
 /** `run_flow` on the mesh of a `dfn_mesh.vtu` text, with the output files */

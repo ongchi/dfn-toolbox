@@ -9,25 +9,13 @@ export const TRANSPORT_FLOW_FILE = "flow.toml";
 
 export type TimeUnit = "seconds" | "minutes" | "hours" | "days" | "years";
 export type RoutingRule = "complete_mixing" | "streamline_routing";
-export type SeedingMethod = "uniform_per_line" | "equidistant" | "random" | "flux_weighted" | "at_nodes" | "points";
 
 /** x, y, z in the coordinates of the mesh */
 export type ReleasePoint = [number, number, number];
 
-/** The keys of all methods; the TOML has only the keys of `method` */
+/** The particles start only at the release points, picked on the fractures of the 3D view (user decision) */
 export interface SeedingState {
-  method: SeedingMethod;
-  /** uniform_per_line, equidistant */
-  particlesPerLine: number;
-  /** uniform_per_line, equidistant */
-  isWeightedByFlux: boolean;
-  /** random, flux_weighted */
-  particleCount: number;
-  /** at_nodes */
-  particlesPerNode: number;
-  /** points: the release points, picked on the fractures of the 3D view */
   points: ReleasePoint[];
-  /** points */
   particlesPerPoint: number;
 }
 
@@ -48,15 +36,6 @@ export function defaultTransportState(): TransportState {
     porosity: 1.0,
     maxTimeSteps: 1000000,
     routing: "complete_mixing",
-    seeding: {
-      method: "uniform_per_line",
-      // Few particles: the trajectories have about 1 MB for each particle
-      particlesPerLine: 3,
-      isWeightedByFlux: true,
-      particleCount: 50,
-      particlesPerNode: 1,
-      points: [],
-      particlesPerPoint: 1,
-    },
+    seeding: { points: [], particlesPerPoint: 1 },
   };
 }

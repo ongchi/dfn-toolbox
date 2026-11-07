@@ -3,8 +3,8 @@
 // the in-flow and out-flow boundaries (the roles of the Domain tab). The
 // routing is in the settings dialog.
 import type { FormContext } from "../form/context";
-import { checkboxField, element, numberField, row, section, selectField } from "../form/fields";
-import type { ReleasePoint, RoutingRule, SeedingMethod, TimeUnit, TransportState } from "./state";
+import { element, numberField, row, section, selectField } from "../form/fields";
+import type { ReleasePoint, RoutingRule, TimeUnit, TransportState } from "./state";
 
 /** The pick mode of the release points in the 3D view (page state, not in the workflow file) */
 export interface PointPicking {
@@ -117,103 +117,9 @@ export function routingSection(state: TransportState, context: FormContext): HTM
   );
 }
 
+/** The particles start only at the release points (user decision) */
 function seedingSection(state: TransportState, context: FormContext, picking: PointPicking): HTMLElement {
-  const seeding = state.seeding;
-  const method = selectField<SeedingMethod>({
-    label: "Method",
-    key: "method",
-    help: "the initial positions of the particles",
-    value: seeding.method,
-    choices: [
-      ["flux_weighted", "flux weighted"],
-      ["uniform_per_line", "uniform per in-flow line"],
-      ["equidistant", "equidistant"],
-      ["random", "random triangles"],
-      ["at_nodes", "at the in-flow points"],
-      ["points", "at the clicked points"],
-    ],
-    onInput: (value) => {
-      seeding.method = value;
-      context.rerender();
-    },
-  });
-  const container = section("Seeding", method);
-
-  switch (seeding.method) {
-    case "uniform_per_line":
-    case "equidistant":
-      container.append(
-        row(
-          numberField({
-            label: "Particles per line",
-            key: "particles_per_line",
-            help: `1 or more; ${TRAJECTORY_SIZE}`,
-            value: seeding.particlesPerLine,
-            isInteger: true,
-            min: 1,
-            onInput: (value) => {
-              seeding.particlesPerLine = value;
-              context.changed();
-            },
-          }),
-        ),
-        checkboxField({
-          label: "Weight by flux",
-          key: "weight_by_flux",
-          help: "flux weight of a particle: the in-flow flux at its position, or 0",
-          value: seeding.isWeightedByFlux,
-          onInput: (value) => {
-            seeding.isWeightedByFlux = value;
-            context.changed();
-          },
-        }),
-      );
-      break;
-    case "random":
-    case "flux_weighted":
-      container.append(
-        row(
-          numberField({
-            label: "Particles",
-            key: "particle_count",
-            help:
-              seeding.method === "flux_weighted"
-                ? `1 or more; at least one for each in-flow point; ${TRAJECTORY_SIZE}`
-                : `1 or more; ${TRAJECTORY_SIZE}`,
-            value: seeding.particleCount,
-            isInteger: true,
-            min: 1,
-            onInput: (value) => {
-              seeding.particleCount = value;
-              context.changed();
-            },
-          }),
-        ),
-      );
-      break;
-    case "at_nodes":
-      container.append(
-        row(
-          numberField({
-            label: "Particles per point",
-            key: "particles_per_node",
-            help: `1 or more; ${TRAJECTORY_SIZE}`,
-            value: seeding.particlesPerNode,
-            isInteger: true,
-            min: 1,
-            onInput: (value) => {
-              seeding.particlesPerNode = value;
-              context.changed();
-            },
-          }),
-        ),
-      );
-      break;
-    case "points":
-      container.append(...releasePointFields(state, context, picking));
-      break;
-  }
-  return container;
+  return section("Seeding", ...releasePointFields(state, context, picking));
 }
 
 /** Text of a release point: 4 significant digits */

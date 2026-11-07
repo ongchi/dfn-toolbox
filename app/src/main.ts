@@ -76,6 +76,8 @@ const GENERATION_RENDER_INTERVAL_MS = 200;
 // The generation keeps all clusters when none connects an in-flow and an out-flow surface
 const NO_CONNECTING_CLUSTER =
   "No cluster connects an in-flow and an out-flow surface: all clusters stay. The particles need a path between them; increase the number of fractures or their size, try another seed, or change the roles of the surfaces (Domain tab).";
+// The transport runs only with a release point (user decision)
+const NO_RELEASE_POINT = "To track particles, click “Pick points” (Transport tab), then click on a fracture.";
 
 // The domain, the user fractures and the network are the three tabs of the network input
 const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
@@ -163,11 +165,13 @@ let flowState: FlowState = defaultFlowState();
 let flowOutput: FlowOutput | null = null;
 /** The flow TOML of `flowOutput`: the transport solves this flow again */
 let flowOutputToml: string | null = null;
+/** The status of the last flow: the status with no release point shows it again */
+let flowDoneText = "";
 let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
 /** The time unit of the input of `transportOutput`: the unit of its velocities */
 let transportTimeUnit: TimeUnit = "days";
-/** A click on a final fracture of the 3D view adds a release point (Transport tab, seeding "points") */
+/** A click on a final fracture of the 3D view adds a release point (Transport tab, seeding) */
 let isPickingPoints = false;
 let activeSidebarTab: SidebarTab = "domain";
 /** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
@@ -414,14 +418,13 @@ function addReleasePoint(point: ReleasePoint): void {
 }
 
 function renderTransport(): void {
-  const isPointSeeding = transportState.seeding.method === "points";
   // The picking needs the shown triangle mesh of a flow
-  isPickingPoints &&= isPointSeeding && flowOutput !== null && activeSidebarTab === "transport";
+  isPickingPoints &&= flowOutput !== null && activeSidebarTab === "transport";
   renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext, pointPicking);
   ui.settingsTransportForm.replaceChildren(routingSection(transportState, transportContext));
   void updateViewer((view) => {
     view.setPointPicking(isPickingPoints ? addReleasePoint : null);
-    view.setReleasePoints(isPointSeeding ? transportState.seeding.points : []);
+    view.setReleasePoints(transportState.seeding.points);
   });
 }
 
@@ -807,9 +810,8 @@ async function runFlow(): Promise<StepResult> {
       showStatus(toolErrorText(result.error), true);
       return "failed";
     }
-    showStatus(
-      `Done in ${durationText(performance.now() - startTime)}: ${result.newtonIterations} Newton iterations.`,
-    );
+    flowDoneText = `Done in ${durationText(performance.now() - startTime)}: ${result.newtonIterations} Newton iterations.`;
+    showStatus(flowDoneText);
     await showFlowOutput(result, input.toml);
     return "done";
   } catch (error) {
@@ -840,6 +842,12 @@ async function runTransport(): Promise<StepResult> {
   if (typeof input === "string") {
     showStatus(input, true);
     return "failed";
+  }
+  if (transportState.seeding.points.length === 0) {
+    // The trajectories of removed points go
+    clearTransportOutput();
+    showStatus(`${flowDoneText}\n${NO_RELEASE_POINT}`);
+    return "done";
   }
   setBusy(true);
   const timeUnit = transportState.timeUnit;

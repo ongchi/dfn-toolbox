@@ -7,7 +7,6 @@ import {
   defaultTransportState,
   TRANSPORT_FLOW_FILE,
   type RoutingRule,
-  type SeedingMethod,
   type SeedingState,
   type TimeUnit,
   type TransportState,
@@ -15,36 +14,12 @@ import {
 
 const TIME_UNITS: readonly TimeUnit[] = ["seconds", "minutes", "hours", "days", "years"];
 const ROUTING_RULES: readonly RoutingRule[] = ["complete_mixing", "streamline_routing"];
-const SEEDING_METHODS: readonly SeedingMethod[] = [
-  "uniform_per_line",
-  "equidistant",
-  "random",
-  "flux_weighted",
-  "at_nodes",
-  "points",
-];
 
 function seedingLines(seeding: SeedingState): string[] {
-  const lines = [`method = ${string(seeding.method)}`];
-  switch (seeding.method) {
-    case "uniform_per_line":
-    case "equidistant":
-      lines.push(`particles_per_line = ${integer(seeding.particlesPerLine)}`);
-      lines.push(`weight_by_flux = ${seeding.isWeightedByFlux}`);
-      break;
-    case "random":
-    case "flux_weighted":
-      lines.push(`particle_count = ${integer(seeding.particleCount)}`);
-      break;
-    case "at_nodes":
-      lines.push(`particles_per_node = ${integer(seeding.particlesPerNode)}`);
-      break;
-    case "points":
-      lines.push(`points = [${seeding.points.map((point) => `[${point.map(float).join(", ")}]`).join(", ")}]`);
-      lines.push(`particles_per_point = ${integer(seeding.particlesPerPoint)}`);
-      break;
-  }
-  return lines;
+  return [
+    `points = [${seeding.points.map((point) => `[${point.map(float).join(", ")}]`).join(", ")}]`,
+    `particles_per_point = ${integer(seeding.particlesPerPoint)}`,
+  ];
 }
 
 /** The tables of `[transport]` of the workflow file */
@@ -81,7 +56,7 @@ const OUTPUT_TABLE: TomlTable = {
  * flow". `boundaries`: the in-flow and out-flow surfaces with a point in the mesh.
  */
 export function transportToLibraryToml(state: TransportState, boundaries: BoundaryRoles): string {
-  const [root, ...others] = transportTables(state);
+  const [root, seeding] = transportTables(state);
   const flowRoot = {
     ...root,
     lines: [
@@ -91,31 +66,16 @@ export function transportToLibraryToml(state: TransportState, boundaries: Bounda
       `outflow = ${nameList(boundaries.outflow)}`,
     ],
   };
-  return tablesToToml([flowRoot, ...others, OUTPUT_TABLE], "");
+  // The workflow file has only one seeding method: dfntrans needs its name
+  const librarySeeding = { ...seeding, lines: ['method = "points"', ...seeding.lines] };
+  return tablesToToml([flowRoot, librarySeeding, OUTPUT_TABLE], "");
 }
 
 function readSeeding(table: Table, problems: string[]): SeedingState {
   const seeding = defaultTransportState().seeding;
   const reader = new TableReader(table, "[transport.seeding]", problems);
-  seeding.method = reader.choice("method", SEEDING_METHODS, seeding.method);
-  switch (seeding.method) {
-    case "uniform_per_line":
-    case "equidistant":
-      seeding.particlesPerLine = reader.integer("particles_per_line", seeding.particlesPerLine);
-      seeding.isWeightedByFlux = reader.boolean("weight_by_flux", seeding.isWeightedByFlux);
-      break;
-    case "random":
-    case "flux_weighted":
-      seeding.particleCount = reader.integer("particle_count", seeding.particleCount);
-      break;
-    case "at_nodes":
-      seeding.particlesPerNode = reader.integer("particles_per_node", seeding.particlesPerNode);
-      break;
-    case "points":
-      seeding.points = reader.points("points");
-      seeding.particlesPerPoint = reader.integer("particles_per_point", seeding.particlesPerPoint);
-      break;
-  }
+  seeding.points = reader.points("points");
+  seeding.particlesPerPoint = reader.integer("particles_per_point", seeding.particlesPerPoint);
   reader.checkUnknownKeys();
   return seeding;
 }

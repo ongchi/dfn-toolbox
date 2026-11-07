@@ -19,7 +19,7 @@ import {
 } from "../src/pkg/dfn_wasm.js";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow } from "../src/workflow";
-import { exampleNames, initWasm, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile } from "./cases";
+import { exampleNames, initWasm, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile, withInflowReleasePoints } from "./cases";
 
 // Milliseconds: the network, the flow and the transport of an example
 const WORKFLOW_TIMEOUT = 60000;
@@ -83,7 +83,8 @@ describe.each(exampleNames)("%s", (exampleName) => {
       inflow: surfacesWithPoints(textBoundaries(mesh), roles.inflow),
       outflow: surfacesWithPoints(textBoundaries(mesh), roles.outflow),
     };
-    const transportToml = transportToLibraryToml(workflow.transport, boundaries);
+    const transportState = withInflowReleasePoints(workflow.transport, mesh, boundaries.inflow);
+    const transportToml = transportToLibraryToml(transportState, boundaries);
     transport = runTransport(transportToml, flowToml, mesh, 1, TrajectoryDetail.View);
   }, WORKFLOW_TIMEOUT);
 

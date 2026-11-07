@@ -9,7 +9,7 @@ import { networkToLibraryToml } from "../src/form/toml";
 import { MeshStep, run_generation, TrajectoryDetail, type FlowResult, type TransportResult } from "../src/pkg/dfn_wasm.js";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow, workflowToToml, type Workflow } from "../src/workflow";
-import { exampleNames, initWasm, meshPath, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile } from "./cases";
+import { exampleNames, initWasm, meshPath, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile, withInflowReleasePoints } from "./cases";
 
 // Milliseconds: the network, the flow and the transport of an example
 const WORKFLOW_TIMEOUT = 60000;
@@ -52,7 +52,8 @@ describe.each(exampleNames)("%s", (exampleName) => {
       inflow: surfacesWithPoints(textBoundaries(mesh), roles.inflow),
       outflow: surfacesWithPoints(textBoundaries(mesh), roles.outflow),
     };
-    transport = runTransport(transportToLibraryToml(workflow.transport, boundaries), flowToml, mesh, 1, TrajectoryDetail.Full);
+    const transportState = withInflowReleasePoints(workflow.transport, mesh, boundaries.inflow);
+    transport = runTransport(transportToLibraryToml(transportState, boundaries), flowToml, mesh, 1, TrajectoryDetail.Full);
   }, WORKFLOW_TIMEOUT);
 
   test("the domain is a predefined mesh", () => {

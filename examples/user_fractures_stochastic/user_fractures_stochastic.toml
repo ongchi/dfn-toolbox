@@ -54,6 +54,5 @@ max_time_steps = 1000000
 routing = "complete_mixing"
 
 [transport.seeding]
-method = "uniform_per_line"
-particles_per_line = 3
-weight_by_flux = false
+points = []
+particles_per_point = 1

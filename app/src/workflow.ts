@@ -45,6 +45,8 @@
 //   max_time_steps = 1000000
 //   routing = "complete_mixing"        # no inflow, no outflow: [boundaries] gives them
 //   [transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
+//   points = []                        # only the release points (no `method`); none: no transport
+//   particles_per_point = 1
 import { boundariesTables, readBoundaries, type BoundaryRoles } from "./boundaryRoles";
 import { flowTables, readFlow } from "./flow/toml";
 import type { FlowState } from "./flow/state";
