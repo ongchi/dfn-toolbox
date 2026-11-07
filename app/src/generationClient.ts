@@ -5,7 +5,8 @@ import type { ToolError } from "./errors";
 export interface GenerationInput {
   toml: string;
   mesh: string;
-  userFractures: string | undefined;
+  /** The polygon file of the user-defined fractures; the TOML always names it */
+  userFractures: string;
 }
 
 /** The triangle mesh of a generation, for the flow and the transport */

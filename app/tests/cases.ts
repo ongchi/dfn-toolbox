@@ -107,11 +107,9 @@ export function readMesh(name: string): string {
   return readFileSync(meshPath(name), "utf8");
 }
 
-/** The polygon file of the user-defined fractures of a network; undefined without them */
-export function userFracturesFile(network: FormState): string | undefined {
-  return network.userFractures.length === 0
-    ? undefined
-    : userFracturesToVtp(network.userFractures, network, meshRegionNames(readMesh(network.domain)));
+/** The polygon file of the user-defined fractures of a network; empty (no polygon) without them */
+export function userFracturesFile(network: FormState): string {
+  return userFracturesToVtp(network.userFractures, network, meshRegionNames(readMesh(network.domain)));
 }
 
 // The workflow examples of dfn-toolbox (../examples)

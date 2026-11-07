@@ -46,9 +46,7 @@ describe.each(exampleNames)("example %s", (exampleName) => {
     // The native binary reads the mesh at its full path, and the fracture file next to its input
     network.domain = meshPath(network.domain);
     const inputDir = mkdtempSync(join(tmpdir(), `dfngen-input-${exampleName}-`));
-    if (userFractures !== undefined) {
-      writeFileSync(join(inputDir, USER_FRACTURES_FILE), userFractures);
-    }
+    writeFileSync(join(inputDir, USER_FRACTURES_FILE), userFractures);
     writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network, boundaries));
     const nativeDir = runNativeDfngen(join(inputDir, "input.toml"));
     expect(compareOutputFolders(nativeDir, wasmDir)).toBe("");
@@ -282,9 +280,10 @@ test("the key user_fractures (a fracture file) is an error", () => {
   expect(problemsOf(toml)).toEqual(["[network]: `user_fractures` is an unknown key"]);
 });
 
-test("the dfngen input names the fracture file only with user fractures", () => {
-  expect(networkLibraryToml(USER_FRACTURES)).toMatch(/^user_fractures = "user_fractures\.vtp"$/m);
-  expect(networkLibraryToml(BOX)).not.toMatch(/^user_fractures =/m);
+// A new user fracture keeps the text of the dfngen input: a checkpoint of the
+// network (its hash) stays valid
+test("the dfngen input names the fracture file also without user fractures", () => {
+  expect(networkLibraryToml(BOX)).toMatch(/^user_fractures = "user_fractures\.vtp"$/m);
 });
 
 test("an unknown key in [flow] is an error", () => {

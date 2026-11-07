@@ -15,8 +15,17 @@ show the direction and the speed of the flow.
 
 ## Use
 
-The tabs follow the steps of the workflow. "Next" goes to the next tab. All
-input is in the page: the app does not save the input or the output.
+The tabs follow the steps of the workflow. One "Run" button runs all steps:
+the fractures, their triangle mesh, the flow and the transport. While the run
+is on ("Pause" shows), a change of a setting runs the steps again from the
+first step which the change affects, 0.5 s after the last change; the results
+of the steps before it stay. For example, a new pressure runs only the flow
+and the transport, and a new user-defined fracture keeps the stochastic
+fractures of the last run (FRAM does not check them again). "Pause" during the
+generation keeps the fractures until the last checkpoint (each 5 s); the next
+"Run" adds the others. "Reset" removes all results: the next run starts from
+the seed. All input is in the page: the app does not save the input or the
+output.
 
 - **Domain**: select an example, or a predefined domain shape. Give each
   boundary surface a role (in-flow, out-flow or no-flow). The pointer over the
@@ -30,17 +39,16 @@ input is in the page: the app does not save the input or the output.
   same plane. Also the number of points of all fractures (one value for the
   families and the user fractures), the minimum feature size, the FRAM rules
   of the generation, the choice of the clusters, the size of the triangles
-  of the mesh for the flow ("Meshing" uses them), the fluid of the flow
+  of the mesh for the flow, the fluid of the flow
   (temperature and gravity), and the routing of the particles.
-- **DFN**: set the fracture families. "Generate" makes the fractures, and
-  "Meshing" makes their triangle mesh. A generation can stop and keep its
-  fractures, then continue later. The network keeps only the clusters which
-  connect an in-flow and an out-flow surface. If there is no such cluster, a
-  warning shows, and you cannot go to the next step.
-- **Flow**: set a pressure for each in-flow and out-flow surface, then "Solve
-  flow" (the temperature and the gravity are in the settings).
-- **Transport**: set the seeding of the particles, then "Track particles"
-  (the routing is in the settings).
+- **DFN**: set the fracture families. The network keeps only the clusters
+  which connect an in-flow and an out-flow surface. If there is no such
+  cluster, a warning shows, and the run stops after the fractures.
+- **Flow**: set a pressure for each in-flow and out-flow surface (the
+  temperature and the gravity are in the settings).
+- **Transport**: set the seeding of the particles (the routing is in the
+  settings). With the method "at the clicked points", click "Pick points",
+  then click on a fracture of the 3D view: each click adds a release point.
 
 The 3D view shows the fractures during a generation. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,

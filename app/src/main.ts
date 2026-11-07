@@ -1,5 +1,6 @@
 // The page: input forms (network, flow and transport), generation, flow and
-// transport in the worker, 3D view and output files.
+// transport in the worker (one "Run" for all steps, `liveRun.ts`), 3D view
+// and output files.
 import "./style.css";
 import {
   defaultBoundaryRoles,
@@ -45,6 +46,7 @@ import {
   type InputFiles,
   type RegionBounds,
 } from "./inputFiles";
+import { isSameFractureInput, LiveRun, networkChangeStep, type ChainStep, type StepResult } from "./liveRun";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm, routingSection, type PointPicking } from "./transport/form";
 import { defaultTransportState, type ReleasePoint, type TimeUnit, type TransportState } from "./transport/state";
@@ -79,15 +81,6 @@ const NO_CONNECTING_CLUSTER =
 const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
 type SidebarTab = (typeof SIDEBAR_TABS)[number];
 
-/** The text of the run button; null = no run button (the domain and the user fractures: "Generate" is on the DFN tab) */
-const RUN_BUTTON_TEXT: Record<SidebarTab, string | null> = {
-  domain: null,
-  fractures: null,
-  network: "Generate",
-  flow: "Solve flow",
-  transport: "Track particles",
-};
-
 /** The screens with the settings in a bottom sheet: the condition of this layout in `style.css` */
 const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
 /** The heights of the bottom sheet */
@@ -117,11 +110,7 @@ const ui = {
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
-  cancelButton: byId<HTMLButtonElement>("cancel-button"),
-  stopButton: byId<HTMLButtonElement>("stop-button"),
-  continueButton: byId<HTMLButtonElement>("continue-button"),
-  meshingButton: byId<HTMLButtonElement>("meshing-button"),
-  nextButton: byId<HTMLButtonElement>("next-button"),
+  resetButton: byId<HTMLButtonElement>("reset-button"),
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
   colorSelect: byId<HTMLSelectElement>("color-select"),
@@ -184,26 +173,49 @@ let activeSidebarTab: SidebarTab = "domain";
 /** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
 let lastShape: string | null = null;
 let isBusy = false;
+/** The checkpoint of a generation, with the accepted fractures until it and the input of the generation */
+interface SavedGeneration {
+  checkpoint: GenerationCheckpoint;
+  fractures: FractureBatch;
+  input: GenerationInput;
+  /** The insertion ended: the checkpoint has all stochastic fractures. False after a stop or a cancel. */
+  isComplete: boolean;
+}
+
+/** A generation from a saved checkpoint */
+interface GenerationRestart {
+  from: SavedGeneration;
+  /** "continue": the insertion continues; "finish": the network of the fractures of the checkpoint */
+  mode: Restart["mode"];
+}
+
 /**
- * The last checkpoint of a generation which did not complete (a stop, a
- * cancel, or the network of a checkpoint), with the fractures until it:
- * "Continue" restarts from it. null after a complete generation.
+ * The last checkpoint of the stochastic fractures: the next generation of
+ * the same stochastic fractures starts from it. null without stochastic
+ * fractures, and before the first checkpoint of a generation.
  */
-let stoppedGeneration: { checkpoint: GenerationCheckpoint; fractures: FractureBatch } | null = null;
-/** "Stop and keep the fractures" was clicked: the cancel of the run starts the network of its checkpoint */
+let savedGeneration: SavedGeneration | null = null;
+/** "Pause" during a generation: the cancel of the run starts the network of its checkpoint */
 let isKeepRequested = false;
-/** The last generation with no error, for "Meshing"; null without a network */
+/** The last generation with no error, for the mesh; null without a network */
 let generatedNetwork: {
   input: GenerationInput;
   seed: string;
-  /** The checkpoint with all accepted fractures; null: "Meshing" runs the generation again from the seed */
+  /** The checkpoint with all accepted fractures; null: the mesh runs the generation again from the seed */
   checkpoint: Uint8Array | null;
   isWithoutConnectingCluster: boolean;
   /** FRAM was on: the network can have rejected fractures */
   isFramOn: boolean;
 } | null = null;
+/** The input of the network forms at the last mesh; null without a mesh */
+let meshedInput: GenerationInput | null = null;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
+const liveRun = new LiveRun({
+  runStep: (step) => runChainStep(step),
+  cancel: () => client.cancel(),
+  onStateChange: () => updateRunButtons(),
+});
 
 // ---------------------------------------------------------------- status
 
@@ -231,45 +243,67 @@ function durationText(milliseconds: number): string {
   return milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(1)} s`;
 }
 
-/** A run in the worker: the buttons are disabled, and "Cancel" and the progress bar show */
+/** A step runs in the worker: the progress bar shows, and a new example or domain waits for its end */
 function setBusy(busy: boolean): void {
   isBusy = busy;
   // On a phone, the sheet goes down at a run: the view shows the fractures
   if (busy && window.matchMedia(SHEET_QUERY).matches) {
     setSheetSize("half");
   }
-  ui.runButton.disabled = busy;
   ui.exampleSelect.disabled = busy;
   ui.domainSource.disabled = busy;
-  ui.cancelButton.hidden = !busy;
-  // Only a generation shows it (`generate`)
-  ui.stopButton.hidden = true;
   ui.progress.hidden = !busy;
-  updateStepButtons();
-  updateContinueButton();
-}
-
-/** "Continue" shows on the DFN tab when a stopped generation has a checkpoint */
-function updateContinueButton(): void {
-  ui.continueButton.hidden = activeSidebarTab !== "network" || stoppedGeneration === null;
-  ui.continueButton.disabled = isBusy;
+  updateRunButtons();
 }
 
 /**
- * "Next" goes to the next tab; the Transport tab has none. On the DFN tab it
- * needs the fracture mesh of a generation with a cluster which connects an
- * in-flow and an out-flow surface, on the Flow tab a solved flow. "Meshing"
- * shows on the DFN tab, and it needs a network with such a cluster.
+ * "Run" starts the live run, which shows "Pause". The network of a stopped
+ * generation (after "Pause") runs with the live run off: "Run" waits for it.
  */
-function updateStepButtons(): void {
-  const isLastTab = activeSidebarTab === SIDEBAR_TABS[SIDEBAR_TABS.length - 1];
-  const isNetworkMissing = flowMesh() === null || output?.isWithoutConnectingCluster === true;
-  const isOutputMissing =
-    (activeSidebarTab === "network" && isNetworkMissing) || (activeSidebarTab === "flow" && flowOutput === null);
-  ui.nextButton.hidden = isLastTab;
-  ui.nextButton.disabled = isBusy || isOutputMissing;
-  ui.meshingButton.hidden = activeSidebarTab !== "network";
-  ui.meshingButton.disabled = isBusy || generatedNetwork === null || generatedNetwork.isWithoutConnectingCluster;
+function updateRunButtons(): void {
+  ui.runButton.textContent = liveRun.isOn ? "Pause" : "Run";
+  ui.runButton.setAttribute("aria-pressed", String(liveRun.isOn));
+  ui.runButton.disabled = isBusy && !liveRun.isOn;
+  // For the e2e check: "idle" when no step runs or waits
+  ui.runButton.dataset.state = liveRun.isIdle && !isBusy ? "idle" : "running";
+}
+
+/** "Run" or "Pause" */
+function toggleLiveRun(): void {
+  if (!liveRun.isOn) {
+    if (liveRun.staleStep === null) {
+      showStatus("All results are up to date.");
+    }
+    liveRun.start();
+    return;
+  }
+  // "Pause" during the generation keeps the fractures until its last checkpoint (user decision)
+  isKeepRequested = liveRun.currentStep === "generation" || liveRun.currentStep === "userFractures";
+  liveRun.stop();
+}
+
+/** "Reset": all results go; the next run starts from the seed. The forms stay. */
+function resetAll(): void {
+  isKeepRequested = false;
+  liveRun.reset();
+  savedGeneration = null;
+  meshedInput = null;
+  viewer?.clearGenerationFractures();
+  clearOutput();
+  showStatus("");
+}
+
+/** A value of the network forms changed: the steps from the first step which it affects are stale */
+function networkChanged(): void {
+  const current = generationInput();
+  // An invalid value: the next valid change runs the steps
+  if (typeof current === "string") {
+    return;
+  }
+  const step = networkChangeStep(current, generatedNetwork?.input ?? null, meshedInput);
+  if (step !== null) {
+    liveRun.changed(step);
+  }
 }
 
 // ---------------------------------------------------------------- form
@@ -285,8 +319,14 @@ const formContext: FormContext = {
     return regionBounds;
   },
   highlightBoundarySurface: (name) => highlightBoundarySurface(name),
-  changed: () => updateUserFracturesInViewer(),
-  rerender: () => render(),
+  changed: () => {
+    updateUserFracturesInViewer();
+    networkChanged();
+  },
+  rerender: () => {
+    render();
+    networkChanged();
+  },
 };
 
 const fileHandlers: FileHandlers = {
@@ -309,8 +349,11 @@ const flowContext: FormContext = {
   meshNames: [],
   regionBounds: [],
   highlightBoundarySurface: (name) => highlightBoundarySurface(name),
-  changed: () => {},
-  rerender: () => renderFlow(),
+  changed: () => liveRun.changed("flow"),
+  rerender: () => {
+    renderFlow();
+    liveRun.changed("flow");
+  },
 };
 
 const transportContext: FormContext = {
@@ -318,8 +361,11 @@ const transportContext: FormContext = {
   meshNames: [],
   regionBounds: [],
   highlightBoundarySurface: (name) => highlightBoundarySurface(name),
-  changed: () => {},
-  rerender: () => renderTransport(),
+  changed: () => liveRun.changed("transport"),
+  rerender: () => {
+    renderTransport();
+    liveRun.changed("transport");
+  },
 };
 
 function render(): void {
@@ -395,12 +441,6 @@ function selectSidebarTab(name: SidebarTab): void {
   if (isPickingPoints && name !== "transport") {
     pointPicking.setOn(false);
   }
-  const runText = RUN_BUTTON_TEXT[name];
-  ui.runButton.hidden = runText === null;
-  ui.runButton.textContent = runText ?? "";
-  updateStepButtons();
-  updateContinueButton();
-  showStatus("");
 }
 
 /** The radio button "Example" of the Domain tab is selected (else "Predefined domain shape") */
@@ -432,7 +472,7 @@ function renderBoundarySurfaces(): void {
       onRole: (name, role) => {
         setRole(boundaryRoles, name, role, boundarySurfaceNames);
         // The network keeps the clusters which connect the in-flow and out-flow surfaces
-        clearOutput();
+        networkChanged();
       },
       onHover: (name) => highlightBoundarySurface(name),
     }),
@@ -461,7 +501,11 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   clearPinnedSurface();
   ui.shapeDescription.textContent = mesh === null ? "" : meshDescription(mesh.text);
   renderBoundarySurfaces();
+  // A new domain: no result stays
+  savedGeneration = null;
+  meshedInput = null;
   clearOutput();
+  liveRun.changed("generation");
   if (viewer && mesh) {
     showDomainInViewer(viewer, mesh);
     viewer.resetCamera();
@@ -503,54 +547,91 @@ function generationInput(): GenerationInput | string {
   return {
     toml: networkToLibraryToml(state, boundaryRoles),
     mesh: files.mesh.text,
-    userFractures: state.userFractures.length === 0 ? undefined : userFracturesToVtp(state.userFractures, state, regionNames),
+    userFractures: userFracturesToVtp(state.userFractures, state, regionNames),
   };
 }
 
-/** "Generate": a new generation */
-async function runGeneration(): Promise<void> {
-  await generate(null);
+/** The steps of the live run (`liveRun.ts`) */
+async function runChainStep(step: ChainStep): Promise<StepResult> {
+  switch (step) {
+    case "generation":
+    case "userFractures":
+      return runFractureStep();
+    case "mesh":
+      return runMeshing();
+    case "flow":
+      return runFlow();
+    case "transport":
+      return runTransport();
+  }
 }
 
-/** "Stop and keep the fractures": the worker stops, and the network is made from the last checkpoint */
-function stopAndKeepFractures(): void {
-  isKeepRequested = true;
-  client.cancel();
+/** The result of a step which threw: a cancel, or an error of the page */
+function failedStep(error: unknown): StepResult {
+  if (error instanceof CancelledError) {
+    // A cancel by a change: the step starts again and shows its own status
+    if (!liveRun.isOn) {
+      showStatus("Paused.");
+    }
+    return "cancelled";
+  }
+  showStatus(errorText(error), true);
+  return "failed";
 }
 
-/** A generation; with `restartMode`, from the checkpoint of `stoppedGeneration` */
-async function generate(restartMode: Restart["mode"] | null): Promise<void> {
+/**
+ * The fractures of the forms. With the stochastic fractures of the last
+ * checkpoint, from that checkpoint: a complete one gives its network with the
+ * user-defined fractures of the form, and FRAM does not check its fractures
+ * again (user decisions); a stopped one continues the insertion. Else from
+ * the seed. Nothing if the network has these fractures.
+ */
+async function runFractureStep(): Promise<StepResult> {
   const input = generationInput();
   if (typeof input === "string") {
     showStatus(input, true);
-    return;
+    return "failed";
   }
+  const network = generatedNetwork;
+  const saved = savedGeneration;
+  const isNetworkCurrent =
+    network !== null &&
+    isSameFractureInput(network.input, input) &&
+    network.input.userFractures === input.userFractures &&
+    (saved === null || saved.isComplete);
+  if (isNetworkCurrent) {
+    return "done";
+  }
+  if (saved !== null && isSameFractureInput(saved.input, input)) {
+    // The checkpoint is for the TOML of its generation (its hash)
+    const restartInput = { ...saved.input, userFractures: input.userFractures };
+    return generate(restartInput, { from: saved, mode: saved.isComplete ? "finish" : "continue" });
+  }
+  return generate(input, null);
+}
+
+/** A generation; with `restart`, from a saved checkpoint */
+async function generate(input: GenerationInput, restart: GenerationRestart | null): Promise<StepResult> {
   const isFramOn = state.fram.enable;
-  const stopped = restartMode === null ? null : stoppedGeneration;
-  if (restartMode !== null && stopped === null) {
-    return;
-  }
+  const from = restart?.from ?? null;
   setBusy(true);
-  // The network of a checkpoint has no insertion to stop
-  ui.stopButton.hidden = restartMode === "finish";
   ui.progress.value = 0;
   showStatus(
-    restartMode === "finish"
-      ? `Making the network of the ${stopped?.checkpoint.acceptedCount} fractures until the stop…`
+    restart?.mode === "finish"
+      ? `Making the network of the ${from?.checkpoint.acceptedCount} stochastic fractures of the last run…`
       : "Generating…",
   );
   // The view shows the new fractures during the run, not the old network;
   // a restart shows the fractures until its checkpoint again
   clearOutput();
   viewer?.clearGenerationFractures();
-  const fractures: FractureBatch[] = stopped === null ? [] : [stopped.fractures];
-  if (stopped !== null) {
-    viewer?.addGenerationFractures(stopped.fractures);
+  const fractures: FractureBatch[] = from === null ? [] : [from.fractures];
+  if (from !== null) {
+    viewer?.addGenerationFractures(from.fractures);
     viewer?.render();
   }
-  let checkpoint: GenerationCheckpoint | null = stopped?.checkpoint ?? null;
+  let checkpoint: GenerationCheckpoint | null = from?.checkpoint ?? null;
   let lastAcceptedCount = checkpoint?.acceptedCount ?? null;
-  ui.stopButton.disabled = checkpoint === null;
   let lastRenderTime = 0;
   const startTime = performance.now();
   const callbacks: GenerationCallbacks = {
@@ -575,42 +656,53 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
     },
     onCheckpoint: (newCheckpoint) => {
       checkpoint = newCheckpoint;
-      ui.stopButton.disabled = false;
     },
   };
+  /** The checkpoint until now, with its fractures; `isInsertionEnded`: this run ended the insertion */
+  const savedNow = (isInsertionEnded: boolean): SavedGeneration | null => {
+    if (checkpoint === null) {
+      return null;
+    }
+    if (checkpoint === from?.checkpoint) {
+      // No new fracture: the saved generation stays, with the user-defined fractures of this run
+      return { ...from, input, isComplete: from.isComplete || isInsertionEnded };
+    }
+    return { checkpoint, fractures: firstFractures(fractures, checkpoint.acceptedCount), input, isComplete: isInsertionEnded };
+  };
   try {
-    const restart =
-      stopped === null || restartMode === null ? null : { checkpoint: stopped.checkpoint.checkpoint, mode: restartMode };
-    const result = await client.run(input, callbacks, restart);
+    const result = await client.run(
+      input,
+      callbacks,
+      restart === null ? null : { checkpoint: restart.from.checkpoint.checkpoint, mode: restart.mode },
+    );
     if (result.error !== null) {
       showStatus(toolErrorText(result.error), true);
-      return;
+      return "failed";
     }
-    // The network of a checkpoint has only the fractures until the stop: "Continue" adds the others
-    stoppedGeneration = restartMode === "finish" ? stopped : null;
+    const isCheckpointOfAll = checkpoint?.acceptedCount === lastAcceptedCount;
+    savedGeneration = isCheckpointOfAll ? savedNow(restart?.mode !== "finish") : null;
     const finishText =
-      restartMode === "finish"
-        ? `\nThe network has the ${stopped?.checkpoint.acceptedCount} fractures until the stop. "Continue" adds the others.`
+      savedGeneration?.isComplete === false
+        ? `\nThe network has the ${savedGeneration.checkpoint.acceptedCount} fractures until the pause. "Run" adds the others.`
         : "";
     showGenerationDone(result, startTime, finishText);
     generatedNetwork = {
       input,
       seed: result.seed,
-      checkpoint: checkpoint?.acceptedCount === lastAcceptedCount ? (checkpoint?.checkpoint ?? null) : null,
+      checkpoint: savedGeneration?.checkpoint.checkpoint ?? null,
       isWithoutConnectingCluster: result.isWithoutConnectingCluster,
       isFramOn,
     };
+    meshedInput = null;
     showDiscardedLabel();
     await showOutput(result);
+    return "done";
   } catch (error) {
-    if (!(error instanceof CancelledError)) {
-      showStatus(errorText(error), true);
-      return;
+    if (error instanceof CancelledError) {
+      // The checkpoint of the run, or that of its restart; none: a new generation stopped before its first checkpoint
+      savedGeneration = savedNow(false);
     }
-    // The checkpoint of the run, or that of its restart; none: a new generation stopped before its first checkpoint
-    stoppedGeneration =
-      checkpoint === null ? null : { checkpoint, fractures: firstFractures(fractures, checkpoint.acceptedCount) };
-    showStatus(isKeepRequested ? "Stopped." : "Cancelled.");
+    return failedStep(error);
   } finally {
     // The final layers replace the fractures of the run; after an error or a cancel, nothing does
     if (viewer) {
@@ -618,10 +710,19 @@ async function generate(restartMode: Restart["mode"] | null): Promise<void> {
       viewer.render();
     }
     setBusy(false);
+    await keepStoppedFractures();
   }
-  if (isKeepRequested) {
-    isKeepRequested = false;
-    await generate("finish");
+}
+
+/** After "Pause" during a generation: the network of the fractures until its last checkpoint */
+async function keepStoppedFractures(): Promise<void> {
+  if (!isKeepRequested) {
+    return;
+  }
+  isKeepRequested = false;
+  const saved = savedGeneration;
+  if (saved !== null) {
+    await generate(saved.input, { from: saved, mode: "finish" });
   }
 }
 
@@ -634,16 +735,21 @@ function showGenerationDone(result: GenerationOutput, startTime: number, finishT
   }
 }
 
-/** "Meshing": the fractures of the last generation, with the mesh values of the forms now */
-async function runMeshing(): Promise<void> {
+/** The triangle mesh: the fractures of the last generation, with the mesh values of the forms now */
+async function runMeshing(): Promise<StepResult> {
   const network = generatedNetwork;
   const current = generationInput();
-  if (network === null) {
-    return;
-  }
   if (typeof current === "string") {
     showStatus(current, true);
-    return;
+    return "failed";
+  }
+  if (network === null) {
+    showStatus("The mesh needs a network.", true);
+    return "failed";
+  }
+  // The particles need a path: the status shows the warning of the generation
+  if (network.isWithoutConnectingCluster) {
+    return "failed";
   }
   setBusy(true);
   // dfngen reports no progress during the mesh: an indeterminate bar
@@ -659,12 +765,14 @@ async function runMeshing(): Promise<void> {
     });
     if (result.error !== null) {
       showStatus(toolErrorText(result.error), true);
-      return;
+      return "failed";
     }
     showGenerationDone(result, startTime);
+    meshedInput = current;
     await showOutput(result);
+    return "done";
   } catch (error) {
-    showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
+    return failedStep(error);
   } finally {
     setBusy(false);
   }
@@ -674,7 +782,7 @@ async function runMeshing(): Promise<void> {
 function flowInput(): FlowInput | string {
   const mesh = flowMesh();
   if (mesh === null) {
-    return 'Generate a network and click "Meshing" first: the flow needs its triangle mesh.';
+    return "The flow needs the triangle mesh of a network.";
   }
   if (ui.flowForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
@@ -682,11 +790,11 @@ function flowInput(): FlowInput | string {
   return { toml: flowToLibraryToml(flowState, surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles))), mesh };
 }
 
-async function runFlow(): Promise<void> {
+async function runFlow(): Promise<StepResult> {
   const input = flowInput();
   if (typeof input === "string") {
     showStatus(input, true);
-    return;
+    return "failed";
   }
   setBusy(true);
   // fehm reports no progress: an indeterminate bar
@@ -697,14 +805,15 @@ async function runFlow(): Promise<void> {
     const result = await client.runFlow(input);
     if (result.error !== null) {
       showStatus(toolErrorText(result.error), true);
-      return;
+      return "failed";
     }
     showStatus(
       `Done in ${durationText(performance.now() - startTime)}: ${result.newtonIterations} Newton iterations.`,
     );
     await showFlowOutput(result, input.toml);
+    return "done";
   } catch (error) {
-    showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
+    return failedStep(error);
   } finally {
     setBusy(false);
   }
@@ -714,7 +823,7 @@ async function runFlow(): Promise<void> {
 function transportInput(): TransportInput | string {
   const mesh = flowMesh();
   if (mesh === null || flowOutputToml === null) {
-    return "Solve the flow first: the transport needs its flow input.";
+    return "The transport needs a flow.";
   }
   if (ui.transportForm.querySelector(".is-invalid")) {
     return "A field of the form has an invalid value (red border). Correct it first.";
@@ -726,11 +835,11 @@ function transportInput(): TransportInput | string {
   return { toml: transportToLibraryToml(transportState, boundaries), flowToml: flowOutputToml, mesh };
 }
 
-async function runTransport(): Promise<void> {
+async function runTransport(): Promise<StepResult> {
   const input = transportInput();
   if (typeof input === "string") {
     showStatus(input, true);
-    return;
+    return "failed";
   }
   setBusy(true);
   const timeUnit = transportState.timeUnit;
@@ -742,14 +851,15 @@ async function runTransport(): Promise<void> {
     const result = await client.runTransport(input);
     if (result.error !== null) {
       showStatus(toolErrorText(result.error), true);
-      return;
+      return "failed";
     }
     showStatus(
       `Done in ${durationText(performance.now() - startTime)}: ${result.exitCount} of ${result.particleCount} particles exited.`,
     );
     await showTransportOutput(result, timeUnit);
+    return "done";
   } catch (error) {
-    showStatus(error instanceof CancelledError ? "Cancelled." : errorText(error), !(error instanceof CancelledError));
+    return failedStep(error);
   } finally {
     setBusy(false);
   }
@@ -761,7 +871,6 @@ function clearOutput(): void {
   output = null;
   generatedNetwork = null;
   showDiscardedLabel();
-  updateStepButtons();
   ui.results.hidden = true;
   ui.logEmpty.hidden = false;
   ui.colorSelect.disabled = true;
@@ -799,7 +908,6 @@ function removeColorOptions(optionValues: string[]): void {
 /** The flow output belongs to the mesh of one generation */
 function clearFlowOutput(): void {
   flowOutput = null;
-  updateStepButtons();
   flowOutputToml = null;
   ui.flowResults.hidden = true;
   removeColorOptions([PRESSURE_OPTION, FLOW_VELOCITY_OPTION]);
@@ -823,7 +931,7 @@ function clearTransportOutput(): void {
   }
 }
 
-/** The triangle mesh of the last "Meshing", the mesh of the flow */
+/** The triangle mesh of the last mesh step, the mesh of the flow */
 function flowMesh(): FlowMeshArrays | null {
   const shapes = output?.shapes;
   if (shapes == null || shapes.mesh === null) {
@@ -855,7 +963,6 @@ function showStats(list: HTMLDListElement, stats: [string, string][]): void {
 async function showOutput(result: GenerationOutput): Promise<void> {
   clearFlowOutput();
   output = result;
-  updateStepButtons();
   ui.logEmpty.hidden = true;
   ui.results.hidden = false;
   renderFlow();
@@ -877,7 +984,6 @@ function massFlowText(massFlow: number): string {
 async function showFlowOutput(result: FlowOutput, toml: string): Promise<void> {
   clearTransportOutput();
   flowOutput = result;
-  updateStepButtons();
   flowOutputToml = toml;
   renderTransport();
   ui.flowResults.hidden = false;
@@ -1030,7 +1136,7 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
     return;
   }
   const shapes = output.shapes;
-  // Before "Meshing", the polygons of the final fractures
+  // Before the mesh step, the polygons of the final fractures
   viewer.setLayer("final", shapes?.mesh ? meshWithFlowArrays(shapes.mesh) : layerShapes(shapes?.fractures));
   viewer.setLayer("removed", layerShapes(shapes?.removed));
   viewer.setLayer("rejected", layerShapes(shapes?.rejected));
@@ -1199,6 +1305,7 @@ function setOrientationConvention(convention: OrientationConvention): void {
   }
   state.orientationConvention = convention;
   render();
+  networkChanged();
 }
 
 function toggleLog(): void {
@@ -1227,19 +1334,8 @@ function updateCoveredArea(): void {
 function bindEvents(): void {
   ui.exampleSelect.addEventListener("change", () => void openExample(ui.exampleSelect.value));
   ui.domainSource.addEventListener("change", () => switchDomainSource());
-  const runActions: Partial<Record<SidebarTab, () => Promise<void>>> = {
-    network: runGeneration,
-    flow: runFlow,
-    transport: runTransport,
-  };
-  ui.runButton.addEventListener("click", () => void runActions[activeSidebarTab]?.());
-  ui.nextButton.addEventListener("click", () =>
-    selectSidebarTab(SIDEBAR_TABS[SIDEBAR_TABS.indexOf(activeSidebarTab) + 1] ?? activeSidebarTab),
-  );
-  ui.cancelButton.addEventListener("click", () => client.cancel());
-  ui.stopButton.addEventListener("click", stopAndKeepFractures);
-  ui.continueButton.addEventListener("click", () => void generate("continue"));
-  ui.meshingButton.addEventListener("click", () => void runMeshing());
+  ui.runButton.addEventListener("click", toggleLiveRun);
+  ui.resetButton.addEventListener("click", resetAll);
 
   for (const control of [ui.colorSelect, ui.logScale]) {
     control.addEventListener("change", () => updateViewer(applyColorChoice));

@@ -81,7 +81,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     "No fractures intersect. Increase the number of fractures or their size (DFN tab), or decrease Minimum feature size.",
   "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (DFN tab, General). Details: ${f.message}`,
   "dfngen.CheckpointInputChanged": () =>
-    "The input changed: Continue needs the input of the stopped run, and Meshing needs the number of families of the network. Generate the network again.",
+    "The input changed during the run: the network needs a new generation. Click “Reset”, then “Run”.",
 
   "fehm.TemperatureRange": (f) => `Temperature (Settings, Fluid) must be ${f.min} to ${f.max} °C.`,
   "fehm.NoBoundaryDefined": () =>

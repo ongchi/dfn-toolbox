@@ -229,7 +229,9 @@ const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray:
 /**
  * The dfngen input file of the network. The mesh is always on in dfn-toolbox. The
  * user-defined fractures are the polygons of `USER_FRACTURES_FILE` (made by
- * `userFracturesToVtp`), not tables. The isolated fractures and the clusters
+ * `userFracturesToVtp`), not tables; the file is named also without user-defined
+ * fractures (it is then empty), thus a new user-defined fracture keeps the hash of
+ * this text, and a checkpoint stays valid. The isolated fractures and the clusters
  * which do not connect an in-flow and an out-flow surface are always removed
  * (the particles need a path between them), thus the workflow file has no
  * keys for them.
@@ -242,8 +244,7 @@ export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): st
       const lines = table.lines.filter(
         (line) => !line.startsWith(`${ORIENTATION_OPTION_KEY} =`) && !line.startsWith(`${NUMBER_OF_POINTS_KEY} =`),
       );
-      const fileLines = state.userFractures.length === 0 ? [] : [`user_fractures = ${string(USER_FRACTURES_FILE)}`];
-      return [{ ...table, lines: [...lines, ...fileLines] }];
+      return [{ ...table, lines: [...lines, `user_fractures = ${string(USER_FRACTURES_FILE)}`] }];
     }
     if (table.name === "mesh") {
       return [REGION_BOUNDARIES_TABLE, { ...table, lines: ["enable = true", ...table.lines] }];

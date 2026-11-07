@@ -295,7 +295,7 @@ export function renderTransportForm(
       element(
         "p",
         "form-note",
-        "Solve the flow (Flow tab) first. The particle tracking uses the flow input of the last “Solve flow” and its mesh.",
+        "Click “Run”: the particle tracking uses the flow and its triangle mesh.",
       ),
     );
     return;

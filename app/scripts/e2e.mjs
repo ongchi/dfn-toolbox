@@ -1,11 +1,12 @@
 // End-to-end check of the web app in the local Chrome (headless).
 // Start the dev server first (npm run dev), then:
 //   node scripts/e2e.mjs [url] [screenshot folder]
-// It checks the default example, runs the full workflow (network, flow,
-// transport) of each example, the flow and the transport without their
-// input, the choice of a predefined mesh, a new user-defined fracture, a bad
-// input, the fractures in the view during a run, a cancel, and a stop with
-// the fractures kept and a continue, and the phone layout; it saves screenshots.
+// It checks the default example, runs all steps (network, mesh, flow,
+// transport) of each example, the live run (a pressure change, a new
+// user-defined fracture, a release point clicked on a fracture, "Reset"), the
+// choice of a predefined mesh, a bad input, the fractures in the view during a
+// run, "Pause" during the mesh, and "Pause" with the fractures kept and a new
+// "Run", and the phone layout; it saves screenshots.
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
 
@@ -48,8 +49,9 @@ async function isStatusError(page) {
   return page.$eval("#status", (node) => node.classList.contains("is-error"));
 }
 
+/** Waits until no step of the live run runs or waits for its delay */
 async function waitIdle(page) {
-  await page.waitForFunction(() => !document.querySelector("#run-button").disabled, { timeout: RUN_TIMEOUT });
+  await page.waitForFunction(() => document.querySelector("#run-button").dataset.state === "idle", { timeout: RUN_TIMEOUT });
 }
 
 /**
@@ -111,6 +113,22 @@ async function setFractureCount(page, count) {
   }, count);
 }
 
+/** Types a value into the field with a label of a form */
+async function setField(page, formSelector, label, value) {
+  await page.evaluate(
+    (selector, fieldLabel, fieldValue) => {
+      const input = [...document.querySelectorAll(`${selector} .field`)]
+        .find((field) => field.querySelector(".field-label")?.textContent === fieldLabel)
+        .querySelector("input, select");
+      input.value = String(fieldValue);
+      input.dispatchEvent(new Event(input.tagName === "SELECT" ? "change" : "input"));
+    },
+    formSelector,
+    label,
+    value,
+  );
+}
+
 /** The values of the options of "Color by" */
 async function colorOptions(page) {
   return page.$$eval("#color-select option", (options) => options.map((option) => option.value));
@@ -157,20 +175,43 @@ async function viewGeometryCount(page) {
   return page.$eval("#viewer-canvas", (node) => Number(node.dataset.geometryCount));
 }
 
-/** Runs the step of a sidebar tab; returns the status text */
-async function runStep(page, tab) {
-  await page.click(`[data-sidebar-tab="${tab}"]`);
+/** "Run" until the steps end, then "Pause": a later change of a form runs no step; returns the status text */
+async function runAll(page) {
   await page.click("#run-button");
   await waitIdle(page);
+  await page.click("#run-button");
   return statusText(page);
 }
 
-/** Runs "Meshing" of the DFN tab; returns the status text */
-async function runMeshing(page) {
-  await page.click('[data-sidebar-tab="network"]');
-  await page.click("#meshing-button");
+/** The texts of the status during `action` and the steps which it starts (with the live run on) */
+async function statusesDuring(page, action) {
+  await page.evaluate(() => {
+    window.e2eStatuses = [];
+    window.e2eStatusObserver = new MutationObserver(() => {
+      const text = document.querySelector("#status").textContent;
+      if (window.e2eStatuses.at(-1) !== text) {
+        window.e2eStatuses.push(text);
+      }
+    });
+    window.e2eStatusObserver.observe(document.querySelector("#status"), { childList: true, characterData: true, subtree: true });
+  });
+  await action();
+  // The steps start after the delay of the last change
+  await page.waitForFunction(() => document.querySelector("#run-button").dataset.state !== "idle", { timeout: 5000 });
   await waitIdle(page);
-  return statusText(page);
+  return page.evaluate(() => {
+    window.e2eStatusObserver.disconnect();
+    return window.e2eStatuses;
+  });
+}
+
+/** A value of the Log view */
+async function resultValue(page, term) {
+  return page.$eval(
+    "#log-view",
+    (node, name) => [...node.querySelectorAll("dt")].find((item) => item.textContent === name)?.nextElementSibling?.textContent,
+    term,
+  );
 }
 
 /** The controls of the shown view which are too small for a finger, and the width of the page */
@@ -260,6 +301,7 @@ async function checkPhone() {
   await page.tap("#run-button");
   await page.waitForFunction(() => !document.querySelector("#results").hidden, { timeout: RUN_TIMEOUT });
   await waitIdle(page);
+  await page.tap("#run-button");
   const sheetAfterRun = await sheetState();
   check(sheetBeforeRun === "full" && sheetAfterRun === "half", "phone: the sheet at a run", `${sheetBeforeRun} → ${sheetAfterRun}`);
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_view.png` });
@@ -615,14 +657,19 @@ try {
     "settings sections in the settings dialog",
     `DFN tab: ${networkSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
   );
-  const tabWalk = [];
-  for (let step = 0; step < 2; step++) {
-    const isRunHidden = await page.$eval("#run-button", (node) => node.hidden);
-    await page.click("#next-button");
-    const tab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
-    tabWalk.push(`${isRunHidden ? "no run" : "run"} → ${tab}`);
+  // One "Run" button and one "Reset" button for all steps, on each tab
+  const runButtons = [];
+  for (const tab of ["domain", "fractures", "network", "flow", "transport"]) {
+    await page.click(`[data-sidebar-tab="${tab}"]`);
+    runButtons.push(
+      await page.$$eval(".run-buttons button:not([hidden])", (nodes) => nodes.map((node) => node.textContent).join(" ")),
+    );
   }
-  check(tabWalk.join(", ") === "no run → fractures, no run → network", "next button", tabWalk.join(", "));
+  check(
+    runButtons.every((buttons) => buttons === "Run Reset Log"),
+    "run buttons on each tab",
+    runButtons.join(" | "),
+  );
 
   // The full workflow of each example
   const examples = await page.$$eval("#example-select option", (options) =>
@@ -631,23 +678,19 @@ try {
   for (const name of examples) {
     await page.click('[data-sidebar-tab="network"]');
     await selectExample(page, name);
-    // "Meshing" needs a network; "Next" of the DFN tab needs the fracture mesh, "Next" of the Flow tab a solved flow
-    const isMeshingDisabled = () => page.$eval("#meshing-button", (node) => node.disabled);
-    const isMeshingDisabledBefore = await isMeshingDisabled();
-    const isNextDisabled = () => page.$eval("#next-button", (node) => node.disabled);
-    const isNetworkNextDisabled = await isNextDisabled();
+    // "Run" runs all steps: the network, its mesh, the flow and the transport
     // The results of the Log view show only with a result
     const hasResults = () => page.$eval("#results", (node) => !node.hidden);
     const hasResultsBefore = await hasResults();
-    const networkStatus = await runStep(page, "network");
-    const isNextDisabledBeforeMesh = await isNextDisabled();
-    check(
-      networkStatus.startsWith("Done") && isNetworkNextDisabled && isNextDisabledBeforeMesh && isMeshingDisabledBefore,
-      `${name}: network`,
-      networkStatus,
+    const runStatus = await runAll(page);
+    const shownResults = await page.evaluate(() =>
+      ["#results", "#flow-results", "#transport-results"].filter((selector) => !document.querySelector(selector).hidden).length,
     );
-    const meshStatus = await runMeshing(page);
-    check(meshStatus.startsWith("Done") && !(await isNextDisabled()), `${name}: meshing`, meshStatus);
+    check(
+      /^Done in .*particles exited/.test(runStatus) && !(await isStatusError(page)) && shownResults === 3,
+      `${name}: run of all steps`,
+      `${runStatus}; ${shownResults} result sections`,
+    );
     const hasResultsAfter = await hasResults();
     check(!hasResultsBefore && hasResultsAfter, `${name}: results in the log view`, `${hasResultsBefore} → ${hasResultsAfter}`);
 
@@ -709,8 +752,6 @@ try {
         `${isSameView(flowViewPinned, flowViewBefore) ? "unchanged" : "kept"}, input focus ${isInputFocused}, flow "${pinnedOnFlow}", domain "${pinnedOnDomain}", second click ${isSameView(flowViewUnpinned, flowViewBefore) ? "removed" : "different"}`,
       );
     }
-    const isFlowNextDisabled = await isNextDisabled();
-    const flowStatus = await runStep(page, "flow");
     // The moving particles change the view between two frames
     await page.click("#show-particles");
     const particleFrame = await viewerScreenshot();
@@ -720,14 +761,8 @@ try {
       await page.screenshot({ path: `${screenshotDir}/e2e_particles.png` });
     }
     await page.click("#show-particles");
-    const isFlowNextEnabled = !(await isNextDisabled());
-    const hasFlowResults = await page.$eval("#flow-results", (node) => !node.hidden);
-    const isPressureShown = await page.$eval("#color-select", (node) => node.value === "point:pressure");
-    check(
-      flowStatus.startsWith("Done") && hasFlowResults && isPressureShown && isFlowNextDisabled && isFlowNextEnabled,
-      `${name}: flow`,
-      flowStatus,
-    );
+    const colorAfterRun = await page.$eval("#color-select", (node) => node.value);
+    check(colorAfterRun === "point:pressure", `${name}: pressure colors after the flow`, colorAfterRun);
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow.png` });
     const hasFlowVelocity = (await colorOptions(page)).includes("cell:flow_velocity");
@@ -767,14 +802,8 @@ try {
       `${name}: no transport boundaries and no routing`,
       `boundaries ${hasTransportBoundaries}, routing ${hasTransportRouting}`,
     );
-    const transportStatus = await runStep(page, "transport");
-    const hasTransportResults = await page.$eval("#transport-results", (node) => !node.hidden);
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
-    check(
-      transportStatus.startsWith("Done") && hasTransportResults && areTrajectoriesShown,
-      `${name}: transport`,
-      transportStatus,
-    );
+    check(areTrajectoriesShown, `${name}: trajectories shown`, String(areTrajectoriesShown));
     const hasTransportVelocity = (await colorOptions(page)).includes("point:transport_velocity");
     check(hasTransportVelocity, `${name}: transport velocity in Color by`, String(hasTransportVelocity));
     await page.select("#color-select", "point:transport_velocity");
@@ -786,12 +815,14 @@ try {
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_transport.png` });
   }
 
-  // More runs of the transport free the shapes of the old views
-  await runStep(page, "transport");
+  // More runs of the transport free the shapes of the old views: with the live run on, each new seed runs it again
+  await page.click("#run-button");
+  await waitIdle(page);
   const geometriesBefore = await viewGeometryCount(page);
   for (let run = 0; run < TRANSPORT_REPEATS; run += 1) {
-    await runStep(page, "transport");
+    await statusesDuring(page, () => setField(page, "#transport-form", "Seed", 100 + run));
   }
+  await page.click("#run-button");
   const geometriesAfter = await viewGeometryCount(page);
   check(geometriesBefore > 0 && geometriesAfter === geometriesBefore, "view memory of repeated transports", `${geometriesBefore} → ${geometriesAfter} geometries`);
 
@@ -836,38 +867,111 @@ try {
   const viewAfterLog = await stableViewerScreenshot();
   check(isSameView(viewAfterLog, viewBeforeLog), "3D view after the Log panel", isSameView(viewAfterLog, viewBeforeLog) ? "same" : "different");
 
-  // A new run of an earlier step removes the "Color by" options of the later
-  // outputs; the new mesh is not colored by an array which it does not have
-  await page.select("#color-select", "point:transport_velocity");
-  const reflowStatus = await runStep(page, "flow");
-  const reflowOptions = await colorOptions(page);
-  check(
-    reflowStatus.startsWith("Done") && !(await isStatusError(page)) && !reflowOptions.includes("point:transport_velocity"),
-    "flow again after the transport",
-    reflowStatus,
-  );
-  await page.select("#color-select", "point:pressure");
-  const regenerateStatus = await runStep(page, "network");
-  const isMeshGone = await page.$eval("#next-button", (node) => node.disabled);
-  check(isMeshGone, "generate removes the mesh", isMeshGone ? "next disabled" : "next enabled");
-  const regenerateOptions = await colorOptions(page);
-  const regenerateColor = await page.$eval("#color-select", (node) => node.value);
-  check(
-    regenerateStatus.startsWith("Done") &&
-      !(await isStatusError(page)) &&
-      !regenerateOptions.includes("point:pressure") &&
-      regenerateColor === "cell:fracture_id",
-    "generate again after the flow",
-    `${regenerateStatus}; Color by ${regenerateColor}`,
-  );
-
-  // Flow without a mesh and transport without a flow: a new example has no output
+  // The live run: a change of a setting runs again the steps which it affects; the results before them stay
   await page.click('[data-sidebar-tab="network"]');
   await selectExample(page, "box_west_east");
-  const noMeshStatus = await runStep(page, "flow");
-  check(await isStatusError(page), "flow without a mesh", noMeshStatus);
-  const noFlowStatus = await runStep(page, "transport");
-  check(await isStatusError(page), "transport without a flow", noFlowStatus);
+  await runAll(page);
+  await page.click("#run-button");
+  await waitIdle(page);
+  const isUpToDate = (await statusText(page)) === "All results are up to date.";
+  const isDone = (statuses) => /^Done in .*particles exited/.test(statuses.at(-1) ?? "");
+  const startsStep = (statuses, text) => statuses.some((status) => status.startsWith(text));
+  const acceptedBefore = Number(await resultValue(page, "Accepted fractures"));
+  await page.click('[data-sidebar-tab="flow"]');
+  const pressureStatuses = await statusesDuring(page, async () => {
+    await page.$eval('#flow-form [data-highlight-surface="west"] input', (input) => {
+      input.value = String(Number(input.value) + 0.5);
+      input.dispatchEvent(new Event("input"));
+    });
+  });
+  check(
+    isUpToDate &&
+      isDone(pressureStatuses) &&
+      startsStep(pressureStatuses, "Solving the flow") &&
+      !startsStep(pressureStatuses, "Generating") &&
+      !startsStep(pressureStatuses, "Meshing"),
+    "live run: a pressure change runs the flow and the transport again",
+    pressureStatuses.join(" | "),
+  );
+  // A new user-defined fracture: the stochastic fractures of the last run stay, without a new generation
+  await page.click('[data-sidebar-tab="fractures"]');
+  const fractureStatuses = await statusesDuring(page, async () => {
+    await page.evaluate(() =>
+      [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
+    );
+    await page.waitForFunction(() => [...document.querySelectorAll("#fractures-form h4")].some((node) => node.textContent === "Fracture 1"));
+    await setField(page, "#fractures-form", "Radius (m)", 4);
+  });
+  const acceptedAfter = Number(await resultValue(page, "Accepted fractures"));
+  check(
+    isDone(fractureStatuses) &&
+      fractureStatuses[0].startsWith("Making the network of the") &&
+      startsStep(fractureStatuses, "Meshing") &&
+      acceptedAfter === acceptedBefore + 1,
+    "live run: a new user fracture keeps the stochastic fractures",
+    `${fractureStatuses.join(" | ")}; accepted ${acceptedBefore} → ${acceptedAfter}`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_live_user_fracture.png` });
+
+  // A click on a fracture of the 3D view adds a release point, and the particles start there
+  await page.click('[data-sidebar-tab="transport"]');
+  const noPointStatuses = await statusesDuring(page, () => setField(page, "#transport-form", "Method", "points"));
+  check(
+    (await isStatusError(page)) && noPointStatuses.at(-1).startsWith("The seeding has no release point"),
+    "live run: points seeding without a point",
+    noPointStatuses.at(-1),
+  );
+  await page.click("#pick-points");
+  const isPickingOn = await page.$eval("#pick-points", (node) => node.getAttribute("aria-pressed") === "true");
+  const pointCount = () => page.$$eval("#release-points li", (nodes) => nodes.length);
+  const pointStatuses = await statusesDuring(page, async () => {
+    // A click on the boundary surfaces only (no fracture) adds no point: the points of a grid around the middle of
+    // the free part of the view, until one is on a fracture
+    const { first, last, top, bottom } = await page.evaluate(() => ({
+      first: Math.ceil(document.querySelector("#settings-panel").getBoundingClientRect().right),
+      last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
+      top: window.innerHeight / 3,
+      bottom: (2 * window.innerHeight) / 3,
+    }));
+    const middle = { x: (first + last) / 2, y: (top + bottom) / 2 };
+    for (let ring = 0; ring < 10 && (await pointCount()) === 0; ring++) {
+      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        await page.mouse.click(middle.x + 20 * ring * dx, middle.y + 20 * ring * dy);
+        if ((await pointCount()) > 0) {
+          break;
+        }
+      }
+    }
+  });
+  const pointParticles = /of (\d+) particles/.exec(pointStatuses.at(-1) ?? "")?.[1];
+  check(
+    isPickingOn && (await pointCount()) === 1 && isDone(pointStatuses) && pointParticles === "1",
+    "live run: a click on a fracture adds a release point",
+    `${await pointCount()} points; ${pointStatuses.join(" | ")}`,
+  );
+  await page.mouse.move(0, 0);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  await page.screenshot({ path: `${screenshotDir}/e2e_release_point.png` });
+  await page.click("#pick-points");
+
+  // "Reset" removes all results; the next run starts from the seed
+  await page.mouse.move(0, 0);
+  const viewBeforeReset = await stableViewerScreenshot();
+  await page.click("#reset-button");
+  const afterReset = await page.evaluate(() => ({
+    hasResults: !document.querySelector("#results").hidden,
+    runText: document.querySelector("#run-button").textContent,
+  }));
+  await page.mouse.move(0, 0);
+  const resetView = await stableViewerScreenshot();
+  const resetStatuses = await statusesDuring(page, () => page.click("#run-button"));
+  await page.click("#run-button");
+  check(
+    !afterReset.hasResults && afterReset.runText === "Run" && resetStatuses[0] === "Generating…" && isDone(resetStatuses),
+    "reset, then a run from the seed",
+    `results ${afterReset.hasResults}, button ${afterReset.runText}; ${resetStatuses.join(" | ")}`,
+  );
+  check(!isSameView(resetView, viewBeforeReset), "the view after reset has no network", "changed");
 
   // The domain mesh dropdown: in the shape mode, a new shape replaces only the mesh
   await page.click('[data-sidebar-tab="domain"]');
@@ -938,7 +1042,7 @@ try {
   await page.waitForFunction(() =>
     [...document.querySelectorAll("#form option")].some((node) => node.textContent.endsWith("(not in the mesh)")),
   );
-  await runStep(page, "network");
+  await runAll(page);
   // The text of the app for the error of the library
   const badInputStatus = await statusText(page);
   check(
@@ -959,18 +1063,18 @@ try {
     input.value = "1837757520";
     input.dispatchEvent(new Event("input"));
   });
-  const noClusterStatus = await runStep(page, "network");
+  const noClusterStatus = await runAll(page);
   const isStatusWarning = await page.$eval("#status", (node) => node.classList.contains("is-warning"));
   const hasNetwork = await page.$eval("#results", (node) => !node.hidden);
-  // "Next" of the DFN tab needs a cluster which connects an in-flow and an out-flow surface
-  const isNoClusterNextDisabled = await page.$eval("#next-button", (node) => node.disabled);
+  // The mesh needs a cluster which connects an in-flow and an out-flow surface: the steps stop after the network
+  const hasFlow = await page.$eval("#flow-results", (node) => !node.hidden);
   check(
     isStatusWarning &&
       hasNetwork &&
-      isNoClusterNextDisabled &&
+      !hasFlow &&
       noClusterStatus.includes("No cluster connects an in-flow and an out-flow surface"),
     "no connecting cluster",
-    `${noClusterStatus}; next ${isNoClusterNextDisabled ? "disabled" : "enabled"}`,
+    `${noClusterStatus}; flow ${hasFlow ? "shown" : "none"}`,
   );
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_no_connecting_cluster.png` });
@@ -979,17 +1083,16 @@ try {
   const shapeRoles = await domainRoles(page);
   check(shapeRoles === BOX_ROLES, "default roles of a shape", shapeRoles);
 
-  // A change of a role clears the network; with no out-flow surface, the generation asks for one
+  // With no out-flow surface, the generation asks for one
   await setRole(page, "east", "noflow");
-  const isNetworkCleared = await page.$eval("#results", (node) => node.hidden);
-  const noOutflowStatus = await runStep(page, "network");
+  const noOutflowStatus = await runAll(page);
   check(
-    isNetworkCleared && noOutflowStatus === "Set at least one out-flow surface (Domain tab, Boundary surfaces).",
+    noOutflowStatus === "Set at least one out-flow surface (Domain tab, Boundary surfaces).",
     "no out-flow surface",
-    `${isNetworkCleared ? "cleared" : "not cleared"}; ${noOutflowStatus}`,
+    noOutflowStatus,
   );
 
-  // A large run: the view shows the new fractures during the run; then a cancel. FRAM on: a slow run (with FRAM off
+  // A large run: the view shows the new fractures during the run; then "Pause". FRAM on: a slow run (with FRAM off
   // the intersections soon need more memory than WebAssembly has)
   await selectExample(page, "box_west_east");
   await setFram(page, true);
@@ -1019,59 +1122,66 @@ try {
     `view ${isSameView(firstView, secondView) ? "unchanged" : "changed"}`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_generation_live.png` });
-  await page.click("#cancel-button");
+  await page.click("#run-button");
   await waitIdle(page);
-  const cancelStatus = await statusText(page);
-  check(cancelStatus === "Cancelled.", "cancel", cancelStatus);
+  // Before the first checkpoint (5 s) no fracture stays
+  const largeStopStatus = await statusText(page);
+  check(
+    largeStopStatus === "Paused." || /^Done in .*until the pause/s.test(largeStopStatus),
+    "stop of a large run",
+    largeStopStatus.replace("\n", " "),
+  );
 
-  // The new worker runs the next input
+  // The new worker runs the next input; "Pause" during the mesh keeps the network, and "Run" makes the mesh again
   await selectExample(page, "box_west_east");
-  const afterCancel = await runStep(page, "network");
-  check(afterCancel.startsWith("Done"), "run after cancel", afterCancel);
-  // A cancel of "Meshing" keeps the network; "Meshing" runs again
-  // In one step: the mesh of this small network is fast
   await page.evaluate(() => {
-    document.querySelector("#meshing-button").click();
-    document.querySelector("#cancel-button").click();
+    const observer = new MutationObserver(() => {
+      if (document.querySelector("#status").textContent === "Meshing…") {
+        observer.disconnect();
+        document.querySelector("#run-button").click();
+      }
+    });
+    observer.observe(document.querySelector("#status"), { childList: true, characterData: true, subtree: true });
   });
+  await page.click("#run-button");
   await waitIdle(page);
-  const meshCancelStatus = await statusText(page);
-  const hasNetworkAfterCancel = await page.$eval("#results", (node) => !node.hidden);
-  check(meshCancelStatus === "Cancelled." && hasNetworkAfterCancel, "cancel of meshing", meshCancelStatus);
-  const meshAfterCancel = await runMeshing(page);
-  check(meshAfterCancel.startsWith("Done"), "meshing after its cancel", meshAfterCancel);
+  const meshStopStatus = await statusText(page);
+  const hasNetworkAfterStop = await page.$eval("#results", (node) => !node.hidden);
+  check(meshStopStatus === "Paused." && hasNetworkAfterStop, "stop during the mesh", meshStopStatus);
+  const statusesAfterMeshStop = await statusesDuring(page, () => page.click("#run-button"));
+  await page.click("#run-button");
+  check(
+    statusesAfterMeshStop[0] === "Meshing…" && /^Done in .*particles exited/.test(statusesAfterMeshStop.at(-1)),
+    "run after a stop during the mesh",
+    statusesAfterMeshStop.join(" | "),
+  );
   await page.screenshot({ path: `${screenshotDir}/e2e_network.png` });
   await page.$eval(".family-card", (node) => node.scrollIntoView());
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
 
-  // Stop and keep the fractures after the first checkpoint (5 s), then continue:
-  // the network is that of a run with no stop. FRAM on: the run is longer than the first checkpoint
+  // "Pause" after the first checkpoint (5 s) keeps the fractures; "Run" continues: the network is that of a run with
+  // no stop. FRAM on and 95 fractures: the generation takes about 16 s on the Mac, longer than the first checkpoint
   await selectExample(page, "box_west_east");
   await setFram(page, true);
-  await setFractureCount(page, 80);
-  const fullRun = await runStep(page, "network");
+  await setFractureCount(page, 95);
+  await runAll(page);
+  const fullRunCount = await resultValue(page, "Final fractures");
+  await page.click("#reset-button");
   await page.click("#run-button");
-  await page.waitForFunction(() => !document.querySelector("#stop-button").disabled, { timeout: RUN_TIMEOUT });
-  await page.click("#stop-button");
+  await new Promise((resolve) => setTimeout(resolve, 9000));
+  await page.click("#run-button");
   await waitIdle(page);
   const stoppedStatus = await statusText(page);
-  const isContinueShown = await page.$eval("#continue-button", (node) => !node.hidden);
-  check(
-    /^Done in .*until the stop/s.test(stoppedStatus) && isContinueShown,
-    "stop and keep the fractures",
-    `${stoppedStatus.replace("\n", " ")}; Continue ${isContinueShown ? "shown" : "hidden"}`,
-  );
+  check(/^Done in .*until the pause/s.test(stoppedStatus), "stop keeps the fractures", stoppedStatus.replace("\n", " "));
   await page.screenshot({ path: `${screenshotDir}/e2e_stopped.png` });
-  await page.click("#continue-button");
-  await waitIdle(page);
-  const continuedStatus = await statusText(page);
-  const finalCount = (status) => /(\d+) final fractures/.exec(status)?.[1];
-  const isContinueHidden = await page.$eval("#continue-button", (node) => node.hidden);
+  const continuedStatus = await runAll(page);
+  const continuedCount = await resultValue(page, "Final fractures");
   check(
-    finalCount(continuedStatus) !== undefined && finalCount(continuedStatus) === finalCount(fullRun) && isContinueHidden,
-    "continue gives the network of a run with no stop",
-    `${continuedStatus}; with no stop: ${fullRun}`,
+    /^Done in .*particles exited/.test(continuedStatus) && continuedCount !== undefined && continuedCount === fullRunCount,
+    "run after the stop gives the network of a run with no stop",
+    `${continuedCount} final fractures, with no stop ${fullRunCount}; ${continuedStatus}`,
   );
+
 
   // The icons of the 3D view, the color bar first: each has a name, and a computer shows its label only at the pointer
   await page.mouse.move(0, 0);
@@ -1119,7 +1229,7 @@ try {
   await setFram(page, false);
   const labelBeforeRun = await discardedLabel();
   await setFractureCount(page, 10);
-  await runStep(page, "network");
+  await runAll(page);
   const labelWithoutFram = await discardedLabel();
   check(
     labelWithFram === "Removed and rejected (Removed and rejected, Removed and rejected, cross true)" &&
@@ -1129,9 +1239,13 @@ try {
     `FRAM on: ${labelWithFram}; FRAM off, before the run: ${labelBeforeRun}; after: ${labelWithoutFram}`,
   );
   await page.hover("#reset-camera");
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  const hoverStart = Date.now();
+  // The transition of the label (0.15 s)
+  await page
+    .waitForFunction(() => getComputedStyle(document.querySelector("#reset-camera .icon-label")).opacity === "1", { timeout: 3000 })
+    .catch(() => {});
   const hoverLabel = await page.$eval("#reset-camera .icon-label", (node) => getComputedStyle(node).opacity);
-  check(hoverLabel === "1", "icon label at the pointer", hoverLabel);
+  check(hoverLabel === "1", "icon label at the pointer", `${hoverLabel} after ${Date.now() - hoverStart} ms`);
   await page.screenshot({ path: `${screenshotDir}/e2e_icons.png` });
 
   // The color bar goes off and comes back; the choice stays through a new color
@@ -1156,7 +1270,7 @@ try {
 
   // The Log panel stays open during a run, and the settings panel too
   await page.click("#log-button");
-  await runStep(page, "network");
+  await runAll(page);
   const isPanelShownAfterRun = await page.$eval("#settings-panel", (node) => getComputedStyle(node).display !== "none");
   check(
     (await isLogShown()) && isPanelShownAfterRun,

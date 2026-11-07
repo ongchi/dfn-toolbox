@@ -140,12 +140,8 @@
             <button id="panel-open" class="button" type="button" aria-label="Show the settings" title="Show the settings" hidden>
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
             </button>
-            <button id="run-button" class="button button-primary" type="button">Generate</button>
-            <button id="continue-button" class="button" type="button" hidden>Continue</button>
-            <button id="stop-button" class="button" type="button" hidden><span class="label-long">Stop and keep the fractures</span><span class="label-short">Stop</span></button>
-            <button id="cancel-button" class="button" type="button" hidden>Cancel</button>
-            <button id="meshing-button" class="button" type="button" hidden>Meshing</button>
-            <button id="next-button" class="button" type="button">Next</button>
+            <button id="run-button" class="button button-primary" type="button" title="Run all steps; a change of a setting runs the steps again" aria-pressed="false">Run</button>
+            <button id="reset-button" class="button" type="button" title="Remove all results: the next run starts from the seed">Reset</button>
             <button id="log-button" class="button log-button" type="button" aria-expanded="false" aria-controls="log-view">Log</button>
           </div>
           <progress id="progress" max="1" value="0" hidden></progress>
