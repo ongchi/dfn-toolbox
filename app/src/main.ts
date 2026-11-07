@@ -46,8 +46,8 @@ import {
   type RegionBounds,
 } from "./inputFiles";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
-import { renderTransportForm, routingSection } from "./transport/form";
-import { defaultTransportState, type TimeUnit, type TransportState } from "./transport/state";
+import { renderTransportForm, routingSection, type PointPicking } from "./transport/form";
+import { defaultTransportState, type ReleasePoint, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
 import { convertOrientation, polygonFileShapes, userFracturesToVtp } from "./userFractures";
@@ -178,6 +178,8 @@ let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
 /** The time unit of the input of `transportOutput`: the unit of its velocities */
 let transportTimeUnit: TimeUnit = "days";
+/** A click on a final fracture of the 3D view adds a release point (Transport tab, seeding "points") */
+let isPickingPoints = false;
 let activeSidebarTab: SidebarTab = "domain";
 /** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
 let lastShape: string | null = null;
@@ -349,9 +351,32 @@ function renderFlow(): void {
   ui.settingsFlowForm.replaceChildren(fluidSection(flowState, flowContext));
 }
 
+const pointPicking: PointPicking = {
+  get isOn() {
+    return isPickingPoints;
+  },
+  setOn: (isOn) => {
+    isPickingPoints = isOn;
+    renderTransport();
+  },
+};
+
+function addReleasePoint(point: ReleasePoint): void {
+  transportState.seeding.points.push(point);
+  renderTransport();
+  transportContext.changed();
+}
+
 function renderTransport(): void {
-  renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext);
+  const isPointSeeding = transportState.seeding.method === "points";
+  // The picking needs the shown triangle mesh of a flow
+  isPickingPoints &&= isPointSeeding && flowOutput !== null && activeSidebarTab === "transport";
+  renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext, pointPicking);
   ui.settingsTransportForm.replaceChildren(routingSection(transportState, transportContext));
+  void updateViewer((view) => {
+    view.setPointPicking(isPickingPoints ? addReleasePoint : null);
+    view.setReleasePoints(isPointSeeding ? transportState.seeding.points : []);
+  });
 }
 
 function selectSidebarTab(name: SidebarTab): void {
@@ -367,6 +392,9 @@ function selectSidebarTab(name: SidebarTab): void {
   ui.form.hidden = name !== "network";
   ui.flowForm.hidden = name !== "flow";
   ui.transportForm.hidden = name !== "transport";
+  if (isPickingPoints && name !== "transport") {
+    pointPicking.setOn(false);
+  }
   const runText = RUN_BUTTON_TEXT[name];
   ui.runButton.hidden = runText === null;
   ui.runButton.textContent = runText ?? "";

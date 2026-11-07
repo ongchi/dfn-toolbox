@@ -434,3 +434,22 @@ export function vectorMagnitudes(components: ArrayLike<number>): Float64Array {
   }
   return magnitudes;
 }
+
+/** Largest move of the pointer (pixels) between down and up which is a click, not a camera move */
+const CLICK_DISTANCE = 4;
+
+/** True if the pointer went up near the place where it went down: a click, not a drag */
+export function isClick(down: { x: number; y: number }, up: { x: number; y: number }): boolean {
+  return Math.hypot(up.x - down.x, up.y - down.y) <= CLICK_DISTANCE;
+}
+
+/**
+ * The position of a point of the view in normalized device coordinates
+ * (-1 to 1, y up), from its position in the client area of the canvas
+ */
+export function deviceCoordinates(
+  client: { x: number; y: number },
+  canvas: { left: number; top: number; width: number; height: number },
+): [number, number] {
+  return [((client.x - canvas.left) / canvas.width) * 2 - 1, 1 - ((client.y - canvas.top) / canvas.height) * 2];
+}

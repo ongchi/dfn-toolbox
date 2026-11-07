@@ -300,7 +300,7 @@ test("a pressure which is not a number is an error", () => {
 test("an unknown seeding method is an error", () => {
   const toml = BOX.replace('method = "uniform_per_line"', 'method = "everywhere"');
   expect(problemsOf(toml)).toContain(
-    '[transport.seeding]: `method` must be "uniform_per_line", "equidistant", "random", "flux_weighted", "at_nodes"',
+    '[transport.seeding]: `method` must be "uniform_per_line", "equidistant", "random", "flux_weighted", "at_nodes", "points"',
   );
 });
 

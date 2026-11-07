@@ -15,7 +15,14 @@ import {
 
 const TIME_UNITS: readonly TimeUnit[] = ["seconds", "minutes", "hours", "days", "years"];
 const ROUTING_RULES: readonly RoutingRule[] = ["complete_mixing", "streamline_routing"];
-const SEEDING_METHODS: readonly SeedingMethod[] = ["uniform_per_line", "equidistant", "random", "flux_weighted", "at_nodes"];
+const SEEDING_METHODS: readonly SeedingMethod[] = [
+  "uniform_per_line",
+  "equidistant",
+  "random",
+  "flux_weighted",
+  "at_nodes",
+  "points",
+];
 
 function seedingLines(seeding: SeedingState): string[] {
   const lines = [`method = ${string(seeding.method)}`];
@@ -31,6 +38,10 @@ function seedingLines(seeding: SeedingState): string[] {
       break;
     case "at_nodes":
       lines.push(`particles_per_node = ${integer(seeding.particlesPerNode)}`);
+      break;
+    case "points":
+      lines.push(`points = [${seeding.points.map((point) => `[${point.map(float).join(", ")}]`).join(", ")}]`);
+      lines.push(`particles_per_point = ${integer(seeding.particlesPerPoint)}`);
       break;
   }
   return lines;
@@ -99,6 +110,10 @@ function readSeeding(table: Table, problems: string[]): SeedingState {
       break;
     case "at_nodes":
       seeding.particlesPerNode = reader.integer("particles_per_node", seeding.particlesPerNode);
+      break;
+    case "points":
+      seeding.points = reader.points("points");
+      seeding.particlesPerPoint = reader.integer("particles_per_point", seeding.particlesPerPoint);
       break;
   }
   reader.checkUnknownKeys();

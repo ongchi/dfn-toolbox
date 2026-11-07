@@ -9,7 +9,10 @@ export const TRANSPORT_FLOW_FILE = "flow.toml";
 
 export type TimeUnit = "seconds" | "minutes" | "hours" | "days" | "years";
 export type RoutingRule = "complete_mixing" | "streamline_routing";
-export type SeedingMethod = "uniform_per_line" | "equidistant" | "random" | "flux_weighted" | "at_nodes";
+export type SeedingMethod = "uniform_per_line" | "equidistant" | "random" | "flux_weighted" | "at_nodes" | "points";
+
+/** x, y, z in the coordinates of the mesh */
+export type ReleasePoint = [number, number, number];
 
 /** The keys of all methods; the TOML has only the keys of `method` */
 export interface SeedingState {
@@ -22,6 +25,10 @@ export interface SeedingState {
   particleCount: number;
   /** at_nodes */
   particlesPerNode: number;
+  /** points: the release points, picked on the fractures of the 3D view */
+  points: ReleasePoint[];
+  /** points */
+  particlesPerPoint: number;
 }
 
 export interface TransportState {
@@ -48,6 +55,8 @@ export function defaultTransportState(): TransportState {
       isWeightedByFlux: true,
       particleCount: 50,
       particlesPerNode: 1,
+      points: [],
+      particlesPerPoint: 1,
     },
   };
 }

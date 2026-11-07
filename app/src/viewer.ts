@@ -32,7 +32,10 @@ import {
   type Object3D,
   OrthographicCamera,
   PerspectiveCamera,
+  Points,
+  PointsMaterial,
   Quaternion,
+  Raycaster,
   Scene,
   ShaderMaterial,
   Sphere,
@@ -51,6 +54,8 @@ import {
   cellTriangles,
   colorFraction,
   colorRange,
+  deviceCoordinates,
+  isClick,
   localPositions,
   pathTubes,
   scalarBarTicks,
@@ -111,6 +116,8 @@ const BOUNDARY_SURFACE_COLOR = [0.75, 0.77, 0.8] as const;
 /** The highlighted boundary surface: the accent orange of the panels (`--accent` of `style.css`), more opaque */
 const HIGHLIGHT_COLOR = [1.0, 0.54, 0.36] as const;
 const HIGHLIGHT_OPACITY = 0.6;
+// The release points of the particles: the highlight color, in front of all shapes
+const RELEASE_POINT_PIXELS = 9;
 // The x, y, z axes in the top-left corner of the free part of the view: their part of the shorter side of the view, and their scene
 const AXES_VIEW_PART = 0.2;
 const AXES_CAMERA_DISTANCE = 3;
@@ -549,6 +556,10 @@ export class NetworkViewer {
   private isDrawPending = false;
   private coveredArea: CoveredArea = { left: 0, top: 0, bottom: 0 };
   private readonly canvas: HTMLCanvasElement;
+  private releasePoints: Points | null = null;
+  /** Gets each point of a click on the shown final fractures; null = no picking */
+  private onPick: ((point: [number, number, number]) => void) | null = null;
+  private pointerDown: { x: number; y: number } | null = null;
 
   private constructor(canvas: HTMLCanvasElement, renderer: WebGLRenderer, parent: HTMLElement) {
     this.canvas = canvas;
@@ -565,6 +576,20 @@ export class NetworkViewer {
     this.controls.rotateSpeed = 3;
     this.controls.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.DOLLY };
     this.controls.addEventListener("change", () => (this.isDrawPending = true));
+    // A click picks a point; a drag moves the camera
+    canvas.addEventListener("pointerdown", (event) => (this.pointerDown = { x: event.clientX, y: event.clientY }));
+    canvas.addEventListener("pointerup", (event) => {
+      const down = this.pointerDown;
+      this.pointerDown = null;
+      const up = { x: event.clientX, y: event.clientY };
+      if (this.onPick === null || down === null || !isClick(down, up)) {
+        return;
+      }
+      const point = this.fracturePointAt(up);
+      if (point !== null) {
+        this.onPick(point);
+      }
+    });
 
     new ResizeObserver(() => this.resize()).observe(parent);
     this.resize();
@@ -872,6 +897,48 @@ export class NetworkViewer {
       cones.setMatrixAt(point / step, matrix.compose(position, rotation, new Vector3().setScalar(size)));
     }
     return cones;
+  }
+
+  /** Turns the picking of points on the final fractures on (with the function which gets them) or off (null) */
+  setPointPicking(onPick: ((point: [number, number, number]) => void) | null): void {
+    this.onPick = onPick;
+    this.canvas.style.cursor = onPick === null ? "" : "crosshair";
+  }
+
+  /** The first point of the shown final fractures under a client position, in the coordinates of the mesh */
+  private fracturePointAt(client: { x: number; y: number }): [number, number, number] | null {
+    const layer = this.layers.get("final");
+    if (layer === undefined || !layer.group.visible) {
+      return null;
+    }
+    const raycaster = new Raycaster();
+    raycaster.setFromCamera(new Vector2(...deviceCoordinates(client, this.canvas.getBoundingClientRect())), this.camera);
+    const [hit] = raycaster.intersectObject(layer.mesh);
+    return hit === undefined ? null : [hit.point.x, hit.point.y, hit.point.z];
+  }
+
+  /** Shows the release points of the particles as dots in front of all shapes; replaces the old ones */
+  setReleasePoints(points: readonly (readonly [number, number, number])[]): void {
+    this.removeObject(this.releasePoints);
+    this.releasePoints = null;
+    if (points.length === 0) {
+      return;
+    }
+    const { origin, positions } = localPositions(points.flat());
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(positions, 3));
+    const [red, green, blue] = HIGHLIGHT_COLOR;
+    const material = new PointsMaterial({
+      color: new Color(red, green, blue),
+      size: RELEASE_POINT_PIXELS,
+      sizeAttenuation: false,
+      transparent: true,
+      depthTest: false,
+    });
+    this.releasePoints = placed(new Points(geometry, material), origin);
+    // After the translucent shapes
+    this.releasePoints.renderOrder = 2;
+    this.scene.add(this.releasePoints);
   }
 
   setVisible(layer: FractureLayer | "domain" | "trajectories" | "particles", isVisible: boolean): void {

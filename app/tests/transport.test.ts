@@ -10,7 +10,8 @@ import { FLOW_MESH_FILE } from "../src/flow/state";
 import { flowToLibraryToml } from "../src/flow/toml";
 import { check_transport_input, TrajectoryDetail } from "../src/pkg/dfn_wasm.js";
 import { defaultTransportState, TRANSPORT_FLOW_FILE, type TransportState } from "../src/transport/state";
-import { transportTables, transportToLibraryToml } from "../src/transport/toml";
+import { parseToml, tablesToToml } from "../src/form/toml";
+import { readTransport, transportTables, transportToLibraryToml } from "../src/transport/toml";
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
 import { compareOutputFolders, generateExample, initWasm, runNativeDfntrans, runTransport } from "./cases";
 
@@ -130,4 +131,40 @@ test("the transport velocities give a speed at the points of the mesh", () => {
   const pointCount = Number(mesh.match(/NumberOfPoints="(\d+)"/)?.[1]);
   const speeds = [...nodeVelocityMagnitudes(result.sector_nodes, result.sector_velocities, pointCount, state.timeUnit)];
   expect(speeds.every((speed) => Number.isFinite(speed) && speed >= 0) && speeds.some((speed) => speed > 0)).toBe(true);
+});
+
+/** The first point of the triangle mesh: it is on a fracture */
+function firstMeshPoint(): [number, number, number] {
+  const numbers = /<Points>\s*<DataArray[^>]*>\s*([^<]*)/.exec(mesh)?.[1].trim().split(/\s+/).map(Number) ?? [];
+  return [numbers[0], numbers[1], numbers[2]];
+}
+
+/** The transport state with particles at release points */
+function pointState(points: [number, number, number][]): TransportState {
+  const state = defaultTransportState();
+  state.seeding.method = "points";
+  state.seeding.points = points;
+  state.seeding.particlesPerPoint = 2;
+  return state;
+}
+
+test("the release points of the workflow file give the same state back", () => {
+  const state = pointState([firstMeshPoint(), [1.5, -2.25, 1e-7]]);
+  const problems: string[] = [];
+  const read = readTransport(parseToml(tablesToToml(transportTables(state), "")), problems);
+  expect([read, problems]).toEqual([state, []]);
+});
+
+test("the TOML of release points is a valid input", () => {
+  expect(check_transport_input(transportToml(pointState([firstMeshPoint()])), flowToml, mesh)).toBeUndefined();
+});
+
+test("a release point on the mesh gives its particles", () => {
+  const result = runTransport(transportToml(pointState([firstMeshPoint()])), flowToml, mesh, 1, TrajectoryDetail.View);
+  expect([result.error, result.particle_count]).toEqual([undefined, 2]);
+});
+
+test("no release point is an error", () => {
+  const error = check_transport_input(transportToml(pointState([])), flowToml, mesh);
+  expect(error?.kind).toBe("dfntrans.NoSeedingPoints");
 });

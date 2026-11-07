@@ -272,6 +272,13 @@ export function isTable(value: unknown): value is Table {
 }
 
 /** Reads the keys of one table and records each problem with the path of the table */
+function pointOf(value: unknown): [number, number, number] | null {
+  if (Array.isArray(value) && value.length === 3 && value.every((item) => typeof item === "number" || typeof item === "bigint")) {
+    return [Number(value[0]), Number(value[1]), Number(value[2])];
+  }
+  return null;
+}
+
 export class TableReader {
   private readonly usedKeys = new Set<string>();
 
@@ -390,11 +397,26 @@ export class TableReader {
     if (value === undefined) {
       return [0, 0, 0];
     }
-    if (Array.isArray(value) && value.length === 3 && value.every((item) => typeof item === "number" || typeof item === "bigint")) {
-      return [Number(value[0]), Number(value[1]), Number(value[2])];
+    const point = pointOf(value);
+    if (point === null) {
+      this.problems.push(`${this.where(key)} must be an array of three numbers`);
+      return [0, 0, 0];
     }
-    this.problems.push(`${this.where(key)} must be an array of three numbers`);
-    return [0, 0, 0];
+    return point;
+  }
+
+  /** An array of points, each three numbers */
+  points(key: string): [number, number, number][] {
+    const value = this.value(key, false);
+    if (value === undefined) {
+      return [];
+    }
+    const points = Array.isArray(value) ? value.map(pointOf) : [null];
+    if (points.some((point) => point === null)) {
+      this.problems.push(`${this.where(key)} must be an array of points, each an array of three numbers`);
+      return [];
+    }
+    return points as [number, number, number][];
   }
 
   stringArray(key: string): string[] {

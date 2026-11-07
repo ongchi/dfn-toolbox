@@ -6,7 +6,9 @@ import {
   cellTriangles,
   colorFraction,
   colorRange,
+  deviceCoordinates,
   domainEdges,
+  isClick,
   localPositions,
   pathTubes,
   powerOfTenText,
@@ -175,4 +177,19 @@ test("a path of one repeated point has no tube", () => {
 
 test("the diagonal of the bounds", () => {
   expect(boundsDiagonal([0, 0, 0, 3, 4, 0])).toBe(5);
+});
+
+test("a pointer up near its down position is a click", () => {
+  expect(isClick({ x: 100, y: 50 }, { x: 103, y: 52 })).toBe(true);
+});
+
+test("a pointer up far from its down position is a camera move", () => {
+  expect(isClick({ x: 100, y: 50 }, { x: 110, y: 50 })).toBe(false);
+});
+
+test("the corners and the center of the canvas have the device coordinates -1, 0 and 1", () => {
+  const canvas = { left: 10, top: 20, width: 200, height: 100 };
+  expect(deviceCoordinates({ x: 10, y: 20 }, canvas)).toEqual([-1, 1]);
+  expect(deviceCoordinates({ x: 110, y: 70 }, canvas)).toEqual([0, 0]);
+  expect(deviceCoordinates({ x: 210, y: 120 }, canvas)).toEqual([1, -1]);
 });
