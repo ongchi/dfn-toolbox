@@ -49,8 +49,8 @@ output.
 - **Transport**: the particles start only at release points (the routing is
   in the settings). Click "Pick points", then click on a fracture of the 3D
   view: each click adds a release point and runs the particle tracking. With
-  no release point, the run ends after the flow. Only the paths of the
-  particles which exit show.
+  no release point, the run ends after the flow. The path of each particle
+  shows, also of a particle which does not exit.
 
 The 3D view shows the fractures during a generation, cut at the domain (the
 mesh has the same shape). A change of a user-defined fracture shows its

@@ -42,13 +42,14 @@ export function transportTables(state: TransportState): TomlTable[] {
 
 /**
  * The trajectories and the velocities are always on in dfn-toolbox (the 3D view
- * shows them), thus the workflow file has no section for the output; the
+ * shows them), also of the particles which do not exit (each release point
+ * shows its path), thus the workflow file has no section for the output; the
  * dfntrans input needs it
  */
 const OUTPUT_TABLE: TomlTable = {
   name: "output",
   isArray: false,
-  lines: ["trajectories = true", "all_particles = false", "velocities = true"],
+  lines: ["trajectories = true", "all_particles = true", "velocities = true"],
 };
 
 /**

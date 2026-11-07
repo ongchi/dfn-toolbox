@@ -879,14 +879,9 @@ try {
       `${name}: no transport boundaries and no routing`,
       `boundaries ${hasTransportBoundaries}, routing ${hasTransportRouting}`,
     );
-    // dfntrans gives only the paths of the particles which exit: a point in a fracture with no exit has none
+    // The path of each particle shows, also of a particle which does not exit
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
-    const hasExit = !/: 0 of \d+ particles exited/.test(transportStatuses.at(-1));
-    check(
-      areTrajectoriesShown === hasExit,
-      `${name}: trajectories shown if a particle exits`,
-      `exit ${hasExit}, trajectories ${areTrajectoriesShown}`,
-    );
+    check(areTrajectoriesShown, `${name}: trajectories shown`, transportStatuses.at(-1));
     const hasTransportVelocity = (await colorOptions(page)).includes("point:transport_velocity");
     check(hasTransportVelocity, `${name}: transport velocity in Color by`, String(hasTransportVelocity));
     await page.select("#color-select", "point:transport_velocity");

@@ -62,8 +62,8 @@ test("the workflow file has no in-flow and out-flow surfaces in the transport", 
   expect(root.lines.filter((line) => /^(inflow|outflow) =/.test(line))).toEqual([]);
 });
 
-test("the dfntrans input always has the trajectories and the velocities, and only the particles which exit", () => {
-  expect(transportToml()).toContain("[output]\ntrajectories = true\nall_particles = false\nvelocities = true\n");
+test("the dfntrans input always has the trajectories and the velocities, also of the particles which do not exit", () => {
+  expect(transportToml()).toContain("[output]\ntrajectories = true\nall_particles = true\nvelocities = true\n");
 });
 
 // The math functions are the same, but the flow solution is not exactly the
