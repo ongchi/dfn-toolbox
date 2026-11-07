@@ -204,6 +204,13 @@ pub fn fehm_report(error: &FehmError) -> ErrorReport {
         FehmError::SolverTolerance { tolerance } => {
             report("fehm.SolverTolerance").with("tolerance", tolerance)
         }
+        // `fehm::solve` gives `NoBoundary` for a triangle mesh; the others
+        // are of the voxel grids
+        FehmError::NoBoundaryNodes { .. } => report("fehm.NoBoundaryNodes"),
+        FehmError::NodeArrayLength { .. } => report("fehm.NodeArrayLength"),
+        FehmError::VoxelArrayLength { .. } => report("fehm.VoxelArrayLength"),
+        FehmError::VoxelSize { .. } => report("fehm.VoxelSize"),
+        FehmError::VoxelPermeability { .. } => report("fehm.VoxelPermeability"),
         FehmError::SolverMaxIterations => report("fehm.SolverMaxIterations"),
         FehmError::InvalidMesh(_) => report("fehm.InvalidMesh"),
         FehmError::DegenerateTriangle { cell } => {
@@ -237,6 +244,7 @@ pub fn dfntrans_report(error: &DfntransError) -> ErrorReport {
             report("dfntrans.BoundaryInInflowAndOutflow").with("boundary", boundary)
         }
         DfntransError::ParticleCount => report("dfntrans.ParticleCount"),
+        DfntransError::NoSeedingPoints => report("dfntrans.NoSeedingPoints"),
         DfntransError::MatrixPorosity => report("dfntrans.MatrixPorosity"),
         DfntransError::MatrixDiffusivity => report("dfntrans.MatrixDiffusivity"),
         DfntransError::ControlPlaneSpacing => report("dfntrans.ControlPlaneSpacing"),
@@ -249,6 +257,11 @@ pub fn dfntrans_report(error: &DfntransError) -> ErrorReport {
         }
         DfntransError::NoSeededParticle => report("dfntrans.NoSeededParticle"),
         DfntransError::NoCellForSeeding => report("dfntrans.NoCellForSeeding"),
+        DfntransError::SeedingPointOutsideMesh { index, x, y, z } => {
+            report("dfntrans.SeedingPointOutsideMesh")
+                .with("index", index)
+                .with("point", &format!("({x}, {y}, {z})"))
+        }
         DfntransError::NoInflowFlux { volume_flux } => {
             report("dfntrans.NoInflowFlux").with("volume_flux", &format!("{volume_flux:e}"))
         }

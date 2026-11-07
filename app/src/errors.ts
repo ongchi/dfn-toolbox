@@ -107,6 +107,8 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     "The network needs a point on an in-flow and on an out-flow surface. Change the roles of the surfaces (Domain tab), or generate another network.",
   "dfntrans.BoundaryInInflowAndOutflow": (f) => `The boundary ${f.boundary} cannot be in-flow and out-flow.`,
   "dfntrans.ParticleCount": () => "The number of particles (Transport tab, Seeding) must be 1 or more.",
+  "dfntrans.NoSeedingPoints": () =>
+    "The seeding has no release point. Click “Pick points” (Transport tab, Seeding), then click on a fracture.",
   "dfntrans.MatrixPorosity": () => "The matrix porosity must be above 0 and at most 1.",
   "dfntrans.MatrixDiffusivity": () => "The matrix diffusivity must be above 0.",
   "dfntrans.EmptyInflowOutflow": () =>
@@ -117,6 +119,8 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     "The seeding places no particle. Check the in-flow surfaces (Domain tab) and the seeding (Transport tab).",
   "dfntrans.NoCellForSeeding": () =>
     "Each cell has a point on the out-flow surfaces, thus the seeding cannot place a particle. Change the roles of the surfaces (Domain tab).",
+  "dfntrans.SeedingPointOutsideMesh": (f) =>
+    `Release point ${f.index} ${f.point} is not on the triangle mesh. Remove it (Transport tab, Seeding) and click on a fracture again.`,
   "dfntrans.NoInflowFlux": (f) =>
     `The flow into the network at the in-flow surfaces is ${f.volume_flux} m³/s, not above 0. Change the pressures (Flow tab): the in-flow pressure must be higher.`,
 };
