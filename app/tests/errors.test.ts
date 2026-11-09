@@ -70,7 +70,7 @@ particle_count = 10
 
 test("a family region which the mesh does not have names the family and the region", () => {
   const text = networkErrorText((toml) => toml.replace("[[family]]", '[[family]]\nregion = "nowhere"'));
-  expect(text).toBe("Family 1 (DFN tab): the domain has no region nowhere. Choose another region.");
+  expect(text).toBe("Family 1 (DFN panel): the domain has no region nowhere. Choose another region.");
 });
 
 test("a minimum feature size of 0 names the field of the form", () => {
@@ -82,7 +82,7 @@ test("a user fracture aperture of 0 names the fracture and the field of the form
   const files = readCase("user_fractures");
   const userFractures = files.userFractures?.replace(/(Name="aperture" format="ascii">\n)2e-4/, "$10.0");
   const text = userText(check_input(files.toml, files.mesh, userFractures));
-  expect(text).toBe("Fracture 1 (User fractures tab): Aperture must be greater than 0.");
+  expect(text).toBe("Fracture 1 (User fractures panel): Aperture must be greater than 0.");
 });
 
 test("a domain without boundary surfaces asks for another domain shape", () => {
@@ -93,7 +93,7 @@ test("a domain without boundary surfaces asks for another domain shape", () => {
       .replace("keep_only_connected_to = []", 'keep_only_connected_to = [["west"], ["east"]]'),
   );
   expect(text).toBe(
-    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect an in-flow and an out-flow surface. Choose another domain shape (Domain tab).",
+    "The domain shape has no boundary surfaces: the network keeps only the clusters which connect an in-flow and an out-flow surface. Choose another domain shape (Domain panel).",
   );
 });
 
@@ -105,16 +105,16 @@ function clusterGroupsErrorText(groups: string): string {
 }
 
 test("no out-flow surface asks for one", () => {
-  expect(clusterGroupsErrorText('[["west"], []]')).toBe("Set at least one out-flow surface (Domain tab, Boundary surfaces).");
+  expect(clusterGroupsErrorText('[["west"], []]')).toBe("Set at least one out-flow surface (Domain panel, Boundary surfaces).");
 });
 
 test("no in-flow surface asks for one", () => {
-  expect(clusterGroupsErrorText('[[], ["east"]]')).toBe("Set at least one in-flow surface (Domain tab, Boundary surfaces).");
+  expect(clusterGroupsErrorText('[[], ["east"]]')).toBe("Set at least one in-flow surface (Domain panel, Boundary surfaces).");
 });
 
 test("a role of a surface which the domain does not have names the surface", () => {
   expect(clusterGroupsErrorText('[["west"], ["north"]]')).toBe(
-    "The domain has no boundary surface north. Choose the roles of the surfaces again (Domain tab).",
+    "The domain has no boundary surface north. Choose the roles of the surfaces again (Domain panel).",
   );
 });
 
@@ -125,24 +125,24 @@ test("a family with 2 points names the family", () => {
 
 test("a temperature outside the range gives the range of fehm", () => {
   const text = userText(check_flow_input(FLOW_TOML.replace("20.0", "400.0"), MESH));
-  expect(text).toBe("Temperature (Settings, Fluid) must be 15 to 360 °C.");
+  expect(text).toBe("Temperature (Flow panel, Fluid) must be 15 to 360 °C.");
 });
 
 test("a boundary with no point names the boundary", () => {
   const text = userText(check_flow_input(FLOW_TOML.replace('"west"', '"none"'), MESH));
   expect(text).toBe(
-    "The boundary none has no point in the network. Change its role (Domain tab), or generate another network.",
+    "The boundary none has no point in the network. Change its role (Domain panel), or generate another network.",
   );
 });
 
 test("a porosity above 1 names the field of the form", () => {
   const text = userText(check_transport_input(TRANSPORT_TOML.replace("porosity = 1.0", "porosity = 2.0"), FLOW_TOML, MESH));
-  expect(text).toBe("Porosity (Transport tab) must be above 0 and at most 1.");
+  expect(text).toBe("Porosity (Transport panel) must be above 0 and at most 1.");
 });
 
-test("an error of the flow input of the transport is a text of the Flow tab", () => {
+test("an error of the flow input of the transport is a text of the Flow panel", () => {
   const text = userText(check_transport_input(TRANSPORT_TOML, FLOW_TOML.replace("10.0", "200.0"), MESH));
-  expect(text).toBe("The pressure of the boundary west (Flow tab) must be 0.001 to 110 MPa.");
+  expect(text).toBe("The pressure of the boundary west (Flow panel) must be 0.001 to 110 MPa.");
 });
 
 test("an error of the file format is an internal error with the text of the library", () => {

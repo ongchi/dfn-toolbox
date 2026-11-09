@@ -1,7 +1,7 @@
 // The input form of the network: one section for each part of `[network]`, in
-// three tabs (the domain, the user-defined fractures, and the other sections)
-// and the settings dialog (the fracture shape, FRAM, the clusters and the
-// triangle mesh).
+// three step panels (the domain, the user-defined fractures, and the other
+// sections, with FRAM, the clusters and the triangle mesh in its advanced
+// part) and the settings dialog (the fracture shape).
 import { clustersSection } from "./clusters";
 import type { FormContext } from "./context";
 import { familiesSection } from "./families";
@@ -14,15 +14,16 @@ import { shapeSection } from "./shape";
 import type { FormState } from "./state";
 import { userFracturesSection } from "./userFractures";
 
-/** The containers of the three tabs of the network input, and of its sections in the settings dialog */
+/** The containers of the three step panels of the network input, of its advanced part, and of its section in the settings dialog */
 export interface NetworkTabs {
   domain: HTMLElement;
   fractures: HTMLElement;
   network: HTMLElement;
+  advanced: HTMLElement;
   settings: HTMLElement;
 }
 
-/** Replaces the sections of a tab; its scroll position stays */
+/** Replaces the sections of a container; its scroll position stays */
 function replaceSections(container: HTMLElement, ...sections: HTMLElement[]): void {
   const scrollTop = container.scrollTop;
   container.replaceChildren(...sections);
@@ -38,9 +39,9 @@ export function renderForm(tabs: NetworkTabs, state: FormState, context: FormCon
     generationSection(state, context),
     familiesSection(state, context),
   );
+  replaceSections(tabs.settings, shapeSection(state, context));
   replaceSections(
-    tabs.settings,
-    shapeSection(state, context),
+    tabs.advanced,
     framSection(state, context),
     clustersSection(state, context),
     meshSection(state, context),

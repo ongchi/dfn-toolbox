@@ -96,60 +96,98 @@
         </a>
       </div>
 
-      <!-- The settings and the run bar: side by side on a wide screen, a bottom sheet on a phone -->
+      <header id="title-panel" class="panel title-panel">
+        <h1>dfn-toolbox <span class="subtitle">Discrete fracture network: generation, flow and transport</span></h1>
+      </header>
+
+      <!-- The run bar (a media player: run, reset, the steps, the log) and the settings of the open step above it;
+           a bottom sheet on a phone -->
       <div id="dock" class="dock">
-        <aside id="settings-panel" class="panel settings-panel">
+        <section id="step-panel" class="panel step-panel" aria-labelledby="step-panel-title" hidden>
           <header class="panel-header">
             <button id="sheet-size" class="sheet-handle" type="button" aria-label="Larger settings"></button>
-            <h1>dfn-toolbox <span class="subtitle">Discrete fracture network: generation, flow and transport</span></h1>
-            <button id="panel-close" class="icon-button" type="button" aria-label="Hide the settings" title="Hide the settings">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+            <h2 id="step-panel-title"></h2>
+            <button id="panel-close" class="icon-button" type="button" aria-label="Close the settings" title="Close the settings">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
           </header>
-          <div class="tabs sidebar-tabs" role="tablist">
-            <button class="tab is-active" type="button" data-sidebar-tab="domain">Domain</button>
-            <button class="tab" type="button" data-sidebar-tab="fractures"><span class="label-long">User fractures</span><span class="label-short">Fractures</span></button>
-            <button class="tab" type="button" data-sidebar-tab="network">DFN</button>
-            <button class="tab" type="button" data-sidebar-tab="flow">Flow</button>
-            <button class="tab" type="button" data-sidebar-tab="transport">Transport</button>
+          <div id="step-panel-body" class="step-panel-body">
+            <div data-step-group="domain">
+              <fieldset id="domain-source" class="domain-source">
+                <label><input type="radio" name="domain-source" value="example" checked /> Example</label>
+                <label><input type="radio" name="domain-source" value="shape" /> Predefined domain shape</label>
+              </fieldset>
+              <label id="example-row" class="example-row">
+                <span class="field-label">Example</span>
+                <select id="example-select">
+                  <option value="">Choose…</option>
+                </select>
+              </label>
+              <p id="example-description" class="example-description" hidden></p>
+              <div id="domain-form" class="form"></div>
+              <p id="shape-description" class="example-description" hidden></p>
+              <div id="boundary-surfaces" class="boundary-surfaces" hidden></div>
+            </div>
+            <div data-step-group="fractures">
+              <div id="fractures-form" class="form"></div>
+            </div>
+            <div data-step-group="network">
+              <div id="form" class="form"></div>
+              <!-- The sections of the network input which most runs keep (form/index.ts) -->
+              <details class="advanced-settings">
+                <summary>Advanced: FRAM, clusters, triangle mesh</summary>
+                <div id="network-advanced-form" class="form"></div>
+              </details>
+            </div>
+            <div data-step-group="flow">
+              <div id="flow-form" class="form"></div>
+              <div id="flow-settings-form" class="form"></div>
+            </div>
+            <div data-step-group="transport">
+              <div id="transport-form" class="form"></div>
+              <div id="transport-settings-form" class="form"></div>
+            </div>
           </div>
-          <div class="sidebar">
-            <fieldset id="domain-source" class="domain-source">
-              <label><input type="radio" name="domain-source" value="example" checked /> Example</label>
-              <label><input type="radio" name="domain-source" value="shape" /> Predefined domain shape</label>
-            </fieldset>
-            <label id="example-row" class="example-row">
-              <span class="field-label">Example</span>
-              <select id="example-select">
-                <option value="">Choose…</option>
-              </select>
-            </label>
-            <p id="example-description" class="example-description" hidden></p>
-            <div id="domain-form" class="form"></div>
-            <p id="shape-description" class="example-description" hidden></p>
-            <div id="boundary-surfaces" class="boundary-surfaces" hidden></div>
-            <div id="fractures-form" class="form" hidden></div>
-            <div id="form" class="form" hidden></div>
-            <div id="flow-form" class="form" hidden></div>
-            <div id="transport-form" class="form" hidden></div>
-          </div>
-        </aside>
+        </section>
 
         <div id="run-panel" class="panel run-panel">
-          <div class="run-buttons">
-            <button id="panel-open" class="button" type="button" aria-label="Show the settings" title="Show the settings" hidden>
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          <div class="player">
+            <button id="run-button" class="player-button player-play" type="button" aria-label="Run" aria-pressed="false" title="Run all steps; a change of a setting runs the steps again">
+              <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+              <svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14" /></svg>
             </button>
-            <button id="run-button" class="button button-primary" type="button" title="Run all steps; a change of a setting runs the steps again" aria-pressed="false">Run</button>
-            <button id="reset-button" class="button" type="button" title="Remove all results: the next run starts from the seed">Reset</button>
-            <button id="log-button" class="button log-button" type="button" aria-expanded="false" aria-controls="log-view">Log</button>
+            <button id="reset-button" class="player-button" type="button" aria-label="Reset" title="Reset: remove all results; the next run starts from the seed">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14L8 12z" /></svg>
+            </button>
+            <!-- One segment for each step: its state, and a click opens its settings -->
+            <div class="timeline" role="group" aria-label="Steps">
+              <button class="step-segment" type="button" data-step-panel="domain" data-step-state="empty" aria-expanded="false" aria-controls="step-panel">
+                <span class="step-label">Domain</span><span class="step-strip"></span>
+              </button>
+              <button class="step-segment" type="button" data-step-panel="fractures" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
+                <span class="step-label"><span class="label-long">User fractures</span><span class="label-short">Fractures</span></span><span class="step-strip"></span>
+              </button>
+              <button class="step-segment" type="button" data-step-panel="network" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
+                <span class="step-label">DFN</span><span class="step-strip"></span>
+                <progress id="progress" max="1" value="0" hidden></progress>
+              </button>
+              <button class="step-segment" type="button" data-step-panel="flow" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
+                <span class="step-label">Flow</span><span class="step-strip"></span>
+              </button>
+              <button class="step-segment" type="button" data-step-panel="transport" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
+                <span class="step-label">Transport</span><span class="step-strip"></span>
+              </button>
+            </div>
+            <button id="log-button" class="player-button" type="button" aria-label="Log" title="Log" aria-expanded="false" aria-controls="log-view">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
+            </button>
           </div>
-          <progress id="progress" max="1" value="0" hidden></progress>
-          <pre id="status" class="status" hidden></pre>
         </div>
       </div>
 
       <div id="log-view" class="panel log-view" hidden>
+        <!-- The status of the steps: progress, results, warnings and errors -->
+        <pre id="status" class="status" hidden></pre>
         <p id="log-empty" class="form-note">No results yet.</p>
         <details id="results" class="results-section" open hidden>
           <summary>Fractures</summary>
@@ -180,12 +218,8 @@
               <span class="field-help">The pair of angles of the normal of each family and user fracture. A new choice changes the angles of each one to the same plane.</span>
             </label>
           </section>
-          <!-- The sections of the network input which are settings (form/index.ts) -->
+          <!-- The section of the network input which is a setting: the fracture shape (form/index.ts) -->
           <div id="settings-form"></div>
-          <!-- The section of the flow input which is a setting (flow/form.ts) -->
-          <div id="settings-flow-form"></div>
-          <!-- The section of the transport input which is a setting (transport/form.ts) -->
-          <div id="settings-transport-form"></div>
           <div class="dialog-buttons">
             <button class="button" value="close">Close</button>
           </div>

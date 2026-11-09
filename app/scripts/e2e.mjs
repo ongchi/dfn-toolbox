@@ -6,7 +6,8 @@
 // pressure change, a new user-defined fracture, a release point, "Clear
 // points", "Reset"), the choice of a predefined mesh, a bad input, the
 // fractures in the view during a run, "Pause" during the mesh, and "Pause"
-// with the fractures kept and a new "Run", and the phone layout; it saves
+// with the fractures kept and a new "Run", the run bar (the segments of the
+// steps and their settings panels), and the phone layout; it saves
 // screenshots.
 import { PNG } from "pngjs";
 import puppeteer from "puppeteer-core";
@@ -28,7 +29,7 @@ const MINIMUM_SURFACE_PIXEL_SHARE = 0.05;
 const MAXIMUM_NOISE = 2;
 const MAXIMUM_NOISY_PIXEL_SHARE = 0.0001;
 // The end of the status of a run with no release point: the transport runs only with one
-const NO_POINT_HINT = "To track particles, click “Pick points” (Transport tab), then click on a fracture.";
+const NO_POINT_HINT = "To track particles, click “Pick points” (Transport panel), then click on a fracture.";
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
@@ -57,8 +58,22 @@ async function waitIdle(page) {
   await page.waitForFunction(() => document.querySelector("#run-button").dataset.state === "idle", { timeout: RUN_TIMEOUT });
 }
 
+/** Opens the settings panel of a step (a second click on its segment would close it); `isTap` on a touch screen */
+async function openStepPanel(page, name, isTap = false) {
+  const selector = `[data-step-panel="${name}"]`;
+  if (await page.$eval(selector, (node) => node.getAttribute("aria-expanded") === "true")) {
+    return;
+  }
+  await (isTap ? page.tap(selector) : page.click(selector));
+}
+
+/** The state of each segment of the run bar, as "name=state" */
+async function segmentStates(page) {
+  return page.$$eval("[data-step-panel]", (nodes) => nodes.map((node) => `${node.dataset.stepPanel}=${node.dataset.stepState}`).join(" "));
+}
+
 /**
- * Selects a radio button of the Domain tab ("example" or "shape"); the tab can be hidden.
+ * Selects a radio button of the Domain panel ("example" or "shape"); the panel can be hidden.
  * A switch resets the input: it waits until the example or the shape is loaded.
  */
 async function selectDomainSource(page, source) {
@@ -75,7 +90,7 @@ async function selectDomainSource(page, source) {
   await page.waitForFunction((datasetKey) => document.querySelector("#form").dataset[datasetKey] !== undefined, {}, key);
 }
 
-/** The value of the n_poly field of the DFN tab */
+/** The value of the n_poly field of the DFN panel */
 async function nPolyValue(page) {
   return page.evaluate(
     () => [...document.querySelectorAll("#form input[type=number]")].find((node) => node.closest(".field")?.textContent.includes("n_poly")).value,
@@ -91,21 +106,19 @@ async function selectExample(page, name) {
   await page.waitForFunction((exampleName) => document.querySelector("#form").dataset.example === exampleName, {}, name);
 }
 
-/** Sets the FRAM checkbox of the settings dialog (the examples and the default forms have FRAM off) */
+/** Sets the FRAM checkbox of the advanced part of the DFN panel (the examples and the default forms have FRAM off) */
 async function setFram(page, isOn) {
-  await page.click("#settings-button");
   await page.evaluate((isFramOn) => {
-    const input = [...document.querySelectorAll("#settings-dialog .field-checkbox")]
+    const input = [...document.querySelectorAll("#network-advanced-form .field-checkbox")]
       .find((field) => field.querySelector(".field-label")?.textContent === "FRAM on")
       .querySelector("input");
     if (input.checked !== isFramOn) {
       input.click();
     }
   }, isOn);
-  await page.keyboard.press("Escape");
 }
 
-/** Sets the number of fractures (n_poly) of the DFN tab */
+/** Sets the number of fractures (n_poly) of the DFN panel */
 async function setFractureCount(page, count) {
   await page.evaluate((value) => {
     const input = [...document.querySelectorAll("input[type=number]")].find((node) =>
@@ -137,14 +150,14 @@ async function colorOptions(page) {
   return page.$$eval("#color-select option", (options) => options.map((option) => option.value));
 }
 
-/** The roles of the boundary surfaces in the Domain tab, as "name: role" */
+/** The roles of the boundary surfaces in the Domain panel, as "name: role" */
 async function domainRoles(page) {
   return page.$$eval("#boundary-surfaces select[data-surface]", (nodes) =>
     nodes.map((node) => `${node.dataset.surface}: ${node.value}`).join(", "),
   );
 }
 
-/** The in-flow and then the out-flow surfaces of the Domain tab: the pressure boundaries of the flow */
+/** The in-flow and then the out-flow surfaces of the Domain panel: the pressure boundaries of the flow */
 async function flowSurfaceNames(page) {
   const roles = await page.$$eval("#boundary-surfaces select[data-surface]", (nodes) =>
     nodes.map((node) => [node.dataset.surface, node.value]),
@@ -154,9 +167,9 @@ async function flowSurfaceNames(page) {
     .join(", ");
 }
 
-/** Sets the role of a boundary surface in the Domain tab */
+/** Sets the role of a boundary surface in the Domain panel */
 async function setRole(page, surface, role) {
-  await page.click('[data-sidebar-tab="domain"]');
+  await openStepPanel(page, "domain");
   await page.select(`#boundary-surfaces select[data-surface="${surface}"]`, role);
 }
 
@@ -243,7 +256,7 @@ async function framesDuring(page, action) {
 }
 
 /**
- * With the live run on and the Transport tab open: "Pick points", then clicks on the points of a grid around the
+ * With the live run on and the Transport panel open: "Pick points", then clicks on the points of a grid around the
  * middle of the free part of the view until one adds a release point (a click on the boundary surfaces only adds
  * none), then "Stop picking". Returns the statuses of the transport which the point starts.
  */
@@ -253,7 +266,7 @@ async function pickReleasePoint(page) {
   const countBefore = await pointCount();
   const statuses = await statusesDuring(page, async () => {
     const { first, last, top, bottom } = await page.evaluate(() => ({
-      first: Math.ceil(document.querySelector("#settings-panel").getBoundingClientRect().right),
+      first: Math.ceil(document.querySelector("#step-panel").getBoundingClientRect().right),
       last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
       top: window.innerHeight / 3,
       bottom: (2 * window.innerHeight) / 3,
@@ -311,25 +324,28 @@ async function checkPhone() {
   await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
   await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
 
-  // The 3D view fills the screen; the settings are a bottom sheet with two heights, which a tap on its handle changes
+  // The 3D view fills the screen; the settings of a step are a bottom sheet with two heights, which a tap on its
+  // handle changes; at the start the sheet is closed
   const sheetState = () =>
     page.evaluate(() => {
       const layout = document.querySelector("#layout");
-      const isPanelShown = getComputedStyle(document.querySelector("#settings-panel")).display !== "none";
+      const isPanelShown = !document.querySelector("#step-panel").hidden;
       return `${isPanelShown ? layout.dataset.sheet : "closed"}`;
     });
   const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
   const sizeAtStart = await canvasSize();
   const sheetStates = [await sheetState()];
+  await openStepPanel(page, "domain", true);
+  sheetStates.push(await sheetState());
   await page.tap("#sheet-size");
   sheetStates.push(await sheetState());
   await page.tap("#sheet-size");
   sheetStates.push(await sheetState());
   await page.tap("#panel-close");
   sheetStates.push(await sheetState());
-  await page.tap("#panel-open");
+  await openStepPanel(page, "domain", true);
   sheetStates.push(await sheetState());
-  check(sheetStates.join(", ") === "half, full, half, closed, half", "phone: the heights of the sheet", sheetStates.join(", "));
+  check(sheetStates.join(", ") === "closed, half, full, half, closed, half", "phone: the heights of the sheet", sheetStates.join(", "));
   check(
     (await canvasSize()) === sizeAtStart && sizeAtStart === "390 x 844",
     "phone: the canvas fills the screen and keeps its size",
@@ -355,15 +371,15 @@ async function checkPhone() {
     `tap ${isSameView(viewAfterTap, viewBeforeTap) ? "unchanged" : "changed"}, second tap ${isSameView(viewAfterSecondTap, viewBeforeTap) ? "same" : "different"}`,
   );
 
-  for (const tab of ["domain", "fractures", "network", "flow", "transport"]) {
-    await page.tap(`[data-sidebar-tab="${tab}"]`);
+  for (const step of ["domain", "fractures", "network", "flow", "transport"]) {
+    await openStepPanel(page, step, true);
     const problems = await touchProblems(page);
-    check(problems.length === 0, `phone: touch sizes of the ${tab} tab`, problems.join(", ") || "none");
-    await page.screenshot({ path: `${screenshotDir}/e2e_phone_${tab}.png` });
+    check(problems.length === 0, `phone: touch sizes of the ${step} panel`, problems.join(", ") || "none");
+    await page.screenshot({ path: `${screenshotDir}/e2e_phone_${step}.png` });
   }
 
   // A run lowers the full sheet to half: the view shows the fractures
-  await page.tap('[data-sidebar-tab="network"]');
+  await openStepPanel(page, "network", true);
   await page.tap("#sheet-size");
   const sheetBeforeRun = await sheetState();
   await page.tap("#run-button");
@@ -436,22 +452,28 @@ async function checkPhone() {
   check(!isSameView(viewAfterPinch, viewAfterDrag), "phone: two fingers zoom", isSameView(viewAfterPinch, viewAfterDrag) ? "unchanged" : "changed");
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_pinch.png` });
 
-  // Landscape: the settings panel at the left of the view, as on a computer
+  // Landscape: the settings of a step above the run bar at the left of the view, as on a computer
   await page.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, isLandscape: true, deviceScaleFactor: 2 });
   await new Promise((resolve) => setTimeout(resolve, 500));
   const landscape = await page.evaluate(() => {
-    const panel = document.querySelector("#settings-panel").getBoundingClientRect();
+    const panel = document.querySelector("#step-panel").getBoundingClientRect();
+    const runBar = document.querySelector("#run-panel").getBoundingClientRect();
     const rail = document.querySelector(".layer-rail").getBoundingClientRect();
     const canvas = document.querySelector("#viewer-canvas");
     return {
       panelWidth: panel.width,
+      isPanelAboveRunBar: panel.top >= 0 && panel.bottom <= runBar.top,
       isRailRightOfPanel: rail.left > panel.right,
       isRailInScreen: rail.bottom <= window.innerHeight,
       canvasSize: `${canvas.clientWidth} x ${canvas.clientHeight}`,
     };
   });
   check(
-    landscape.panelWidth === 340 && landscape.isRailRightOfPanel && landscape.isRailInScreen && landscape.canvasSize === "844 x 390",
+    landscape.panelWidth === 340 &&
+      landscape.isPanelAboveRunBar &&
+      landscape.isRailRightOfPanel &&
+      landscape.isRailInScreen &&
+      landscape.canvasSize === "844 x 390",
     "phone: landscape",
     JSON.stringify(landscape),
   );
@@ -522,6 +544,7 @@ async function checkTranslucentShapesWithoutFloatBuffers() {
   await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
   await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
   await new Promise((resolve) => setTimeout(resolve, 3000));
+  await openStepPanel(page, "domain");
   await (await page.evaluateHandle(() => document.querySelector('#boundary-surfaces select[data-surface="south"]').closest("label"))).hover();
   await new Promise((resolve) => setTimeout(resolve, 300));
   const canvas = await page.$("#viewer-canvas");
@@ -554,8 +577,35 @@ try {
   check(startExample === "box_west_east", "default example", startExample);
   const startExampleTitle = await page.$eval("#example-select", (node) => node.selectedOptions[0].textContent);
   check(startExampleTitle === "Box west -> east", "example title", startExampleTitle);
-  const startTab = await page.$eval(".sidebar-tabs .is-active", (node) => node.dataset.sidebarTab);
-  check(startTab === "domain", "start on the domain tab", startTab);
+  // The settings of the steps are hidden at the start; a click on a segment of the run bar opens the panel of its
+  // step, and a second click, the close button or Escape closes it
+  const isStepPanelShown = () => page.$eval("#step-panel", (node) => !node.hidden);
+  const openSegments = () =>
+    page.$$eval("[data-step-panel]", (nodes) => nodes.filter((node) => node.getAttribute("aria-expanded") === "true").map((node) => node.dataset.stepPanel).join(", "));
+  const panelStates = [`${await isStepPanelShown()} (${await openSegments()})`];
+  await page.click('[data-step-panel="flow"]');
+  panelStates.push(`${await isStepPanelShown()} (${await openSegments()}: ${await page.$eval("#step-panel-title", (node) => node.textContent)})`);
+  await page.click('[data-step-panel="flow"]');
+  panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
+  await page.click('[data-step-panel="flow"]');
+  await page.click("#panel-close");
+  panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
+  await page.click('[data-step-panel="flow"]');
+  await page.keyboard.press("Escape");
+  panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
+  check(
+    panelStates.join(" | ") === "false () | true (flow: Flow) | false () | false () | false ()",
+    "step panels: hidden at the start, a segment opens one",
+    panelStates.join(" | "),
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_start.png` });
+  const statesBeforeRun = await segmentStates(page);
+  check(
+    statesBeforeRun === "domain=done fractures=stale network=stale flow=stale transport=stale",
+    "segment states before a run",
+    statesBeforeRun,
+  );
+  await openStepPanel(page, "domain");
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
 
   // The link to the repository is the last item of the view controls: below the layer rail, as wide as it
@@ -604,12 +654,13 @@ try {
   check(exampleRoles === BOX_ROLES, "boundary surface roles", exampleRoles);
 
   // The pointer over the row of a surface highlights it; the view is the same again after it leaves.
-  // The screenshots have the part of the view at the right of the settings panel.
+  // The screenshots have the part of the view at the right of the settings of a step (if shown) and above the run bar.
   const viewerScreenshot = async () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
-    const clip = await page.$eval("#settings-panel", (node) => {
-      const left = Math.ceil(node.getBoundingClientRect().right);
-      return { x: left, y: 0, width: window.innerWidth - left, height: window.innerHeight };
+    const clip = await page.$eval("#step-panel", (node) => {
+      const left = node.hidden ? 0 : Math.ceil(node.getBoundingClientRect().right);
+      const bottom = Math.floor(document.querySelector("#run-panel").getBoundingClientRect().top);
+      return { x: left, y: 0, width: window.innerWidth - left, height: bottom };
     });
     return Buffer.from(await page.screenshot({ clip }));
   };
@@ -673,7 +724,7 @@ try {
     `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
-  // The radio buttons of the Domain tab show the example dropdown or the mesh dropdown
+  // The radio buttons of the Domain panel show the example dropdown or the mesh dropdown
   const domainRows = async () =>
     page.evaluate(
       () => `example ${document.querySelector("#example-row").hidden ? "hidden" : "shown"}, mesh ${document.querySelector("#domain-form").hidden ? "hidden" : "shown"}`,
@@ -708,34 +759,40 @@ try {
     `${exampleAgain}, n_poly ${exampleAgainNPoly}`,
   );
 
-  // The Domain and User fractures tabs have no run button; "Next" goes to the next tab
-  // The fracture shape, FRAM, clusters, mesh, fluid and routing sections are in the settings dialog, not on the
-  // DFN, Flow and Transport tabs; the forms have no number of points
+  // FRAM, clusters and mesh are in the closed advanced part of the DFN panel, the fluid in the Flow panel and the
+  // routing in the Transport panel; the settings dialog has the orientation and the fracture shape. The forms
+  // have no number of points.
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
   const networkSections = await sectionTitles("#form");
+  const advancedSections = await sectionTitles("#network-advanced-form");
+  const isAdvancedOpen = await page.$eval(".advanced-settings", (node) => node.open);
   const settingsSections = await sectionTitles("#settings-dialog");
+  const stepSettings = `${await sectionTitles("#flow-settings-form")}; ${await sectionTitles("#transport-settings-form")}`;
   const pointFields = await page.$$eval(".field-label", (nodes) =>
     nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
   );
   check(
     networkSections === "General, Generation, Fracture families" &&
-      settingsSections === "Orientation of the fractures, Fracture shape, FRAM, Clusters, Triangle mesh for the flow, Fluid, Transport" &&
+      advancedSections === "FRAM, Clusters, Triangle mesh for the flow" &&
+      !isAdvancedOpen &&
+      settingsSections === "Orientation of the fractures, Fracture shape" &&
+      stepSettings === "Fluid; Intersections" &&
       pointFields.join(", ") === "settings-dialog",
-    "settings sections in the settings dialog",
-    `DFN tab: ${networkSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
+    "the places of the settings sections",
+    `DFN panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; flow and transport: ${stepSettings}; number of points in ${pointFields.join(", ")}`,
   );
-  // One "Run" button and one "Reset" button for all steps, on each tab
+  // The run bar has one "Run" button, one "Reset" button and the Log button, with each panel
   const runButtons = [];
-  for (const tab of ["domain", "fractures", "network", "flow", "transport"]) {
-    await page.click(`[data-sidebar-tab="${tab}"]`);
+  for (const step of ["domain", "fractures", "network", "flow", "transport"]) {
+    await openStepPanel(page, step);
     runButtons.push(
-      await page.$$eval(".run-buttons button:not([hidden])", (nodes) => nodes.map((node) => node.textContent).join(" ")),
+      await page.$$eval(".player > button", (nodes) => nodes.map((node) => node.getAttribute("aria-label")).join(" ")),
     );
   }
   check(
     runButtons.every((buttons) => buttons === "Run Reset Log"),
-    "run buttons on each tab",
+    "run buttons with each panel",
     runButtons.join(" | "),
   );
 
@@ -744,7 +801,7 @@ try {
     options.map((option) => option.value).filter((value) => value !== ""),
   );
   for (const name of examples) {
-    await page.click('[data-sidebar-tab="network"]');
+    await openStepPanel(page, "network");
     await selectExample(page, name);
     // "Run" runs the network, its mesh and the flow; the examples have no release point, thus no transport
     // The results of the Log view show only with a result
@@ -761,10 +818,16 @@ try {
     );
     const hasResultsAfter = await hasResults();
     check(!hasResultsBefore && hasResultsAfter, `${name}: results in the log view`, `${hasResultsBefore} → ${hasResultsAfter}`);
+    const statesAfterRun = await segmentStates(page);
+    check(
+      statesAfterRun === "domain=done fractures=done network=done flow=done transport=done",
+      `${name}: segment states after the run`,
+      statesAfterRun,
+    );
 
-    await page.click('[data-sidebar-tab="flow"]');
-    // The boundaries of the flow are the in-flow and out-flow surfaces; the Flow tab has no other section (the
-    // fluid is in the settings dialog)
+    await openStepPanel(page, "flow");
+    // The boundaries of the flow are the in-flow and out-flow surfaces; the flow form has no other section (the
+    // fluid follows it)
     const exampleSurfaces = await flowSurfaceNames(page);
     const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
     const flowSections = await sectionTitles("#flow-form");
@@ -793,9 +856,9 @@ try {
       `${name}: pressure boundary highlight on hover`,
       `hover ${isSameView(flowViewOnHover, flowViewBefore) ? "unchanged" : "changed"}, after ${isSameView(flowViewAfter, flowViewBefore) ? "same" : "different"}`,
     );
-    // A click on the label of a pressure field keeps its surface highlighted, also on the Domain tab (one for the page)
+    // A click on the label of a pressure field keeps its surface highlighted, also on the Domain panel (one for the page)
     if (name === "box_west_east") {
-      // The pinned rows of one tab (the hidden tabs also have their rows)
+      // The pinned rows of one panel (the hidden panels also have their rows)
       const pinnedTargets = (container) =>
         page.$$eval(`${container} .is-pinned`, (nodes) => nodes.map((node) => node.dataset.highlightSurface).join(", "));
       await page.click('#flow-form [data-highlight-surface="west"] .field-label');
@@ -803,9 +866,9 @@ try {
       await page.mouse.move(0, 0);
       const flowViewPinned = await viewerScreenshot();
       const pinnedOnFlow = await pinnedTargets("#flow-form");
-      await page.click('[data-sidebar-tab="domain"]');
+      await openStepPanel(page, "domain");
       const pinnedOnDomain = await pinnedTargets("#boundary-surfaces");
-      await page.click('[data-sidebar-tab="flow"]');
+      await openStepPanel(page, "flow");
       await page.click('#flow-form [data-highlight-surface="west"] .field-label');
       await page.mouse.move(0, 0);
       const flowViewUnpinned = await stableViewerScreenshot();
@@ -856,7 +919,7 @@ try {
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow_velocity.png` });
 
     // A click on a fracture runs the transport; the trajectories and the velocities of the transport are always on
-    await page.click('[data-sidebar-tab="transport"]');
+    await openStepPanel(page, "transport");
     await page.click("#run-button");
     await waitIdle(page);
     const transportStatuses = await pickReleasePoint(page);
@@ -866,8 +929,8 @@ try {
       `${name}: transport at a clicked point`,
       transportStatuses.join(" | "),
     );
-    // The Domain tab gives the in-flow and out-flow boundaries: the Transport tab has no section for them, and
-    // the routing is in the settings dialog
+    // The Domain panel gives the in-flow and out-flow boundaries: the Transport panel has no section for them, and
+    // the routing follows the transport form
     const hasTransportBoundaries = await page.$$eval("#transport-form .form-section h3", (nodes) =>
       nodes.some((node) => node.textContent === "Boundaries"),
     );
@@ -876,7 +939,7 @@ try {
     );
     check(
       !hasTransportBoundaries && !hasTransportRouting,
-      `${name}: no transport boundaries and no routing`,
+      `${name}: no transport boundaries, and the routing after the transport form`,
       `boundaries ${hasTransportBoundaries}, routing ${hasTransportRouting}`,
     );
     // The path of each particle shows, also of a particle which does not exit
@@ -946,7 +1009,7 @@ try {
   check(isSameView(viewAfterLog, viewBeforeLog), "3D view after the Log panel", isSameView(viewAfterLog, viewBeforeLog) ? "same" : "different");
 
   // The live run: a change of a setting runs again the steps which it affects; the results before them stay
-  await page.click('[data-sidebar-tab="network"]');
+  await openStepPanel(page, "network");
   await selectExample(page, "box_west_east");
   await runAll(page);
   await page.click("#run-button");
@@ -957,7 +1020,7 @@ try {
   const isFlowDone = (statuses) => (statuses.at(-1) ?? "").endsWith(NO_POINT_HINT);
   const startsStep = (statuses, text) => statuses.some((status) => status.startsWith(text));
   const acceptedBefore = Number(await resultValue(page, "Accepted fractures"));
-  await page.click('[data-sidebar-tab="flow"]');
+  await openStepPanel(page, "flow");
   const pressureStatuses = await statusesDuring(page, async () => {
     await page.$eval('#flow-form [data-highlight-surface="west"] input', (input) => {
       input.value = String(Number(input.value) + 0.5);
@@ -975,7 +1038,7 @@ try {
     pressureStatuses.join(" | "),
   );
   // A new user-defined fracture: the stochastic fractures of the last run stay, without a new generation
-  await page.click('[data-sidebar-tab="fractures"]');
+  await openStepPanel(page, "fractures");
   const { statuses: fractureStatuses, frames: fractureFrames } = await framesDuring(page, async () => {
     await page.evaluate(() =>
       [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
@@ -1003,7 +1066,7 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_live_user_fracture.png` });
 
   // A click on a fracture of the 3D view adds a release point, and the particles start there
-  await page.click('[data-sidebar-tab="transport"]');
+  await openStepPanel(page, "transport");
   const pointStatuses = await pickReleasePoint(page);
   const pointCount = await page.$$eval("#release-points li", (nodes) => nodes.length);
   const pointParticles = /of (\d+) particles/.exec(pointStatuses.at(-1) ?? "")?.[1];
@@ -1032,7 +1095,7 @@ try {
   await page.click("#reset-button");
   const afterReset = await page.evaluate(() => ({
     hasResults: !document.querySelector("#results").hidden,
-    runText: document.querySelector("#run-button").textContent,
+    runText: document.querySelector("#run-button").getAttribute("aria-label"),
   }));
   await page.mouse.move(0, 0);
   const resetView = await stableViewerScreenshot();
@@ -1046,7 +1109,7 @@ try {
   check(!isSameView(resetView, viewBeforeReset), "the view after reset has no network", "changed");
 
   // The domain mesh dropdown: in the shape mode, a new shape replaces only the mesh
-  await page.click('[data-sidebar-tab="domain"]');
+  await openStepPanel(page, "domain");
   await selectDomainSource(page, "shape");
   // The description of the shape shows below the dropdown, only in the shape mode
   const shapeDescription = () =>
@@ -1067,7 +1130,7 @@ try {
 
   // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
   await selectExample(page, "box_west_east");
-  await page.click('[data-sidebar-tab="fractures"]');
+  await openStepPanel(page, "fractures");
   await page.evaluate(() =>
     [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
   );
@@ -1136,9 +1199,32 @@ try {
   const badInputStatus = await statusText(page);
   check(
     (await isStatusError(page)) &&
-      badInputStatus === "Family 1 (DFN tab): the domain has no region west_box. Choose another region.",
+      badInputStatus === "Family 1 (DFN panel): the domain has no region west_box. Choose another region.",
     "generate with a bad input",
     badInputStatus,
+  );
+  // The status is in the Log panel, not in the run bar; a red dot on the Log button tells of the error, and the
+  // dot does not show while the Log panel is open
+  const logDot = () =>
+    page.$eval("#log-button", (node) => {
+      const dot = getComputedStyle(node, "::after");
+      return `${node.dataset.message ?? "none"} ${dot.display === "none" || dot.content === "none" ? "hidden" : "shown"}`;
+    });
+  const statusPlace = await page.$eval("#status", (node) => node.parentElement.id);
+  const dotOnError = await logDot();
+  await page.click("#log-button");
+  const dotWithLog = await logDot();
+  await page.click("#log-button");
+  check(
+    statusPlace === "log-view" && dotOnError === "error shown" && dotWithLog === "error hidden",
+    "the status in the Log panel, and the dot of the Log button",
+    `status in #${statusPlace}; dot ${dotOnError}, with the Log panel ${dotWithLog}`,
+  );
+  const statesAfterError = await segmentStates(page);
+  check(
+    statesAfterError === "domain=done fractures=stale network=failed flow=stale transport=stale",
+    "segment states after an error",
+    statesAfterError,
   );
 
   // No cluster connects west and east (Box, default forms with FRAM on, this seed): the network shows, with a warning
@@ -1176,7 +1262,7 @@ try {
   await setRole(page, "east", "noflow");
   const noOutflowStatus = await runAll(page);
   check(
-    noOutflowStatus === "Set at least one out-flow surface (Domain tab, Boundary surfaces).",
+    noOutflowStatus === "Set at least one out-flow surface (Domain panel, Boundary surfaces).",
     "no out-flow surface",
     noOutflowStatus,
   );
@@ -1357,10 +1443,11 @@ try {
     "changed",
   );
 
-  // The Log panel stays open during a run, and the settings panel too
+  // The Log panel stays open during a run, and the settings of a step too
+  await openStepPanel(page, "network");
   await page.click("#log-button");
   await runAll(page);
-  const isPanelShownAfterRun = await page.$eval("#settings-panel", (node) => getComputedStyle(node).display !== "none");
+  const isPanelShownAfterRun = await isStepPanelShown();
   check(
     (await isLogShown()) && isPanelShownAfterRun,
     "computer: a run keeps the panels",
@@ -1368,17 +1455,10 @@ try {
   );
   await page.click("#log-button");
 
-  // The settings panel closes and opens again; "Reset view" puts the model in the middle of the free part
-  // The columns between the settings panel (if shown) and the layer rail
+  // "Reset view" puts the model in the middle of the part of the view at the left of the layer rail; the settings of
+  // a step cover the view and do not move it
   const freeColumns = () =>
-    page.evaluate(() => {
-      const panel = document.querySelector("#settings-panel");
-      const isPanelShown = getComputedStyle(panel).display !== "none";
-      return {
-        first: isPanelShown ? Math.ceil(panel.getBoundingClientRect().right) : 0,
-        last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
-      };
-    });
+    page.evaluate(() => ({ first: 0, last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left) }));
   const modelCenter = async () => {
     const image = await page.screenshot({ encoding: "base64" });
     return page.evaluate(async (base64Image, { first, last }) => {
@@ -1408,19 +1488,25 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 300));
   const centerWithoutPanel = await modelCenter();
   await page.screenshot({ path: `${screenshotDir}/e2e_panel_closed.png` });
-  await page.click("#panel-open");
-  await page.click("#reset-camera");
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const panelRight = await page.$eval("#settings-panel", (node) => node.getBoundingClientRect().right);
-  const centerWithPanel = await modelCenter();
-  const freeCenter = (panelRight + 1400) / 2;
+  // The part of the view at the right of the panel and its shadow, above the run bar
+  await openStepPanel(page, "network");
+  const clipRightOfPanel = await page.$eval("#step-panel", (node) => {
+    const left = Math.ceil(node.getBoundingClientRect().right) + 24;
+    const bottom = Math.floor(document.querySelector("#run-panel").getBoundingClientRect().top);
+    return { x: left, y: 0, width: window.innerWidth - left, height: bottom };
+  });
+  const viewRightOfPanel = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return Buffer.from(await page.screenshot({ clip: clipRightOfPanel }));
+  };
+  const viewWithPanel = await viewRightOfPanel();
+  await page.click("#panel-close");
+  await page.mouse.move(700, 450);
+  const isViewKept = isSameView(viewWithPanel, await viewRightOfPanel());
   check(
-    centerWithoutPanel !== null &&
-      Math.abs(centerWithoutPanel - 700) < 120 &&
-      centerWithPanel !== null &&
-      Math.abs(centerWithPanel - freeCenter) < Math.abs(centerWithPanel - 700),
-    "reset view centers the model in the free part",
-    `without panel ${centerWithoutPanel?.toFixed(0)}, with panel ${centerWithPanel?.toFixed(0)} (free center ${freeCenter.toFixed(0)})`,
+    centerWithoutPanel !== null && Math.abs(centerWithoutPanel - 700) < 120 && isViewKept,
+    "reset view centers the model; the settings of a step do not move the view",
+    `center ${centerWithoutPanel?.toFixed(0)}; view with the panel ${isViewKept ? "same" : "different"}`,
   );
 
   // The gear between the layer rail and the GitHub link opens the settings dialog. Its orientation option

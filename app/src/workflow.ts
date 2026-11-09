@@ -60,7 +60,7 @@ const DESCRIPTION_WIDTH = 76;
 export interface Workflow {
   /** The comment at the top of the file, as one line; "" = none */
   description: string;
-  /** The roles of the boundary surfaces of the domain mesh (Domain tab) */
+  /** The roles of the boundary surfaces of the domain mesh (Domain panel) */
   boundaries: BoundaryRoles;
   network: FormState;
   flow: FlowState;

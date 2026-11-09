@@ -1,5 +1,5 @@
 // The roles of the boundary surfaces of the domain mesh: `[boundaries]` of
-// the workflow file, set in the Domain tab. The network keeps only the
+// the workflow file, set in the Domain panel. The network keeps only the
 // clusters which connect an in-flow and an out-flow surface, the flow has a
 // pressure on each of them, and the particles go from the in-flow to the
 // out-flow surfaces.

@@ -21,7 +21,7 @@ export interface ChainRunner {
   runStep(step: ChainStep): Promise<StepResult>;
   /** Cancels the running step: its `runStep` gives "cancelled" */
   cancel(): void;
-  /** The live run went on or off, or a step started or ended */
+  /** The live run went on or off, a step started or ended, or a step became stale */
   onStateChange(): void;
 }
 
@@ -133,11 +133,13 @@ export class LiveRun {
   reset(): void {
     this.stop();
     this.firstStaleStep = CHAIN_STEPS[0];
+    this.runner.onStateChange();
   }
 
   /** A value of a step changed */
   changed(step: ChainStep): void {
     this.firstStaleStep = earlierStep(this.firstStaleStep, step);
+    this.runner.onStateChange();
     if (!this.isLiveOn) {
       return;
     }

@@ -46,7 +46,7 @@ import {
   type InputFiles,
   type RegionBounds,
 } from "./inputFiles";
-import { isSameFractureInput, LiveRun, networkChangeStep, type ChainStep, type StepResult } from "./liveRun";
+import { CHAIN_STEPS, isSameFractureInput, LiveRun, networkChangeStep, type ChainStep, type StepResult } from "./liveRun";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { renderTransportForm, routingSection, type PointPicking } from "./transport/form";
 import { defaultTransportState, type ReleasePoint, type TimeUnit, type TransportState } from "./transport/state";
@@ -75,13 +75,30 @@ const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
 const GENERATION_RENDER_INTERVAL_MS = 200;
 // The generation keeps all clusters when none connects an in-flow and an out-flow surface
 const NO_CONNECTING_CLUSTER =
-  "No cluster connects an in-flow and an out-flow surface: all clusters stay. The particles need a path between them; increase the number of fractures or their size, try another seed, or change the roles of the surfaces (Domain tab).";
+  "No cluster connects an in-flow and an out-flow surface: all clusters stay. The particles need a path between them; increase the number of fractures or their size, try another seed, or change the roles of the surfaces (Domain panel).";
 // The transport runs only with a release point (user decision)
-const NO_RELEASE_POINT = "To track particles, click “Pick points” (Transport tab), then click on a fracture.";
+const NO_RELEASE_POINT = "To track particles, click “Pick points” (Transport panel), then click on a fracture.";
 
-// The domain, the user fractures and the network are the three tabs of the network input
-const SIDEBAR_TABS = ["domain", "fractures", "network", "flow", "transport"] as const;
-type SidebarTab = (typeof SIDEBAR_TABS)[number];
+// The steps of the run bar, each with a panel of its settings; the domain, the user fractures and the network are the network input
+const STEP_PANELS = ["domain", "fractures", "network", "flow", "transport"] as const;
+type StepPanel = (typeof STEP_PANELS)[number];
+const STEP_PANEL_TITLES: Record<StepPanel, string> = {
+  domain: "Domain",
+  fractures: "User fractures",
+  network: "DFN",
+  flow: "Flow",
+  transport: "Transport",
+};
+/** The steps of the live run of each segment of the run bar; the domain has none */
+const STEP_PANEL_CHAIN_STEPS: Record<StepPanel, ChainStep[]> = {
+  domain: [],
+  fractures: ["userFractures"],
+  network: ["generation", "mesh"],
+  flow: ["flow"],
+  transport: ["transport"],
+};
+/** The state of a segment of the run bar (`data-step-state`, for `style.css` and `e2e.mjs`) */
+type SegmentState = "empty" | "stale" | "running" | "failed" | "done";
 
 /** The screens with the settings in a bottom sheet: the condition of this layout in `style.css` */
 const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
@@ -106,9 +123,10 @@ const ui = {
   boundarySurfaces: byId<HTMLDivElement>("boundary-surfaces"),
   fracturesForm: byId<HTMLDivElement>("fractures-form"),
   form: byId<HTMLDivElement>("form"),
+  networkAdvancedForm: byId<HTMLDivElement>("network-advanced-form"),
   settingsForm: byId<HTMLDivElement>("settings-form"),
-  settingsFlowForm: byId<HTMLDivElement>("settings-flow-form"),
-  settingsTransportForm: byId<HTMLDivElement>("settings-transport-form"),
+  flowSettingsForm: byId<HTMLDivElement>("flow-settings-form"),
+  transportSettingsForm: byId<HTMLDivElement>("transport-settings-form"),
   flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
@@ -129,12 +147,15 @@ const ui = {
   canvas: byId<HTMLCanvasElement>("viewer-canvas"),
   viewerMessage: byId<HTMLDivElement>("viewer-message"),
   layout: byId<HTMLElement>("layout"),
+  titlePanel: byId<HTMLElement>("title-panel"),
   viewerToolbar: byId<HTMLDivElement>("viewer-toolbar"),
   dock: byId<HTMLDivElement>("dock"),
   runPanel: byId<HTMLDivElement>("run-panel"),
-  settingsPanel: byId<HTMLElement>("settings-panel"),
+  stepPanel: byId<HTMLElement>("step-panel"),
+  stepPanelTitle: byId<HTMLHeadingElement>("step-panel-title"),
   panelClose: byId<HTMLButtonElement>("panel-close"),
-  panelOpen: byId<HTMLButtonElement>("panel-open"),
+  stepSegments: [...document.querySelectorAll<HTMLButtonElement>("[data-step-panel]")],
+  stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
   sheetSize: byId<HTMLButtonElement>("sheet-size"),
   logButton: byId<HTMLButtonElement>("log-button"),
   settingsButton: byId<HTMLButtonElement>("settings-button"),
@@ -155,7 +176,7 @@ let files: InputFiles = { mesh: null };
 let regionNames: string[] = [];
 let regionBounds: RegionBounds[] = [];
 let boundarySurfaceNames: string[] = [];
-/** The roles of the boundary surfaces (Domain tab) */
+/** The roles of the boundary surfaces (Domain panel) */
 let boundaryRoles: BoundaryRoles = { inflow: [], outflow: [] };
 let meshNames: string[] = [];
 /** The description (comment) of the workflow file */
@@ -171,9 +192,12 @@ let transportState: TransportState = defaultTransportState();
 let transportOutput: TransportOutput | null = null;
 /** The time unit of the input of `transportOutput`: the unit of its velocities */
 let transportTimeUnit: TimeUnit = "days";
-/** A click on a final fracture of the 3D view adds a release point (Transport tab, seeding) */
+/** A click on a final fracture of the 3D view adds a release point (Transport panel, seeding) */
 let isPickingPoints = false;
-let activeSidebarTab: SidebarTab = "domain";
+/** The step whose settings show above the run bar; null: none (the start) */
+let openPanel: StepPanel | null = null;
+/** The step of the live run which failed last; null after a new start of a step */
+let failedChainStep: ChainStep | null = null;
 /** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
 let lastShape: string | null = null;
 let isBusy = false;
@@ -216,10 +240,17 @@ let meshedInput: GenerationInput | null = null;
 let viewer: NetworkViewer | null = null;
 const client = new GenerationClient();
 const liveRun = new LiveRun({
-  runStep: (step) => runChainStep(step),
+  runStep: async (step) => {
+    failedChainStep = null;
+    const result = await runChainStep(step);
+    if (result === "failed") {
+      failedChainStep = step;
+    }
+    return result;
+  },
   cancel: () => client.cancel(),
   onStateChange: () => {
-    updateRunButtons();
+    updateRunBar();
     // The chain stopped (an error, "Pause"): the view shows the results which it has
     if (liveRun.isIdle) {
       void releaseView();
@@ -229,17 +260,29 @@ const liveRun = new LiveRun({
 
 // ---------------------------------------------------------------- status
 
+/** The status is at the top of the Log panel; the Log button has a dot for an error or a warning */
 function showStatus(text: string, isError = false): void {
   ui.status.hidden = text === "";
   ui.status.textContent = text;
   ui.status.classList.toggle("is-error", isError);
   ui.status.classList.remove("is-warning");
+  setLogMessage(isError ? "error" : null);
 }
 
 /** A status which is not an error, but which the user must see */
 function showWarningStatus(text: string): void {
   showStatus(text);
   ui.status.classList.add("is-warning");
+  setLogMessage("warning");
+}
+
+/** The dot of the Log button (`style.css`); null = no dot */
+function setLogMessage(kind: "error" | "warning" | null): void {
+  if (kind === null) {
+    delete ui.logButton.dataset.message;
+  } else {
+    ui.logButton.dataset.message = kind;
+  }
 }
 
 function errorText(error: unknown): string {
@@ -263,19 +306,51 @@ function setBusy(busy: boolean): void {
   ui.exampleSelect.disabled = busy;
   ui.domainSource.disabled = busy;
   ui.progress.hidden = !busy;
-  updateRunButtons();
+  updateRunBar();
+}
+
+/** The state of the segment of a step: from the live run, and from the domain mesh for the Domain step */
+function segmentState(panel: StepPanel): SegmentState {
+  const steps = STEP_PANEL_CHAIN_STEPS[panel];
+  if (steps.length === 0) {
+    return files.mesh === null ? "empty" : "done";
+  }
+  if (liveRun.currentStep !== null && steps.includes(liveRun.currentStep)) {
+    return "running";
+  }
+  if (failedChainStep !== null && steps.includes(failedChainStep)) {
+    return "failed";
+  }
+  const stale = liveRun.staleStep;
+  const lastStep = steps[steps.length - 1];
+  return stale !== null && CHAIN_STEPS.indexOf(stale) <= CHAIN_STEPS.indexOf(lastStep) ? "stale" : "done";
 }
 
 /**
  * "Run" starts the live run, which shows "Pause". The network of a stopped
  * generation (after "Pause") runs with the live run off: "Run" waits for it.
+ * Each segment shows the state of its step; the progress bar is in the running one.
  */
-function updateRunButtons(): void {
-  ui.runButton.textContent = liveRun.isOn ? "Pause" : "Run";
+function updateRunBar(): void {
+  ui.runButton.setAttribute("aria-label", liveRun.isOn ? "Pause" : "Run");
+  ui.runButton.title = liveRun.isOn
+    ? "Pause: the running step stops; the results before it stay"
+    : "Run all steps; a change of a setting runs the steps again";
   ui.runButton.setAttribute("aria-pressed", String(liveRun.isOn));
   ui.runButton.disabled = isBusy && !liveRun.isOn;
   // For the e2e check: "idle" when no step runs or waits
   ui.runButton.dataset.state = liveRun.isIdle && !isBusy ? "idle" : "running";
+  for (const segment of ui.stepSegments) {
+    const panel = STEP_PANELS.find((candidate) => candidate === segment.dataset.stepPanel);
+    if (panel === undefined) {
+      continue;
+    }
+    const state = segmentState(panel);
+    segment.dataset.stepState = state;
+    if (state === "running" && ui.progress.parentElement !== segment) {
+      segment.append(ui.progress);
+    }
+  }
 }
 
 /** "Run" or "Pause" */
@@ -295,6 +370,7 @@ function toggleLiveRun(): void {
 /** "Reset": all results go; the next run starts from the seed. The forms stay. */
 function resetAll(): void {
   isKeepRequested = false;
+  failedChainStep = null;
   liveRun.reset();
   savedGeneration = null;
   meshedInput = null;
@@ -383,7 +459,13 @@ const transportContext: FormContext = {
 
 function render(): void {
   renderForm(
-    { domain: ui.domainForm, fractures: ui.fracturesForm, network: ui.form, settings: ui.settingsForm },
+    {
+      domain: ui.domainForm,
+      fractures: ui.fracturesForm,
+      network: ui.form,
+      advanced: ui.networkAdvancedForm,
+      settings: ui.settingsForm,
+    },
     state,
     formContext,
     fileHandlers,
@@ -407,7 +489,7 @@ function flowBoundaries(): FlowBoundary[] | null {
 
 function renderFlow(): void {
   renderFlowForm(ui.flowForm, flowState, flowBoundaries(), flowContext);
-  ui.settingsFlowForm.replaceChildren(fluidSection(flowState, flowContext));
+  ui.flowSettingsForm.replaceChildren(fluidSection(flowState, flowContext));
 }
 
 const pointPicking: PointPicking = {
@@ -428,48 +510,49 @@ function addReleasePoint(point: ReleasePoint): void {
 
 function renderTransport(): void {
   // The picking needs the shown triangle mesh of a flow
-  isPickingPoints &&= flowOutput !== null && activeSidebarTab === "transport";
+  isPickingPoints &&= flowOutput !== null && openPanel === "transport";
   renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext, pointPicking);
-  ui.settingsTransportForm.replaceChildren(routingSection(transportState, transportContext));
+  ui.transportSettingsForm.replaceChildren(routingSection(transportState, transportContext));
   void updateViewer((view) => {
     view.setPointPicking(isPickingPoints ? addReleasePoint : null);
     view.setReleasePoints(transportState.seeding.points);
   });
 }
 
-function selectSidebarTab(name: SidebarTab): void {
-  activeSidebarTab = name;
-  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
-    tab.classList.toggle("is-active", tab.dataset.sidebarTab === name);
-    if (tab.dataset.sidebarTab === name) {
-      tab.scrollIntoView({ block: "nearest", inline: "nearest" });
-    }
+/** Shows the settings of a step above the run bar (a phone: the bottom sheet); null = no settings */
+function openStepPanel(name: StepPanel | null): void {
+  openPanel = name;
+  ui.stepPanel.hidden = name === null;
+  ui.layout.classList.toggle("has-step-panel", name !== null);
+  if (name !== null) {
+    ui.stepPanelTitle.textContent = STEP_PANEL_TITLES[name];
   }
-  updateDomainSource();
-  ui.fracturesForm.hidden = name !== "fractures";
-  ui.form.hidden = name !== "network";
-  ui.flowForm.hidden = name !== "flow";
-  ui.transportForm.hidden = name !== "transport";
+  for (const segment of ui.stepSegments) {
+    const isOpen = segment.dataset.stepPanel === name;
+    segment.classList.toggle("is-open", isOpen);
+    segment.setAttribute("aria-expanded", String(isOpen));
+  }
+  for (const group of ui.stepGroups) {
+    group.hidden = group.dataset.stepGroup !== name;
+  }
   if (isPickingPoints && name !== "transport") {
     pointPicking.setOn(false);
   }
 }
 
-/** The radio button "Example" of the Domain tab is selected (else "Predefined domain shape") */
+/** The radio button "Example" of the Domain panel is selected (else "Predefined domain shape") */
 function isExampleSource(): boolean {
   return ui.domainSource.querySelector<HTMLInputElement>("input:checked")?.value === "example";
 }
 
-/** The radio buttons of the Domain tab: the example dropdown and its description, or the predefined meshes */
+/** The radio buttons of the Domain panel: the example dropdown and its description, or the predefined meshes */
 function updateDomainSource(): void {
-  const isDomainTab = activeSidebarTab === "domain";
   const isExample = isExampleSource();
-  ui.domainSource.hidden = !isDomainTab;
-  ui.exampleRow.hidden = !isDomainTab || !isExample;
-  ui.exampleDescription.hidden = !isDomainTab || !isExample || ui.exampleDescription.textContent === "";
-  ui.domainForm.hidden = !isDomainTab || isExample;
-  ui.shapeDescription.hidden = !isDomainTab || isExample || ui.shapeDescription.textContent === "";
-  ui.boundarySurfaces.hidden = !isDomainTab || boundarySurfaceNames.length === 0;
+  ui.exampleRow.hidden = !isExample;
+  ui.exampleDescription.hidden = !isExample || ui.exampleDescription.textContent === "";
+  ui.domainForm.hidden = isExample;
+  ui.shapeDescription.hidden = isExample || ui.shapeDescription.textContent === "";
+  ui.boundarySurfaces.hidden = boundarySurfaceNames.length === 0;
 }
 
 /** Highlights a boundary surface in the 3D view (pointer over its row or field, or its pin); null = no surface */
@@ -519,6 +602,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   meshedInput = null;
   clearOutput();
   liveRun.changed("generation");
+  updateRunBar();
   if (viewer && mesh) {
     showDomainInViewer(viewer, mesh);
     viewer.resetCamera();
@@ -1373,13 +1457,6 @@ function switchDomainSource(): void {
   }
 }
 
-/** Shows or hides the settings panel (a phone: the bottom sheet); the view then has the free part of the page */
-function setSettingsShown(isShown: boolean): void {
-  ui.layout.classList.toggle("is-panel-closed", !isShown);
-  ui.panelOpen.hidden = isShown;
-  (isShown ? ui.panelClose : ui.panelOpen).focus();
-}
-
 /** The height of the bottom sheet of a phone; `style.css` uses it only on such a screen */
 function setSheetSize(size: SheetSize): void {
   ui.layout.dataset.sheet = size;
@@ -1413,17 +1490,20 @@ function toggleLog(): void {
 /**
  * The parts of the page which the panels cover: the view centers the model in the
  * rest, and `style.css` places the Log panel, the legend and the layers with them.
+ * On a wide screen the settings of a step cover the view: the view does not move
+ * when they open.
  */
 function updateCoveredArea(): void {
   const isSheet = window.matchMedia(SHEET_QUERY).matches;
   const pageHeight = window.innerHeight;
-  const coveredBottom = isSheet ? pageHeight - ui.dock.getBoundingClientRect().top : 0;
+  const coveredBottom = pageHeight - (isSheet ? ui.dock : ui.runPanel).getBoundingClientRect().top;
   ui.layout.style.setProperty("--covered-bottom", `${coveredBottom}px`);
   ui.layout.style.setProperty("--run-panel-height", `${ui.runPanel.offsetHeight}px`);
-  const isPanelShown = !ui.layout.classList.contains("is-panel-closed");
   viewer?.setCoveredArea({
-    left: !isSheet && isPanelShown ? ui.settingsPanel.getBoundingClientRect().right : 0,
-    top: isSheet ? ui.viewerToolbar.querySelector(".color-panel")?.getBoundingClientRect().bottom ?? 0 : 0,
+    left: 0,
+    top: isSheet
+      ? (ui.viewerToolbar.querySelector(".color-panel")?.getBoundingClientRect().bottom ?? 0)
+      : ui.titlePanel.getBoundingClientRect().bottom,
     bottom: coveredBottom,
   });
 }
@@ -1444,14 +1524,25 @@ function bindEvents(): void {
   ui.showColorBar.addEventListener("change", () => updateViewer((view) => view.setScalarBarShown(ui.showColorBar.checked)));
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
 
-  for (const tab of document.querySelectorAll<HTMLButtonElement>("[data-sidebar-tab]")) {
-    tab.addEventListener("click", () => {
-      const name = SIDEBAR_TABS.find((candidate) => candidate === tab.dataset.sidebarTab);
-      selectSidebarTab(name ?? "network");
+  for (const segment of ui.stepSegments) {
+    segment.addEventListener("click", () => {
+      const name = STEP_PANELS.find((candidate) => candidate === segment.dataset.stepPanel) ?? null;
+      // A second click on the open step closes its settings
+      openStepPanel(name === openPanel ? null : name);
     });
   }
-  ui.panelClose.addEventListener("click", () => setSettingsShown(false));
-  ui.panelOpen.addEventListener("click", () => setSettingsShown(true));
+  ui.panelClose.addEventListener("click", () => {
+    const segment = ui.stepSegments.find((candidate) => candidate.dataset.stepPanel === openPanel);
+    openStepPanel(null);
+    segment?.focus();
+  });
+  // Escape closes the settings of a step; the settings dialog closes itself, and a field keeps its own Escape
+  document.addEventListener("keydown", (event) => {
+    const isInField = event.target instanceof Element && event.target.matches("input, select, textarea");
+    if (event.key === "Escape" && openPanel !== null && !ui.settingsDialog.open && !isInField) {
+      ui.panelClose.click();
+    }
+  });
   ui.sheetSize.addEventListener("click", () => setSheetSize(ui.layout.dataset.sheet === "full" ? "half" : "full"));
   ui.logButton.addEventListener("click", toggleLog);
   ui.settingsButton.addEventListener("click", openSettings);
@@ -1470,11 +1561,9 @@ function bindEvents(): void {
     }
   });
   const coveredAreaObserver = new ResizeObserver(updateCoveredArea);
-  for (const panel of [ui.dock, ui.runPanel, ui.settingsPanel, ui.viewerToolbar]) {
+  for (const panel of [ui.dock, ui.runPanel, ui.viewerToolbar]) {
     coveredAreaObserver.observe(panel);
   }
-  // A closed panel has no size: its change has no resize
-  new MutationObserver(updateCoveredArea).observe(ui.layout, { attributeFilter: ["class", "data-sheet"] });
   window.addEventListener("resize", updateCoveredArea);
 }
 
@@ -1503,7 +1592,8 @@ async function fillMeshList(): Promise<void> {
 }
 
 bindEvents();
-selectSidebarTab(activeSidebarTab);
+openStepPanel(openPanel);
+updateRunBar();
 render();
 renderFlow();
 renderTransport();

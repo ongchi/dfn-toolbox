@@ -2,7 +2,7 @@
 // the input format of `../dfntrans-rs/src/io/input.rs` (see "Input file" of
 // ../dfntrans-rs/README.md): a change of a key there needs a change here, in
 // `toml.ts` and in `form.ts`. The in-flow and out-flow boundaries are those
-// of `[boundaries]` (Domain tab).
+// of `[boundaries]` (Domain panel).
 
 /** Name of the flow file in the TOML; the flow is that of the last "Solve flow" */
 export const TRANSPORT_FLOW_FILE = "flow.toml";

@@ -1,11 +1,11 @@
 // The flow form: one field for each key of the fehm input file. The pressure
-// boundaries are the in-flow and out-flow surfaces of the Domain tab; the
-// fluid is in the settings dialog.
+// boundaries are the in-flow and out-flow surfaces of the Domain panel; the
+// fluid follows them, also before a triangle mesh.
 import type { FormContext } from "../form/context";
 import { bindSurfaceHighlight, checkboxField, element, numberField, row, section } from "../form/fields";
 import { pressureOf, type FlowState } from "./state";
 
-/** The fluid of the flow: in the settings dialog, also before a triangle mesh */
+/** The fluid of the flow: also before a triangle mesh */
 export function fluidSection(state: FlowState, context: FormContext): HTMLElement {
   return section(
     "Fluid",
@@ -34,7 +34,7 @@ export function fluidSection(state: FlowState, context: FormContext): HTMLElemen
   );
 }
 
-/** A pressure boundary of the flow: an in-flow or out-flow surface of the Domain tab */
+/** A pressure boundary of the flow: an in-flow or out-flow surface of the Domain panel */
 export interface FlowBoundary {
   name: string;
   isInflow: boolean;
@@ -48,7 +48,7 @@ function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context
     element(
       "p",
       "form-note",
-      "The in-flow and out-flow surfaces of the Domain tab; the pointer over a field highlights its surface in the 3D view, and a click (a tap) on its name keeps it highlighted until a second click. A point on two surfaces keeps the pressure of the first in this list.",
+      "The in-flow and out-flow surfaces of the Domain panel; the pointer over a field highlights its surface in the 3D view, and a click (a tap) on its name keeps it highlighted until a second click. A point on two surfaces keeps the pressure of the first in this list.",
     ),
   );
   for (const boundary of boundaries) {
@@ -83,7 +83,7 @@ export function renderFlowForm(
       element(
         "p",
         "form-note",
-        'Click “Run”: the flow uses the triangle mesh of the network.',
+        'Click Run (▶): the flow uses the triangle mesh of the network.',
       ),
     );
     return;

@@ -7,6 +7,8 @@
   --panel-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
   --gap: 12px;
   --settings-width: 420px;
+  --run-bar-width: 760px;
+  --title-height: 48px;
   --scalar-bar-width: 300px;
   /* The icons of the layer rail, its padding and its border */
   --rail-width: calc(36px + 2 * 6px + 2px);
@@ -398,56 +400,92 @@ input[type="radio"] {
   height: 100%;
 }
 
-/* The settings at the left, the run bar at the bottom right of them */
+/* The title at the top left */
+.title-panel {
+  position: absolute;
+  top: calc(var(--gap) + env(safe-area-inset-top));
+  left: calc(var(--gap) + env(safe-area-inset-left));
+  height: var(--title-height);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.title-panel h1 {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* The run bar at the bottom left (the legend is at the bottom right), the settings of the open step above it */
 .dock {
   display: contents;
 }
 
-.settings-panel {
+.step-panel {
   position: absolute;
-  top: calc(var(--gap) + env(safe-area-inset-top));
   left: calc(var(--gap) + env(safe-area-inset-left));
-  bottom: var(--gap);
+  bottom: calc(var(--run-panel-height, 60px) + 2 * var(--gap) + env(safe-area-inset-bottom));
   width: var(--settings-width);
+  max-width: calc(100% - 2 * var(--gap));
+  /* Below the title */
+  max-height: calc(100% - var(--run-panel-height, 60px) - 4 * var(--gap) - var(--title-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  min-height: 0;
   overflow: hidden;
 }
 
-.layout.is-panel-closed .settings-panel {
-  display: none;
-}
-
-.sidebar-tabs {
-  flex: none;
-  min-width: 0;
-}
-
-.sidebar {
+.step-panel-body {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
+}
+
+.step-panel h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+}
+
+/* FRAM, the clusters and the triangle mesh: closed at the start */
+.advanced-settings {
+  margin: 0 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.advanced-settings summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.advanced-settings[open] summary {
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.advanced-settings .form {
+  padding: 0 12px 4px;
+}
+
+.advanced-settings .form-section:last-child {
+  border-bottom: none;
 }
 
 .run-panel {
   position: absolute;
-  left: calc(2 * var(--gap) + var(--settings-width) + env(safe-area-inset-left));
+  left: calc(var(--gap) + env(safe-area-inset-left));
   bottom: calc(var(--gap) + env(safe-area-inset-bottom));
-  max-width: calc(100% - 4 * var(--gap) - var(--settings-width) - var(--scalar-bar-width));
+  width: min(var(--run-bar-width), calc(100% - 3 * var(--gap) - var(--scalar-bar-width)));
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding: 8px;
 }
 
-.layout.is-panel-closed .run-panel {
-  left: calc(var(--gap) + env(safe-area-inset-left));
-  max-width: calc(100% - 3 * var(--gap) - var(--scalar-bar-width));
-}
-
-/* The results, above the run bar */
+/* The results, above the run bar, at the right of the settings of a step */
 .log-view {
   position: absolute;
   left: calc(2 * var(--gap) + var(--settings-width) + env(safe-area-inset-left));
@@ -458,14 +496,9 @@ input[type="radio"] {
   padding: 12px 16px;
 }
 
-.layout.is-panel-closed .log-view {
-  left: calc(var(--gap) + env(safe-area-inset-left));
-  width: min(420px, calc(100% - 2 * var(--gap)));
-}
-
 /* ---------------------------------------------------------------- form */
 
-/* The radio buttons of the Domain tab: an example or a predefined domain shape */
+/* The radio buttons of the Domain panel: an example or a predefined domain shape */
 .domain-source {
   display: flex;
   gap: 16px;
@@ -474,7 +507,7 @@ input[type="radio"] {
   border: none;
 }
 
-/* The example select of the Domain tab */
+/* The example select of the Domain panel */
 .example-row {
   display: flex;
   align-items: center;
@@ -495,24 +528,24 @@ input[type="radio"] {
   border-bottom: 1px solid var(--border);
 }
 
+/* The body of the step panel scrolls, not each form */
 .form {
-  flex: 1;
-  overflow-y: auto;
   padding: 0 16px 16px;
 }
 
-/* The color choosers of the boundary surfaces, on the Domain tab (example and shape):
-   directly below the mesh dropdown, which does not take the free height */
+/* The mesh row has the padding of the example row */
 #domain-form {
-  flex: none;
-  /* The mesh row has the padding of the example row */
   padding: 0;
 }
 
 .boundary-surfaces {
-  flex: 1;
-  overflow-y: auto;
   padding: 0 16px 16px;
+}
+
+/* The fluid and the routing follow the form of their step */
+#flow-settings-form,
+#transport-settings-form {
+  margin-top: -16px;
 }
 
 .form-section {
@@ -692,45 +725,195 @@ input[type="radio"] {
 
 /* ---------------------------------------------------------------- run bar */
 
-.run-buttons {
+/* A media player: run or pause, reset, the steps as the timeline, the log */
+.player {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* A line between the run buttons and the Log button */
-.log-button {
-  margin-left: 8px;
+.player-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.player-button:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.player-button:focus-visible,
+.step-segment:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.player-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.player-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-background);
+  color: var(--accent-strong);
+}
+
+/* A dot on the Log button: the status in the Log panel is an error or a warning (none while the panel is open) */
+#log-button {
   position: relative;
 }
 
-.log-button::before {
+#log-button[data-message]::after {
   content: "";
   position: absolute;
-  left: -9px;
-  top: 4px;
-  bottom: 4px;
-  width: 1px;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--panel-solid);
+  border-radius: 50%;
+}
+
+#log-button[data-message="error"]::after {
+  background: var(--error);
+}
+
+#log-button[data-message="warning"]::after {
+  background: var(--warning);
+}
+
+#log-button[aria-expanded="true"]::after {
+  display: none;
+}
+
+/* Run: the main button */
+.player-play {
+  width: 44px;
+  height: 44px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.player-play:hover {
+  background: var(--accent-strong);
+  color: var(--accent-text);
+}
+
+.player-play .icon-play {
+  fill: currentColor;
+}
+
+.player-play .icon-pause {
+  stroke-width: 3;
+}
+
+.player-play[aria-pressed="true"] .icon-play,
+.player-play[aria-pressed="false"] .icon-pause {
+  display: none;
+}
+
+/* The steps: one segment each, as the chapters of a timeline */
+.timeline {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 3px;
+  margin: 0 4px;
+}
+
+.step-segment {
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 6px 4px 4px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.step-segment:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.step-segment.is-open {
+  background: var(--accent-background);
+  color: var(--accent-strong);
+}
+
+.step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The state of the step: gray (not run), the accent (done: as the played part of a timeline), red (failed) */
+.step-strip {
+  height: 4px;
+  border-radius: 2px;
   background: var(--border);
 }
 
-progress {
-  width: 100%;
-  min-width: 240px;
-  height: 6px;
+.step-segment[data-step-state="done"] .step-strip {
+  background: var(--accent);
+}
+
+.step-segment[data-step-state="failed"] .step-strip {
+  background: var(--error);
+}
+
+.step-segment[data-step-state="failed"] .step-label {
+  color: var(--error);
+}
+
+.step-segment[data-step-state="running"] .step-label {
+  color: var(--text);
+}
+
+/* The progress of the running step, over its strip */
+.step-segment progress {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  width: calc(100% - 8px);
+  height: 4px;
   accent-color: var(--accent);
 }
 
 .status {
   margin: 0;
   max-height: 160px;
-  max-width: 640px;
   overflow: auto;
   white-space: pre-wrap;
   padding: 6px 8px;
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+/* At the top of the Log panel */
+.log-view .status {
+  margin-bottom: 8px;
 }
 
 .status.is-error {
@@ -879,33 +1062,6 @@ progress {
   margin: 0;
 }
 
-/* ---------------------------------------------------------------- tabs */
-
-.tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  padding: 0 8px;
-}
-
-.tab {
-  border: none;
-  background: none;
-  font: inherit;
-  padding: 8px 12px;
-  color: var(--muted);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-
-.tab:hover {
-  color: var(--text);
-}
-
-.tab.is-active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-}
-
 .stats {
   display: grid;
   grid-template-columns: max-content max-content;
@@ -936,6 +1092,12 @@ progress {
     --settings-width: 340px;
     --scalar-bar-width: 220px;
     --rail-width: calc(44px + 2 * 6px + 2px);
+    --title-height: 0px;
+  }
+
+  /* The title takes no place on a small screen */
+  .title-panel {
+    display: none;
   }
 
   .label-long {
@@ -953,15 +1115,6 @@ progress {
   .icon-button {
     min-width: 44px;
     min-height: 44px;
-  }
-
-  .tab {
-    flex: none;
-    min-height: 44px;
-  }
-
-  .sidebar-tabs {
-    overflow-x: auto;
   }
 
   .button,
@@ -1015,9 +1168,15 @@ progress {
     gap: 0;
   }
 
-  .icon-toggle {
+  .icon-toggle,
+  .player-button {
     width: 44px;
     height: 44px;
+  }
+
+  .step-segment {
+    min-height: 44px;
+    justify-content: center;
   }
 
   /* No pointer over a touch screen: the icons have no label */
@@ -1029,19 +1188,10 @@ progress {
     padding: 0 10px;
   }
 
-  /* About three lines; a longer text scrolls */
-  .status {
-    max-height: 4.6em;
-  }
-
 }
 
-/* A low landscape screen: the settings panel and the run bar are narrower */
+/* A low landscape screen: the layer rail is a row */
 @media (max-height: 500px) and (orientation: landscape) {
-  .run-buttons .button {
-    padding: 6px 8px;
-  }
-
   .layer-rail {
     flex-direction: row;
     flex-wrap: wrap;
@@ -1056,8 +1206,9 @@ progress {
   }
 }
 
-/* A phone in portrait: the settings are a bottom sheet with the run bar below
-   them, and the 3D view fills the screen above the sheet */
+/* A phone in portrait: the run bar is at the bottom over the full width, the
+   settings of the open step are a bottom sheet above it, and the 3D view fills
+   the screen above them */
 @media (max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px) {
   .dock {
     position: absolute;
@@ -1087,16 +1238,17 @@ progress {
     box-shadow: none;
   }
 
-  .settings-panel {
+  .step-panel {
     flex: 1;
+    max-height: none;
   }
 
-  .layout[data-sheet="half"] .settings-panel {
+  .layout[data-sheet="half"] .step-panel {
     flex: none;
     height: 45dvh;
   }
 
-  .layout[data-sheet="full"]:not(.is-panel-closed) .dock {
+  .layout[data-sheet="full"].has-step-panel .dock {
     top: calc(env(safe-area-inset-top) + 56px);
   }
 
@@ -1136,19 +1288,19 @@ progress {
     padding: 8px var(--gap) calc(8px + env(safe-area-inset-bottom));
   }
 
-  .run-buttons .button {
-    flex: 1;
+  /* The timeline over the full width, the buttons below it: Run and Reset at the left, the log at the right */
+  .player {
+    flex-wrap: wrap;
   }
 
-  .run-buttons #panel-open,
-  .run-buttons .log-button {
-    flex: none;
-    min-width: 44px;
+  .timeline {
+    order: -1;
+    flex-basis: 100%;
+    margin: 0;
   }
 
-  .run-panel,
-  .layout.is-panel-closed .run-panel {
-    max-width: none;
+  #log-button {
+    margin-left: auto;
   }
 
   /* The view settings at the top: the colors at the left of the layers, the round buttons below the layers */
@@ -1183,8 +1335,7 @@ progress {
     overflow-y: auto;
   }
 
-  .log-view,
-  .layout.is-panel-closed .log-view {
+  .log-view {
     left: var(--gap);
     right: var(--gap);
     top: calc(var(--gap) + env(safe-area-inset-top));
