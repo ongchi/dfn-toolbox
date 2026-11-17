@@ -99,7 +99,7 @@ test("some particles exit through the out-flow boundary", () => {
 test("seed 0 uses the seed of the page", () => {
   const state = transportState();
   state.seed = 0;
-  expect(runTransport(transportToml(state), flowToml, mesh, 77, TrajectoryDetail.Full).seed).toBe(77);
+  expect(runTransport(transportToml(state), flowToml, mesh, 2, TrajectoryDetail.Full).seed).toBe(2);
 });
 
 test("no in-flow boundary is an error", () => {
