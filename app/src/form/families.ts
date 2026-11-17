@@ -1,6 +1,6 @@
 import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
-import { bindRegionHighlight, element, numberField, optionalNumberField, row, section, selectField } from "./fields";
+import { bindRegionHighlight, checkboxField, element, lengthStep, row, section, selectField, sliderField } from "./fields";
 import { angleFields } from "./orientation";
 import { totalFractureCount } from "./toml";
 import {
@@ -14,18 +14,28 @@ import {
   type RadiusState,
 } from "./state";
 
+/** Lengths up to the largest side of the domain mesh, as the radius of a user fracture; disabled without a mesh */
+function lengthSlider(
+  options: { label: string; key: string; help?: string; value: number; onInput: (value: number) => void },
+  context: FormContext,
+): HTMLElement {
+  const size = context.domainSize > 0 ? context.domainSize : 1;
+  const step = lengthStep(size);
+  return sliderField({ ...options, min: step, max: size, step, isDisabled: context.domainSize === 0 });
+}
+
 function radiusFields(family: FamilyState, context: FormContext): HTMLElement[] {
   const radius = family.radius;
   const set = <K extends string>(key: K) => (value: number) => {
     (radius as unknown as Record<K, number>)[key] = value;
     context.changed();
   };
-  const positive = { min: 0, isMinExclusive: true };
   const minMax = () =>
     row(
-      numberField({ label: "Minimum", key: "min", value: (radius as { min: number }).min, ...positive, onInput: set("min") }),
-      numberField({ label: "Maximum", key: "max", value: (radius as { max: number }).max, ...positive, onInput: set("max") }),
+      lengthSlider({ label: "Minimum (m)", key: "min", value: (radius as { min: number }).min, onInput: set("min") }, context),
+      lengthSlider({ label: "Maximum (m)", key: "max", value: (radius as { max: number }).max, onInput: set("max") }, context),
     );
+  const size = context.domainSize > 0 ? context.domainSize : 1;
 
   const distribution = selectField<RadiusDistribution>({
     label: "Radius distribution",
@@ -46,7 +56,8 @@ function radiusFields(family: FamilyState, context: FormContext): HTMLElement[] 
   switch (radius.distribution) {
     case "truncated_power_law":
       return [
-        row(distribution, numberField({ label: "Exponent", key: "alpha", value: radius.alpha, ...positive, onInput: set("alpha") })),
+        row(distribution),
+        row(sliderField({ label: "Exponent", key: "alpha", value: radius.alpha, min: 0.1, max: 5, step: 0.01, onInput: set("alpha") })),
         minMax(),
       ];
     case "log_normal":
@@ -70,18 +81,27 @@ function radiusFields(family: FamilyState, context: FormContext): HTMLElement[] 
           }),
         ),
         row(
-          numberField({ label: "Mean of ln(r)", key: "log_mean", value: radius.logMean, onInput: set("logMean") }),
-          numberField({ label: "Standard deviation", key: "sd", value: radius.sd, ...positive, onInput: set("sd") }),
+          sliderField({
+            label: "Mean of ln(r)",
+            key: "log_mean",
+            value: radius.logMean,
+            min: Math.log(lengthStep(size)),
+            max: Math.log(size),
+            step: 0.01,
+            onInput: set("logMean"),
+          }),
         ),
+        row(sliderField({ label: "Standard deviation", key: "sd", value: radius.sd, min: 0.01, max: 3, step: 0.01, onInput: set("sd") })),
         minMax(),
       ];
     case "exponential":
       return [
-        row(distribution, numberField({ label: "Mean", key: "mean", value: radius.mean, ...positive, onInput: set("mean") })),
+        row(distribution),
+        row(lengthSlider({ label: "Mean (m)", key: "mean", value: radius.mean, onInput: set("mean") }, context)),
         minMax(),
       ];
     case "constant":
-      return [row(distribution, numberField({ label: "Radius", key: "value", value: radius.value, ...positive, onInput: set("value") }))];
+      return [row(distribution), row(lengthSlider({ label: "Radius (m)", key: "value", value: radius.value, onInput: set("value") }, context))];
   }
 }
 
@@ -100,13 +120,15 @@ function orientationFields(family: FamilyState, convention: OrientationConventio
   return [
     row(...angleFields(orientation, convention, "mean normal of the Fisher distribution", context)),
     row(
-      numberField({
+      sliderField({
         label: "Concentration",
         key: "kappa",
         help: "large = all normals near the mean",
         value: orientation.kappa,
-        min: 0,
-        isMinExclusive: true,
+        min: 0.1,
+        max: 1000,
+        step: 0.01,
+        isLogScale: true,
         onInput: (value) => {
           orientation.kappa = value;
           context.changed();
@@ -164,25 +186,31 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
 
   const firstRow = row(
     state.generation.stopCondition === "p32"
-      ? numberField({
+      ? sliderField({
           label: "P32 target",
           key: "p32_target",
           help: "fracture area × 2 / region volume",
           value: family.p32Target,
-          min: 0,
-          isMinExclusive: true,
+          min: 1e-3,
+          max: 10,
+          step: 0.01,
+          isLogScale: true,
           onInput: (value) => {
             family.p32Target = value;
             context.changed();
           },
         })
-      : numberField({
+      : sliderField({
           label: "Number of fractures",
           key: "n_poly",
           help: "expected accepted fractures: the family of each new fracture is random with the share of this number; the total is exact",
           value: family.nPoly,
-          isInteger: true,
           min: 1,
+          // Larger networks are too slow and too large for the browser
+          max: 1000,
+          step: 0.01,
+          isLogScale: true,
+          isInteger: true,
           onInput: (value) => {
             family.nPoly = value;
             updateTotal();
@@ -194,33 +222,46 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
   card.append(
     firstRow,
     row(
-      numberField({
+      sliderField({
         label: "Aspect ratio",
         key: "aspect_ratio",
         help: "y radius / x radius",
         value: family.aspectRatio,
-        min: 0,
-        isMinExclusive: true,
+        min: 0.1,
+        max: 1,
+        step: 0.01,
         onInput: (value) => {
           family.aspectRatio = value;
           context.changed();
         },
       }),
-    ),
-    row(
-      regionField(family, context),
-      optionalNumberField({
+      sliderField({
         label: "Rotation β (°)",
         key: "beta",
-        help: "empty = uniform rotation",
-        placeholder: "uniform",
-        value: family.beta,
+        help: "in the plane of the fracture",
+        value: family.beta ?? 0,
+        min: 0,
+        max: 360,
+        step: 1,
+        isDisabled: family.beta === null,
         onInput: (value) => {
           family.beta = value;
           context.changed();
         },
       }),
     ),
+    row(
+      checkboxField({
+        label: "Uniform rotation",
+        help: "a random β for each fracture (no `beta`)",
+        value: family.beta === null,
+        onInput: (isUniform) => {
+          family.beta = isUniform ? null : 0;
+          context.rerender();
+        },
+      }),
+    ),
+    row(regionField(family, context)),
     ...radiusFields(family, context),
     ...orientationFields(family, state.orientationConvention, context),
     ...apertureFields(

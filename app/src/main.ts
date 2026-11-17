@@ -40,6 +40,7 @@ import {
 } from "./generationClient";
 import {
   meshDescription,
+  meshLargestSide,
   meshRegionBounds,
   meshRegionNames,
   type InputFiles,
@@ -169,6 +170,8 @@ let state: FormState = defaultFormState();
 let files: InputFiles = { mesh: null };
 let regionNames: string[] = [];
 let regionBounds: RegionBounds[] = [];
+/** The largest side of the bounding box of the domain mesh (m); 0 without a mesh */
+let domainSize = 0;
 let boundarySurfaceNames: string[] = [];
 /** The roles of the boundary surfaces (Domain panel) */
 let boundaryRoles: BoundaryRoles = { inflow: [], outflow: [] };
@@ -392,6 +395,9 @@ const formContext: FormContext = {
   get regionBounds() {
     return regionBounds;
   },
+  get domainSize() {
+    return domainSize;
+  },
   highlight: (item) => highlight(item),
   changed: () => {
     updateUserFracturesInViewer();
@@ -426,6 +432,7 @@ const flowContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
+  domainSize: 0,
   highlight: (item) => highlight(item),
   changed: () => liveRun.changed("flow"),
   rerender: () => {
@@ -438,6 +445,7 @@ const transportContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
+  domainSize: 0,
   highlight: (item) => highlight(item),
   changed: () => liveRun.changed("transport"),
   rerender: () => {
@@ -579,6 +587,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   previewedUserFracture = null;
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
+  domainSize = mesh === null ? 0 : meshLargestSide(mesh.text);
   boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
   clearPinnedItem();
   ui.shapeDescription.textContent = mesh === null ? "" : meshDescription(mesh.text);

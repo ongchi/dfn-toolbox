@@ -1,7 +1,7 @@
 // The user-defined fractures: one card for each `[[network.user_fracture]]`.
 import type { RegionBounds } from "../inputFiles";
 import type { FormContext } from "./context";
-import { bindRegionHighlight, element, row, section, selectField, sliderField } from "./fields";
+import { bindRegionHighlight, element, lengthStep, row, section, selectField, sliderField } from "./fields";
 import { angleFields } from "./orientation";
 import { defaultUserFracture, type FormState, type UserFractureState } from "./state";
 
@@ -34,11 +34,6 @@ function regionField(fracture: UserFractureState, context: FormContext): HTMLEle
   });
   bindRegionHighlight(field, names, context.highlight);
   return field;
-}
-
-/** A step of the sliders of lengths: the power of 10 near a thousandth of the size */
-function lengthStep(size: number): number {
-  return 10 ** Math.floor(Math.log10(size / 1000));
 }
 
 /** x, y and z of the center, in the bounding box of the region */

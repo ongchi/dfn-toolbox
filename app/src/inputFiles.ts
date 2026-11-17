@@ -40,6 +40,22 @@ export function pointValues(vtkText: string): number[] {
   return pointsText.trim().split(/\s+/).filter((word) => word !== "").map(Number);
 }
 
+/** The largest side of the bounding box of the points of an ASCII .vtu mesh */
+export function meshLargestSide(vtuText: string): number {
+  const points = pointValues(vtuText);
+  let largest = 0;
+  for (let axis = 0; axis < 3; axis++) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let index = axis; index < points.length; index += 3) {
+      min = Math.min(min, points[index]);
+      max = Math.max(max, points[index]);
+    }
+    largest = Math.max(largest, max - min);
+  }
+  return largest;
+}
+
 /**
  * The bounding box of the cells of each region of an ASCII .vtu mesh (the
  * cells with a value above 0 in `region__<name>`), in the order of the file.

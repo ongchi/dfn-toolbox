@@ -1,6 +1,6 @@
 // Fields of an aperture distribution: a family `aperture` (necessary).
 import type { FormContext } from "./context";
-import { numberField, row, selectField } from "./fields";
+import { row, selectField, sliderField } from "./fields";
 import { defaultAperture, type ApertureDistribution, type ApertureState } from "./state";
 
 interface ApertureFieldOptions {
@@ -23,19 +23,28 @@ function parameterFields(aperture: ApertureState, context: FormContext): HTMLEle
     (aperture as unknown as Record<K, number>)[key] = value;
     context.changed();
   };
-  const positive = { min: 0, isMinExclusive: true };
-  const alpha = (value: number) =>
-    numberField({ label: "Factor α (m)", key: "alpha", value, ...positive, onInput: set("alpha") });
-  const beta = (value: number) => numberField({ label: "Exponent β", key: "beta", value, onInput: set("beta") });
+  // The range of an aperture of a user fracture
+  const metres = { min: 1e-6, max: 1e-2, step: 0.01, isLogScale: true };
+  const alpha = (value: number) => sliderField({ label: "Factor α (m)", key: "alpha", value, ...metres, onInput: set("alpha") });
+  const beta = (value: number) =>
+    sliderField({ label: "Exponent β", key: "beta", value, min: 0, max: 2, step: 0.01, onInput: set("beta") });
   const sd = (value: number) =>
-    numberField({ label: "Standard deviation", key: "sd", value, min: 0, onInput: set("sd") });
+    sliderField({ label: "Standard deviation", key: "sd", value, min: 0, max: 3, step: 0.01, onInput: set("sd") });
 
   switch (aperture.distribution) {
     case "constant":
-      return [numberField({ label: "Aperture (m)", key: "value", value: aperture.value, ...positive, onInput: set("value") })];
+      return [sliderField({ label: "Aperture (m)", key: "value", value: aperture.value, ...metres, onInput: set("value") })];
     case "log_normal":
       return [
-        numberField({ label: "Mean of ln(b)", key: "log_mean", value: aperture.logMean, onInput: set("logMean") }),
+        sliderField({
+          label: "Mean of ln(b)",
+          key: "log_mean",
+          value: aperture.logMean,
+          min: -14,
+          max: -4.5,
+          step: 0.01,
+          onInput: set("logMean"),
+        }),
         sd(aperture.sd),
       ];
     case "correlated":
@@ -57,5 +66,6 @@ export function apertureFields(options: ApertureFieldOptions, context: FormConte
       context.rerender();
     },
   });
-  return [row(distribution), row(...parameterFields(options.aperture, context))];
+  // One slider for each row, as a user fracture
+  return [row(distribution), ...parameterFields(options.aperture, context).map((field) => row(field))];
 }

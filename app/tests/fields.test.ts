@@ -14,6 +14,14 @@ test("a log scale value has three significant digits", () => {
   expect(sliderValue(-3.9, true)).toBe(0.000126);
 });
 
+test("a whole-number slider on a log scale gives whole numbers", () => {
+  expect(sliderValue(Math.log10(1400) + 0.004, true, true)).toBe(1410);
+});
+
+test("a whole-number slider reaches 1 at its start", () => {
+  expect(sliderValue(0.01, true, true)).toBe(1);
+});
+
 const WEST: HighlightItem = { kind: "surface", name: "west" };
 const NORTH_BOX: HighlightItem = { kind: "region", name: "north_box" };
 const EAST_BOX: HighlightItem = { kind: "region", name: "east_box" };

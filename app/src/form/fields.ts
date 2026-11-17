@@ -234,13 +234,21 @@ export interface SliderFieldOptions extends FieldOptions {
   /** Step of the slider: of the value, or of its base-10 exponent with `isLogScale` */
   step: number;
   isLogScale?: boolean;
+  /** Whole numbers (a count) */
+  isInteger?: boolean;
   onInput: (value: number) => void;
 }
 
-/** The value at a slider position, without the rounding noise of the steps */
-export function sliderValue(position: number, isLogScale: boolean): number {
+/** The value at a slider position, without the rounding noise of the steps; `isInteger` rounds to a whole number */
+export function sliderValue(position: number, isLogScale: boolean, isInteger = false): number {
   const value = isLogScale ? 10 ** position : position;
-  return Number(value.toPrecision(isLogScale ? 3 : 12));
+  const rounded = Number(value.toPrecision(isLogScale ? 3 : 12));
+  return isInteger ? Math.round(rounded) : rounded;
+}
+
+/** A step of the sliders of lengths: the power of 10 near a thousandth of the size */
+export function lengthStep(size: number): number {
+  return 10 ** Math.floor(Math.log10(size / 1000));
 }
 
 /** The slider position of a value */
@@ -265,7 +273,7 @@ export function sliderField(options: SliderFieldOptions): HTMLElement {
   const isOutside = options.value < options.min || options.value > options.max;
   valueText.classList.toggle("is-invalid", isOutside);
   input.addEventListener("input", () => {
-    const value = sliderValue(input.valueAsNumber, isLogScale);
+    const value = sliderValue(input.valueAsNumber, isLogScale, options.isInteger);
     valueText.textContent = String(value);
     valueText.classList.remove("is-invalid");
     options.onInput(value);
@@ -273,35 +281,6 @@ export function sliderField(options: SliderFieldOptions): HTMLElement {
   const sliderRow = element("span", "slider-row");
   sliderRow.append(input, valueText);
   return fieldShell(options, sliderRow);
-}
-
-/** Number input which can be empty (an optional key) */
-export function optionalNumberField(
-  options: Omit<NumberFieldOptions, "value" | "onInput"> & {
-    value: number | null;
-    placeholder: string;
-    onInput: (value: number | null) => void;
-  },
-): HTMLElement {
-  const input = element("input");
-  input.type = "number";
-  input.step = "any";
-  input.placeholder = options.placeholder;
-  input.value = options.value === null ? "" : String(options.value);
-  input.disabled = options.isDisabled ?? false;
-  input.addEventListener("input", () => {
-    if (input.value.trim() === "") {
-      input.classList.remove("is-invalid");
-      options.onInput(null);
-      return;
-    }
-    const isValid = Number.isFinite(input.valueAsNumber);
-    input.classList.toggle("is-invalid", !isValid);
-    if (isValid) {
-      options.onInput(input.valueAsNumber);
-    }
-  });
-  return fieldShell(options, input);
 }
 
 export function textField(

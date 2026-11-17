@@ -98,7 +98,10 @@ async function startOnShape(page, meshName = "Box.vtu") {
 /** The value of the n_poly field of the first family of the DFN panel */
 async function nPolyValue(page) {
   return page.evaluate(
-    () => [...document.querySelectorAll("#form input[type=number]")].find((node) => node.closest(".field")?.textContent.includes("n_poly")).value,
+    () =>
+      [...document.querySelectorAll("#form .field")]
+        .find((field) => field.querySelector(".field-label")?.textContent === "Number of fractures")
+        .querySelector(".slider-value").textContent,
   );
 }
 
@@ -114,15 +117,29 @@ async function setFram(page, isOn) {
   }, isOn);
 }
 
-/** Sets the number of fractures (n_poly) of the first family of the DFN panel (the default forms have one family) */
+/**
+ * Sets the number of fractures (n_poly) of each family of the DFN panel: the position of its slider on a log scale,
+ * at a step of 0.01 of the exponent (700 gives 708); at most 1000
+ */
 async function setFractureCount(page, count) {
   await page.evaluate((value) => {
-    const input = [...document.querySelectorAll("input[type=number]")].find((node) =>
-      node.closest(".field")?.textContent.includes("n_poly"),
-    );
-    input.value = String(value);
-    input.dispatchEvent(new Event("input"));
+    const inputs = [...document.querySelectorAll("#form .field")]
+      .filter((field) => field.querySelector(".field-label")?.textContent === "Number of fractures")
+      .map((field) => field.querySelector("input[type=range]"));
+    for (const input of inputs) {
+      input.value = String(Math.log10(value));
+      input.dispatchEvent(new Event("input"));
+    }
   }, count);
+}
+
+/** "Duplicate" of the first family: a network with more fractures than the limit of one family */
+async function duplicateFirstFamily(page) {
+  const count = await page.$$eval("#form .family-card", (nodes) => nodes.length);
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#form .family-card button")].find((node) => node.textContent === "Duplicate").click(),
+  );
+  await page.waitForFunction((before) => document.querySelectorAll("#form .family-card").length === before + 1, {}, count);
 }
 
 /** Types a value into the field with a label of a form */
@@ -570,12 +587,21 @@ try {
     meshLabel: document.querySelector("#domain-form select").selectedOptions[0].textContent,
     families: document.querySelectorAll("#form .family-card").length,
     selects: document.querySelectorAll('[data-step-group="domain"] select:not([data-surface])').length,
+    // The family card has sliders, as a user fracture card
+    familyNumberInputs: document.querySelectorAll("#form .family-card input[type=number]").length,
+    familySliders: document.querySelectorAll("#form .family-card input[type=range]").length,
   }));
   const startNPoly = await nPolyValue(page);
   check(
-    start.shape === "Box.vtu" && start.meshLabel === "Box" && start.families === 1 && startNPoly === "100" && start.selects === 1,
+    start.shape === "Box.vtu" &&
+      start.meshLabel === "Box" &&
+      start.families === 1 &&
+      startNPoly === "100" &&
+      start.selects === 1 &&
+      start.familyNumberInputs === 0 &&
+      start.familySliders > 0,
     "default forms on the first shape",
-    `${start.shape} (${start.meshLabel}), ${start.families} family, n_poly ${startNPoly}, ${start.selects} domain dropdowns`,
+    `${start.shape} (${start.meshLabel}), ${start.families} family, n_poly ${startNPoly}, ${start.selects} domain dropdowns, family card: ${start.familyNumberInputs} number inputs, ${start.familySliders} sliders`,
   );
   // The settings of the steps are hidden at the start; a click on a segment of the run bar opens the panel of its
   // step, and a second click, the close button or Escape closes it
@@ -1274,7 +1300,8 @@ try {
   // the intersections soon need more memory than WebAssembly has)
   await startOnShape(page);
   await setFram(page, true);
-  await setFractureCount(page, 100000);
+  await duplicateFirstFamily(page);
+  await setFractureCount(page, 1000);
   await page.click("#run-button");
   await page.waitForFunction(() => document.querySelector("#status").textContent.includes("fractures accepted"), {
     timeout: RUN_TIMEOUT,
@@ -1338,11 +1365,12 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
 
   // "Pause" after the first checkpoint (5 s) keeps the fractures; "Run" continues: the network is that of a run with
-  // no stop. Default forms, FRAM on and 1400 fractures: the generation takes about 25 s (WebAssembly in node on
-  // fungihouse; 1200: 8 s), longer than the first checkpoint and the pause at 9 s
+  // no stop. Default forms, FRAM on and two families of 708 fractures: the generation of 1400 fractures takes about
+  // 25 s (WebAssembly in node on fungihouse; 1200: 8 s), longer than the first checkpoint and the pause at 9 s
   await startOnShape(page);
   await setFram(page, true);
-  await setFractureCount(page, 1400);
+  await duplicateFirstFamily(page);
+  await setFractureCount(page, 700);
   await runAll(page);
   const fullRunCount = await resultValue(page, "Final fractures");
   await page.click("#reset-button");
