@@ -78,21 +78,19 @@ const NO_CONNECTING_CLUSTER =
 // The transport runs only with a release point (user decision)
 const NO_RELEASE_POINT = "To track particles, click “Pick points” (Transport panel), then click on a fracture.";
 
-// The steps of the run bar, each with a panel of its settings; the domain, the user fractures and the network are the network input
-const STEP_PANELS = ["domain", "fractures", "network", "flow", "transport"] as const;
+// The steps of the run bar, each with a panel of its settings; the domain and the fractures are the network input
+const STEP_PANELS = ["domain", "fractures", "flow", "transport"] as const;
 type StepPanel = (typeof STEP_PANELS)[number];
 const STEP_PANEL_TITLES: Record<StepPanel, string> = {
   domain: "Domain",
-  fractures: "User fractures",
-  network: "DFN",
+  fractures: "Fractures",
   flow: "Flow",
   transport: "Transport",
 };
 /** The steps of the live run of each segment of the run bar; the domain has none */
 const STEP_PANEL_CHAIN_STEPS: Record<StepPanel, ChainStep[]> = {
   domain: [],
-  fractures: ["userFractures"],
-  network: ["generation", "mesh"],
+  fractures: ["generation", "userFractures", "mesh"],
   flow: ["flow"],
   transport: ["transport"],
 };

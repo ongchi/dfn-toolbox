@@ -37,24 +37,24 @@ output.
   the default roles: the first surface is in-flow, the second out-flow. The pointer over the
   row of a surface highlights it in the 3D view; a click on the row keeps it
   highlighted until a second click.
-- **User fractures**: add fractures, each with a region, center, shape,
-  aperture and orientation. The cards of the user fractures (and of the
-  families) are an accordion: a click on the header of a card opens it and
-  closes the others; a closed card shows its main values in its header. The pointer over a Region field (also of a
-  family) highlights its region in the 3D view; a click on its name keeps it
-  highlighted until a second click, and a new choice moves the highlight to
-  the new region.
-- **DFN**: set the fracture families. With the stop condition (advanced
-  part) "Number of fractures of each family", each family has its number of fractures: the
-  run stops at the total, and the family of each new fracture is random with
-  the share of its number, thus the number of a family is an expected value.
-  With the stop condition "P32 target of each family", each family has its
-  P32 target, and all families have the same chance. The network keeps only the clusters
-  which connect an in-flow and an out-flow surface. If there is no such
-  cluster, a warning shows, and the run stops after the fractures. The
-  advanced part (closed at the start) has the stop condition, the FRAM rules of the generation,
-  the choice of the clusters and the size of the triangles of the mesh for
-  the flow.
+- **Fractures**: set the fracture families and the user-defined fractures.
+  With the stop condition (advanced part) "Number of fractures of each
+  family", each family has its number of fractures: the run stops at the
+  total, and the family of each new fracture is random with the share of its
+  number, thus the number of a family is an expected value. With the stop
+  condition "P32 target of each family", each family has its P32 target, and
+  all families have the same chance. Each user-defined fracture has a region,
+  center, shape, aperture and orientation. The cards of the families and of
+  the user fractures are an accordion: a click on the header of a card opens
+  it and closes the others; a closed card shows its main values in its
+  header. The pointer over a Region field highlights its region in the 3D
+  view; a click on its name keeps it highlighted until a second click, and a
+  new choice moves the highlight to the new region. The network keeps only
+  the clusters which connect an in-flow and an out-flow surface. If there is
+  no such cluster, a warning shows, and the run stops after the fractures.
+  The advanced part (closed at the start) has the stop condition, the FRAM
+  rules of the generation, the choice of the clusters and the size of the
+  triangles of the mesh for the flow.
 - **Flow**: set a pressure for each in-flow and out-flow surface (default:
   11.0 MPa for the default in-flow surface, 10.0 MPa for the others), and the
   fluid (temperature and gravity).

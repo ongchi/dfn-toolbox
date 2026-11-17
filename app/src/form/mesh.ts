@@ -10,7 +10,7 @@ export function meshSection(state: FormState, context: FormContext): HTMLElement
     element(
       "p",
       "form-note",
-      'The generation always makes the boundary lines of the regions: they give the boundaries of the flow. "Meshing" (DFN panel) makes the triangle mesh of the final fractures, with the values here and the apertures of the form.',
+      'The generation always makes the boundary lines of the regions: they give the boundaries of the flow. "Meshing" (Fractures panel) makes the triangle mesh of the final fractures, with the values here and the apertures of the form.',
     ),
     row(
       numberField({

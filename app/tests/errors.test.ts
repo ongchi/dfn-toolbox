@@ -70,7 +70,7 @@ particle_count = 10
 
 test("a family region which the mesh does not have names the family and the region", () => {
   const text = networkErrorText((toml) => toml.replace("[[family]]", '[[family]]\nregion = "nowhere"'));
-  expect(text).toBe("Family 1 (DFN panel): the domain has no region nowhere. Choose another region.");
+  expect(text).toBe("Family 1 (Fractures panel): the domain has no region nowhere. Choose another region.");
 });
 
 test("a minimum feature size of 0 names the field of the form", () => {
@@ -82,7 +82,7 @@ test("a user fracture aperture of 0 names the fracture and the field of the form
   const files = readCase("user_fractures");
   const userFractures = files.userFractures?.replace(/(Name="aperture" format="ascii">\n)2e-4/, "$10.0");
   const text = userText(check_input(files.toml, files.mesh, userFractures));
-  expect(text).toBe("Fracture 1 (User fractures panel): Aperture must be greater than 0.");
+  expect(text).toBe("Fracture 1 (Fractures panel): Aperture must be greater than 0.");
 });
 
 test("a domain without boundary surfaces asks for another domain shape", () => {

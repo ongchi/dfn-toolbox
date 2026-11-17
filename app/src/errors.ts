@@ -27,9 +27,9 @@ export function toToolError(report: ErrorReport): ToolError {
 
 type Fields = Record<string, string>;
 
-const FAMILY = (fields: Fields) => `Family ${fields.family} (DFN panel)`;
-const USER_FRACTURE = (fields: Fields) => `Fracture ${fields.fracture} (User fractures panel)`;
-const MESH_SECTION = "DFN panel, Advanced, Triangle mesh for the flow";
+const FAMILY = (fields: Fields) => `Family ${fields.family} (Fractures panel)`;
+const USER_FRACTURE = (fields: Fields) => `Fracture ${fields.fracture} (Fractures panel)`;
+const MESH_SECTION = "Fractures panel, Advanced, Triangle mesh for the flow";
 const APERTURE_VALUES =
   "the aperture values are not valid. The aperture and the factor α must be above 0, and the standard deviation must not be negative.";
 
@@ -60,7 +60,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.FamilyRadius.Inefficient": (f) =>
     `${FAMILY(f)}: too many radii are smaller than the minimum radius. Increase the minimum radius.`,
   "dfngen.InefficientSampling": () =>
-    "Too many radii are smaller than the minimum radius. Increase the minimum radius of the families (DFN panel).",
+    "Too many radii are smaller than the minimum radius. Increase the minimum radius of the families (Fractures panel).",
   "dfngen.UserFracture.UnknownRegion": (f) =>
     `${USER_FRACTURE(f)}: the domain has no region ${f.region}. Choose another region.`,
   "dfngen.UserFracture.EmptyRegion": (f) =>
@@ -76,10 +76,10 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.MeshMaxSizeFactor": () => `Maximum size factor (${MESH_SECTION}) must be 1 or more.`,
   "dfngen.MeshSlope": () => `Slope (${MESH_SECTION}) must be greater than 0.`,
   "dfngen.NoFractureDefined": () =>
-    "There is no fracture. Add a fracture family (DFN panel) or a user-defined fracture (User fractures panel).",
+    "There is no fracture. Add a fracture family or a user-defined fracture (Fractures panel).",
   "dfngen.NoIntersectingFractures": () =>
-    "No fractures intersect. Increase the number of fractures or their size (DFN panel), or decrease Minimum feature size.",
-  "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (DFN panel, General). Details: ${f.message}`,
+    "No fractures intersect. Increase the number of fractures or their size (Fractures panel), or decrease Minimum feature size.",
+  "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (Fractures panel, General). Details: ${f.message}`,
   "dfngen.CheckpointInputChanged": () =>
     "The input changed during the run: the network needs a new generation. Click “Reset”, then “Run”.",
 

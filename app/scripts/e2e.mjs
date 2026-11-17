@@ -95,7 +95,7 @@ async function startOnShape(page, meshName = "Box.vtu") {
   }
 }
 
-/** The value of the n_poly field of the first family of the DFN panel */
+/** The value of the n_poly field of the first family of the Fractures panel */
 async function nPolyValue(page) {
   return page.evaluate(
     () =>
@@ -105,7 +105,7 @@ async function nPolyValue(page) {
   );
 }
 
-/** Sets the FRAM checkbox of the advanced part of the DFN panel (the default forms have FRAM off) */
+/** Sets the FRAM checkbox of the advanced part of the Fractures panel (the default forms have FRAM off) */
 async function setFram(page, isOn) {
   await page.evaluate((isFramOn) => {
     const input = [...document.querySelectorAll("#network-advanced-form .field-checkbox")]
@@ -118,7 +118,7 @@ async function setFram(page, isOn) {
 }
 
 /**
- * Sets the number of fractures (n_poly) of each family of the DFN panel: the position of its slider on a log scale,
+ * Sets the number of fractures (n_poly) of each family of the Fractures panel: the position of its slider on a log scale,
  * at a step of 0.01 of the exponent (700 gives 708); at most 1000
  */
 async function setFractureCount(page, count) {
@@ -383,7 +383,7 @@ async function checkPhone() {
     `tap ${isSameView(viewAfterTap, viewBeforeTap) ? "unchanged" : "changed"}, second tap ${isSameView(viewAfterSecondTap, viewBeforeTap) ? "same" : "different"}`,
   );
 
-  for (const step of ["domain", "fractures", "network", "flow", "transport"]) {
+  for (const step of ["domain", "fractures", "flow", "transport"]) {
     await openStepPanel(page, step, true);
     const problems = await touchProblems(page);
     check(problems.length === 0, `phone: touch sizes of the ${step} panel`, problems.join(", ") || "none");
@@ -391,7 +391,7 @@ async function checkPhone() {
   }
 
   // A run lowers the full sheet to half: the view shows the fractures
-  await openStepPanel(page, "network", true);
+  await openStepPanel(page, "fractures", true);
   await page.tap("#sheet-size");
   const sheetBeforeRun = await sheetState();
   await page.tap("#run-button");
@@ -627,7 +627,7 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_start.png` });
   const statesBeforeRun = await segmentStates(page);
   check(
-    statesBeforeRun === "domain=done fractures=stale network=stale flow=stale transport=stale",
+    statesBeforeRun === "domain=done fractures=stale flow=stale transport=stale",
     "segment states before a run",
     statesBeforeRun,
   );
@@ -750,12 +750,12 @@ try {
     `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
-  // FRAM, clusters and mesh are in the closed advanced part of the DFN panel, the fluid in the Flow panel and the
+  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the fluid in the Flow panel and the
   // routing in the Transport panel; the settings dialog has the orientation and the fracture shape. The forms
   // have no number of points.
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
-  const networkSections = await sectionTitles("#form");
+  const networkSections = await sectionTitles('[data-step-group="fractures"] > .form');
   const advancedSections = await sectionTitles("#network-advanced-form");
   const isAdvancedOpen = await page.$eval(".advanced-settings", (node) => node.open);
   const settingsSections = await sectionTitles("#settings-dialog");
@@ -764,18 +764,18 @@ try {
     nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
   );
   check(
-    networkSections === "General, Fracture families" &&
+    networkSections === "General, Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
       settingsSections === "Orientation of the fractures, Fracture shape" &&
       stepSettings === "Fluid; Intersections" &&
       pointFields.join(", ") === "settings-dialog",
     "the places of the settings sections",
-    `DFN panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; flow and transport: ${stepSettings}; number of points in ${pointFields.join(", ")}`,
+    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; flow and transport: ${stepSettings}; number of points in ${pointFields.join(", ")}`,
   );
   // The run bar has one "Run" button, one "Reset" button and the Log button, with each panel
   const runButtons = [];
-  for (const step of ["domain", "fractures", "network", "flow", "transport"]) {
+  for (const step of ["domain", "fractures", "flow", "transport"]) {
     await openStepPanel(page, step);
     runButtons.push(
       await page.$$eval(".player > button", (nodes) => nodes.map((node) => node.getAttribute("aria-label")).join(" ")),
@@ -794,7 +794,7 @@ try {
   for (const meshName of meshNames) {
     const name = meshName.replace(/\.vtu$/, "");
     await startOnShape(page, meshName);
-    await openStepPanel(page, "network");
+    await openStepPanel(page, "fractures");
     // "Run" runs the network, its mesh and the flow; the default forms have no release point, thus no transport
     // The results of the Log view show only with a result
     const hasResults = () => page.$eval("#results", (node) => !node.hidden);
@@ -812,7 +812,7 @@ try {
     check(!hasResultsBefore && hasResultsAfter, `${name}: results in the log view`, `${hasResultsBefore} → ${hasResultsAfter}`);
     const statesAfterRun = await segmentStates(page);
     check(
-      statesAfterRun === "domain=done fractures=done network=done flow=done transport=done",
+      statesAfterRun === "domain=done fractures=done flow=done transport=done",
       `${name}: segment states after the run`,
       statesAfterRun,
     );
@@ -1002,7 +1002,7 @@ try {
 
   // The live run: a change of a setting runs again the steps which it affects; the results before them stay
   await startOnShape(page);
-  await openStepPanel(page, "network");
+  await openStepPanel(page, "fractures");
   await runAll(page);
   await page.click("#run-button");
   await waitIdle(page);
@@ -1121,7 +1121,7 @@ try {
 
   // The pointer over the Region field of a family highlights its region; a click on its name keeps it highlighted,
   // a new choice moves the kept highlight to the new region, and a second click removes it
-  await openStepPanel(page, "network");
+  await openStepPanel(page, "fractures");
   const familyRegionField = () =>
     page.evaluateHandle(() =>
       [...document.querySelectorAll("#form .family-card .field")].find((node) => node.querySelector(".field-label")?.textContent === "Region"),
@@ -1167,7 +1167,7 @@ try {
   // a click on the header of the open card closes it, a button of a header does not open or close its card, the
   // open card stays open after the form is rendered again, and the header of a card has its values
   await startOnShape(page);
-  await openStepPanel(page, "network");
+  await openStepPanel(page, "fractures");
   const cardStates = (formSelector) =>
     page.$$eval(`${formSelector} .family-card`, (nodes) => nodes.map((node) => (node.open ? "open" : "closed")).join(" "));
   const clickButton = (formSelector, label, index = 0) =>
@@ -1292,7 +1292,7 @@ try {
   const badInputStatus = await statusText(page);
   check(
     (await isStatusError(page)) &&
-      badInputStatus === "Family 1 (DFN panel): the domain has no region north_box. Choose another region.",
+      badInputStatus === "Family 1 (Fractures panel): the domain has no region north_box. Choose another region.",
     "generate with a bad input",
     badInputStatus,
   );
@@ -1315,7 +1315,7 @@ try {
   );
   const statesAfterError = await segmentStates(page);
   check(
-    statesAfterError === "domain=done fractures=stale network=failed flow=stale transport=stale",
+    statesAfterError === "domain=done fractures=failed flow=stale transport=stale",
     "segment states after an error",
     statesAfterError,
   );
@@ -1535,7 +1535,7 @@ try {
   );
 
   // The Log panel stays open during a run, and the settings of a step too
-  await openStepPanel(page, "network");
+  await openStepPanel(page, "fractures");
   await page.click("#log-button");
   await runAll(page);
   const isPanelShownAfterRun = await isStepPanelShown();
@@ -1580,7 +1580,7 @@ try {
   const centerWithoutPanel = await modelCenter();
   await page.screenshot({ path: `${screenshotDir}/e2e_panel_closed.png` });
   // The part of the view at the right of the panel and its shadow, above the run bar
-  await openStepPanel(page, "network");
+  await openStepPanel(page, "fractures");
   const clipRightOfPanel = await page.$eval("#step-panel", (node) => {
     const left = Math.ceil(node.getBoundingClientRect().right) + 24;
     const bottom = Math.floor(document.querySelector("#run-panel").getBoundingClientRect().top);

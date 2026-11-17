@@ -1121,10 +1121,6 @@ input[type="radio"] {
 
 /* ---------------------------------------------------------------- touch screens */
 
-.label-short {
-  display: none;
-}
-
 /* A touch screen: portrait, or a low landscape screen */
 @media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {
   :root {
@@ -1138,14 +1134,6 @@ input[type="radio"] {
   /* The title takes no place on a small screen */
   .title-panel {
     display: none;
-  }
-
-  .label-long {
-    display: none;
-  }
-
-  .label-short {
-    display: inline;
   }
 
   .subtitle {
