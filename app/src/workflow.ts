@@ -17,13 +17,16 @@
 //   domain = "Box.vtu"                 # the name of a predefined mesh; no `user_fractures`
 //   orientation_option = "theta_phi"   # or "trend_plunge", "dip_strike": the pair of each orientation table; not in the dfngen input
 //   number_of_points = 8               # of each family and user fracture: 3 or more, 4 = rectangle; the dfngen input has it in each family
-//   [network.generation]               # only n_poly (optional, as [generation]); the dfngen input has force_large_fractures = false, remove_fractures_less_than = 0.0
+//   [network.generation]               # not in the dfngen input: the input has n_poly (the sum of the families), force_large_fractures = false, remove_fractures_less_than = 0.0
+//   stop_condition = "n_poly"          # or "p32"
 //   [network.fram]                     # as [fram]; optional
 //   [network.mesh]                     # optional; no `enable` and no [network.region_boundaries]: always on
 //   max_size_factor = 5.0
 //   slope = 0.5
 //   [network.clusters]                 # only keep_only_largest
-//   [[network.family]]                 # as [[family]], without `number_of_points`; `aperture` is necessary
+//   [[network.family]]                 # as [[family]], without `number_of_points` and `probability`; `aperture` is necessary
+//   n_poly = 10                        # with "n_poly": the expected number of fractures; the dfngen probability is its share of the sum
+//                                      # with "p32": p32_target instead; the same probability for all families
 //   [[network.user_fracture]]          # optional; a regular polygon, all keys necessary
 //   region = "box"                     # one region of the mesh
 //   center = [5.0, 5.0, 5.0]           # m; in the bounding box of the cells of the region

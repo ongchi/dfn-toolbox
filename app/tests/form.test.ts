@@ -160,9 +160,62 @@ test("a family without aperture is an error", () => {
   expect(problemsOf(toml)).toEqual(["network family 1: `aperture` is missing"]);
 });
 
-test("p32_target with n_poly is an error", () => {
+test("p32_target with the stop condition n_poly is an error", () => {
   const toml = BOX.replace("[[network.family]]", "[[network.family]]\np32_target = 1.0");
-  expect(problemsOf(toml)).toContain("network family 1: `p32_target` is not allowed with `n_poly`");
+  expect(problemsOf(toml)).toEqual(["network family 1: `p32_target` is not allowed with the stop condition `n_poly`"]);
+});
+
+test("a family without n_poly is an error with the stop condition n_poly", () => {
+  const toml = BOX.replace(/^n_poly = 10\n/m, "");
+  expect(problemsOf(toml)).toEqual(["network family 1: `n_poly` is necessary with the stop condition `n_poly`"]);
+});
+
+test("n_poly of a family with the stop condition p32 is an error", () => {
+  const toml = BOX.replace('stop_condition = "n_poly"', 'stop_condition = "p32"').replace(
+    "[[network.family]]",
+    "[[network.family]]\np32_target = 1.0",
+  );
+  expect(problemsOf(toml)).toEqual(["network family 1: `n_poly` is not allowed with the stop condition `p32`"]);
+});
+
+test("the probability of a family is an unknown key: the numbers of fractures give it", () => {
+  const toml = BOX.replace("[[network.family]]", "[[network.family]]\nprobability = 1.0");
+  expect(problemsOf(toml)).toEqual(["network family 1: `probability` is an unknown key"]);
+});
+
+test("n_poly in [network.generation] is an unknown key: each family has its number", () => {
+  const toml = BOX.replace("[network.generation]", "[network.generation]\nn_poly = 10");
+  expect(problemsOf(toml)).toEqual(["[network.generation]: `n_poly` is an unknown key"]);
+});
+
+const TWO_FAMILIES = readWorkflowFile("two_families");
+
+test("the dfngen n_poly is the sum of the numbers of fractures of the families", () => {
+  expect(networkLibraryToml(TWO_FAMILIES)).toMatch(/\[generation\]\nn_poly = 5\n/);
+});
+
+test("the probability of a family is its share of the numbers of fractures", () => {
+  const probabilities = [...networkLibraryToml(TWO_FAMILIES).matchAll(/^probability = (.*)$/gm)].map((match) => match[1]);
+  expect(probabilities).toEqual(["0.4", "0.6"]);
+});
+
+test("the dfngen families have no n_poly", () => {
+  expect(networkLibraryToml(TWO_FAMILIES).split("[[family]]").slice(1).join("")).not.toMatch(/n_poly/);
+});
+
+test("with the stop condition p32 the families have the same probability and no dfngen n_poly", () => {
+  const toml = TWO_FAMILIES.replace('stop_condition = "n_poly"', 'stop_condition = "p32"')
+    .replace("n_poly = 2", "p32_target = 0.1")
+    .replace("n_poly = 3", "p32_target = 0.2");
+  const libraryToml = networkLibraryToml(toml);
+  const probabilities = [...libraryToml.matchAll(/^probability = (.*)$/gm)].map((match) => match[1]);
+  expect({ probabilities, hasNPoly: /n_poly/.test(libraryToml) }).toEqual({ probabilities: ["0.5", "0.5"], hasNPoly: false });
+});
+
+test("without a family the dfngen input has no n_poly", () => {
+  const { network, boundaries } = tomlToWorkflow(BOX);
+  network.families = [];
+  expect(networkToLibraryToml(network, boundaries)).not.toMatch(/n_poly/);
 });
 
 test("an unknown aperture distribution is an error", () => {

@@ -95,7 +95,7 @@ async function startOnShape(page, meshName = "Box.vtu") {
   }
 }
 
-/** The value of the n_poly field of the DFN panel */
+/** The value of the n_poly field of the first family of the DFN panel */
 async function nPolyValue(page) {
   return page.evaluate(
     () => [...document.querySelectorAll("#form input[type=number]")].find((node) => node.closest(".field")?.textContent.includes("n_poly")).value,
@@ -114,7 +114,7 @@ async function setFram(page, isOn) {
   }, isOn);
 }
 
-/** Sets the number of fractures (n_poly) of the DFN panel */
+/** Sets the number of fractures (n_poly) of the first family of the DFN panel (the default forms have one family) */
 async function setFractureCount(page, count) {
   await page.evaluate((value) => {
     const input = [...document.querySelectorAll("input[type=number]")].find((node) =>

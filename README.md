@@ -42,7 +42,12 @@ output.
   family) highlights its region in the 3D view; a click on its name keeps it
   highlighted until a second click, and a new choice moves the highlight to
   the new region.
-- **DFN**: set the fracture families. The network keeps only the clusters
+- **DFN**: set the fracture families. With the stop condition "Number of
+  fractures of each family", each family has its number of fractures: the
+  run stops at the total, and the family of each new fracture is random with
+  the share of its number, thus the number of a family is an expected value.
+  With the stop condition "P32 target of each family", each family has its
+  P32 target, and all families have the same chance. The network keeps only the clusters
   which connect an in-flow and an out-flow surface. If there is no such
   cluster, a warning shows, and the run stops after the fractures. The
   advanced part (closed at the start) has the FRAM rules of the generation,

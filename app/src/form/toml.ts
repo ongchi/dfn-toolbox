@@ -22,6 +22,7 @@ import {
   type OrientationState,
   type PlaneOrientationState,
   type RadiusState,
+  type StopCondition,
   type UserFractureState,
 } from "./state";
 import { USER_FRACTURES_FILE } from "../userFractures";
@@ -137,19 +138,32 @@ function orientationEntries(orientation: OrientationState, convention: Orientati
   return [...planeOrientationEntries(orientation, convention), ["kappa", float(orientation.kappa)]];
 }
 
-function familyLines(family: FamilyState, isP32: boolean, convention: OrientationConvention): string[] {
-  const lines = [
-    `probability = ${float(family.probability)}`,
-    `aspect_ratio = ${float(family.aspectRatio)}`,
-  ];
+/**
+ * The probability of each family in the dfngen input: its share of the sum of
+ * the numbers of fractures, or the same for all families with the stop
+ * condition P32
+ */
+export function familyProbabilities(state: FormState): number[] {
+  if (state.generation.stopCondition === "p32") {
+    return state.families.map(() => 1 / state.families.length);
+  }
+  const total = totalFractureCount(state);
+  return state.families.map((family) => family.nPoly / total);
+}
+
+/** The sum of the numbers of fractures of the families: the dfngen `n_poly` */
+export function totalFractureCount(state: FormState): number {
+  return state.families.reduce((total, family) => total + family.nPoly, 0);
+}
+
+/** The lines of a family table after `stopLines` (the keys of the stop condition) */
+function familyLines(family: FamilyState, stopLines: string[], convention: OrientationConvention): string[] {
+  const lines = [...stopLines, `aspect_ratio = ${float(family.aspectRatio)}`];
   if (family.region !== null) {
     lines.push(`region = ${string(family.region)}`);
   }
   if (family.beta !== null) {
     lines.push(`beta = ${float(family.beta)}`);
-  }
-  if (isP32) {
-    lines.push(`p32_target = ${float(family.p32Target)}`);
   }
   lines.push(`aperture = ${inlineTable(apertureEntries(family.aperture))}`);
   lines.push(`radius = ${inlineTable(radiusEntries(family.radius))}`);
@@ -181,8 +195,7 @@ export function networkTables(state: FormState): TomlTable[] {
   ];
   const tables: TomlTable[] = [{ name: "", isArray: false, lines: rootLines }];
 
-  const generationLines = isP32 ? [] : [`n_poly = ${integer(state.generation.nPoly)}`];
-  tables.push({ name: "generation", isArray: false, lines: generationLines });
+  tables.push({ name: "generation", isArray: false, lines: [`stop_condition = ${string(state.generation.stopCondition)}`] });
 
   // Without FRAM, the section is not written: its other keys have no effect
   if (state.fram.enable) {
@@ -212,7 +225,8 @@ export function networkTables(state: FormState): TomlTable[] {
   });
 
   for (const family of state.families) {
-    tables.push({ name: "family", isArray: true, lines: familyLines(family, isP32, state.orientationConvention) });
+    const stopLines = [isP32 ? `p32_target = ${float(family.p32Target)}` : `n_poly = ${integer(family.nPoly)}`];
+    tables.push({ name: "family", isArray: true, lines: familyLines(family, stopLines, state.orientationConvention) });
   }
   for (const fracture of state.userFractures) {
     tables.push({ name: "user_fracture", isArray: true, lines: userFractureLines(fracture, state.orientationConvention) });
@@ -238,6 +252,11 @@ const REGION_BOUNDARIES_TABLE: TomlTable = { name: "region_boundaries", isArray:
  */
 export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): string {
   const clustersLines = ["keep_isolated_fractures = false", clustersLine(roles)];
+  const isP32 = state.generation.stopCondition === "p32";
+  // Without a family, no n_poly: dfngen has then no insertion loop
+  const generationLines = isP32 || state.families.length === 0 ? [] : [`n_poly = ${integer(totalFractureCount(state))}`];
+  const probabilities = familyProbabilities(state);
+  let familyIndex = 0;
   const tables = networkTables(state).flatMap((table) => {
     if (table.name === "") {
       // dfngen has the pair of keys in each orientation table and the number of points in each family: no global keys
@@ -254,10 +273,18 @@ export function networkToLibraryToml(state: FormState, roles: BoundaryRoles): st
     }
     // Not in the form (user decision): no forced large fractures, and no fracture is removed for its size
     if (table.name === "generation") {
-      return [{ ...table, lines: [...table.lines, "force_large_fractures = false", "remove_fractures_less_than = 0.0"] }];
+      return [{ ...table, lines: [...generationLines, "force_large_fractures = false", "remove_fractures_less_than = 0.0"] }];
     }
+    // The probability instead of the number of fractures of the family
     if (table.name === "family") {
-      return [{ ...table, lines: [`${NUMBER_OF_POINTS_KEY} = ${integer(state.numberOfPoints)}`, ...table.lines] }];
+      const family = state.families[familyIndex];
+      const stopLines = [`probability = ${float(probabilities[familyIndex])}`];
+      if (isP32) {
+        stopLines.push(`p32_target = ${float(family.p32Target)}`);
+      }
+      familyIndex += 1;
+      const lines = familyLines(family, stopLines, state.orientationConvention);
+      return [{ ...table, lines: [`${NUMBER_OF_POINTS_KEY} = ${integer(state.numberOfPoints)}`, ...lines] }];
     }
     return table.name === "user_fracture" ? [] : [table];
   });
@@ -569,18 +596,25 @@ function readFamily(
 ): FamilyState {
   const reader = new TableReader(table, path, problems);
   const p32Target = reader.optionalFloat("p32_target");
+  const nPoly = reader.optionalInteger("n_poly");
   if (isP32 && p32Target === null) {
-    problems.push(`${path}: \`p32_target\` is necessary without \`n_poly\``);
+    problems.push(`${path}: \`p32_target\` is necessary with the stop condition \`p32\``);
+  }
+  if (isP32 && nPoly !== null) {
+    problems.push(`${path}: \`n_poly\` is not allowed with the stop condition \`p32\``);
+  }
+  if (!isP32 && nPoly === null) {
+    problems.push(`${path}: \`n_poly\` is necessary with the stop condition \`n_poly\``);
   }
   if (!isP32 && p32Target !== null) {
-    problems.push(`${path}: \`p32_target\` is not allowed with \`n_poly\``);
+    problems.push(`${path}: \`p32_target\` is not allowed with the stop condition \`n_poly\``);
   }
   const aperture = readOptionalAperture(reader, "aperture", `${path}: aperture`, problems);
   if (aperture === null) {
     problems.push(`${path}: \`aperture\` is missing`);
   }
   const family: FamilyState = {
-    probability: reader.float("probability", 0),
+    nPoly: nPoly ?? defaultFamily().nPoly,
     aspectRatio: reader.float("aspect_ratio", 0),
     region: reader.optionalString("region"),
     beta: reader.optionalFloat("beta"),
@@ -630,10 +664,8 @@ export function readNetwork(table: Table, problems: string[]): FormState {
   const reader = new TableReader(table, "[network]", problems);
 
   const generationReader = new TableReader(reader.subTable("generation"), "[network.generation]", problems);
-  const nPoly = generationReader.optionalInteger("n_poly");
   const generation = {
-    stopCondition: nPoly === null ? ("p32" as const) : ("n_poly" as const),
-    nPoly: nPoly ?? 100,
+    stopCondition: generationReader.choice<StopCondition>("stop_condition", ["n_poly", "p32"], "n_poly"),
   };
   generationReader.checkUnknownKeys();
 

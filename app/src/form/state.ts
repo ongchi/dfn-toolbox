@@ -8,7 +8,6 @@ export type StopCondition = "n_poly" | "p32";
 
 export interface GenerationState {
   stopCondition: StopCondition;
-  nPoly: number;
 }
 
 export interface FramState {
@@ -65,7 +64,12 @@ export interface OrientationState extends PlaneOrientationState {
 }
 
 export interface FamilyState {
-  probability: number;
+  /**
+   * The expected number of accepted fractures of the family, for the stop
+   * condition n_poly: the dfngen `n_poly` is the sum of the families, and the
+   * probability of a family is its share of it
+   */
+  nPoly: number;
   aspectRatio: number;
   /** Name of a region of the mesh; null = whole mesh (no key) */
   region: string | null;
@@ -165,7 +169,7 @@ export function defaultRadius(distribution: RadiusDistribution): RadiusState {
 
 export function defaultFamily(): FamilyState {
   return {
-    probability: 1.0,
+    nPoly: 100,
     aspectRatio: 1.0,
     region: null,
     beta: null,
@@ -197,7 +201,7 @@ export function defaultFormState(): FormState {
     orientationConvention: "theta_phi",
     numberOfPoints: 8,
     userFractures: [],
-    generation: { stopCondition: "n_poly", nPoly: 100 },
+    generation: { stopCondition: "n_poly" },
     fram: { ...FRAM_DEFAULTS },
     mesh: { ...MESH_DEFAULTS },
     clusters: { keepOnlyLargest: false },

@@ -17,7 +17,7 @@ orientation_option = "theta_phi"
 number_of_points = 8
 
 [network.generation]
-n_poly = 10
+stop_condition = "n_poly"
 
 [network.mesh]
 max_size_factor = 5.0
@@ -27,7 +27,7 @@ slope = 0.5
 keep_only_largest = true
 
 [[network.family]]
-probability = 1.0
+n_poly = 10
 aspect_ratio = 1.0
 aperture = { distribution = "constant", value = 1e-4 }
 radius = { distribution = "truncated_power_law", alpha = 1.6, min = 2.5, max = 6.0 }

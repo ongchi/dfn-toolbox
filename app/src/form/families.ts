@@ -2,6 +2,7 @@ import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
 import { bindRegionHighlight, element, numberField, optionalNumberField, row, section, selectField } from "./fields";
 import { angleFields } from "./orientation";
+import { totalFractureCount } from "./toml";
 import {
   defaultFamily,
   defaultRadius,
@@ -12,8 +13,6 @@ import {
   type RadiusDistribution,
   type RadiusState,
 } from "./state";
-
-const PROBABILITY_TOLERANCE = 0.001;
 
 function radiusFields(family: FamilyState, context: FormContext): HTMLElement[] {
   const radius = family.radius;
@@ -137,7 +136,7 @@ function regionField(family: FamilyState, context: FormContext): HTMLElement {
   return field;
 }
 
-function familyCard(state: FormState, index: number, context: FormContext, updateSum: () => void): HTMLElement {
+function familyCard(state: FormState, index: number, context: FormContext, updateTotal: () => void): HTMLElement {
   const family = state.families[index];
   const card = element("div", "family-card");
 
@@ -163,37 +162,34 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
   header.append(actions);
   card.append(header);
 
-  const isP32 = state.generation.stopCondition === "p32";
   const firstRow = row(
-    numberField({
-      label: "Probability",
-      key: "probability",
-      help: "chance to select this family",
-      value: family.probability,
-      min: 0,
-      onInput: (value) => {
-        family.probability = value;
-        updateSum();
-        context.changed();
-      },
-    }),
+    state.generation.stopCondition === "p32"
+      ? numberField({
+          label: "P32 target",
+          key: "p32_target",
+          help: "fracture area × 2 / region volume",
+          value: family.p32Target,
+          min: 0,
+          isMinExclusive: true,
+          onInput: (value) => {
+            family.p32Target = value;
+            context.changed();
+          },
+        })
+      : numberField({
+          label: "Number of fractures",
+          key: "n_poly",
+          help: "expected accepted fractures: the family of each new fracture is random with the share of this number; the total is exact",
+          value: family.nPoly,
+          isInteger: true,
+          min: 1,
+          onInput: (value) => {
+            family.nPoly = value;
+            updateTotal();
+            context.changed();
+          },
+        }),
   );
-  if (isP32) {
-    firstRow.append(
-      numberField({
-        label: "P32 target",
-        key: "p32_target",
-        help: "fracture area × 2 / region volume",
-        value: family.p32Target,
-        min: 0,
-        isMinExclusive: true,
-        onInput: (value) => {
-          family.p32Target = value;
-          context.changed();
-        },
-      }),
-    );
-  }
 
   card.append(
     firstRow,
@@ -243,25 +239,23 @@ function familyCard(state: FormState, index: number, context: FormContext, updat
   return card;
 }
 
-/** Shows the sum of the probabilities, with a warning outside 0.999 to 1.001 */
-function showProbabilitySum(state: FormState, note: HTMLElement): void {
-  const sum = state.families.reduce((total, family) => total + family.probability, 0);
-  const isValid = Math.abs(sum - 1) <= PROBABILITY_TOLERANCE;
-  note.className = isValid ? "form-note" : "form-note is-warning";
-  note.textContent = `Sum of the probabilities: ${Number(sum.toFixed(6))}${isValid ? "" : " (must be 1)"}`;
+/** Shows the total of the numbers of fractures: the number of accepted stochastic fractures of the network */
+function showTotal(state: FormState, note: HTMLElement): void {
+  note.className = "form-note";
+  note.textContent = `Total: ${totalFractureCount(state)} fractures`;
 }
 
 export function familiesSection(state: FormState, context: FormContext): HTMLElement {
   const container = section("Fracture families");
-  const sumNote = element("p");
-  const updateSum = () => showProbabilitySum(state, sumNote);
+  const totalNote = element("p");
+  const updateTotal = () => showTotal(state, totalNote);
   if (state.families.length === 0) {
     container.append(element("p", "form-note", "No stochastic family: the network has only the user-defined fractures."));
-  } else {
-    updateSum();
-    container.append(sumNote);
+  } else if (state.generation.stopCondition === "n_poly") {
+    updateTotal();
+    container.append(totalNote);
   }
-  state.families.forEach((_family, index) => container.append(familyCard(state, index, context, updateSum)));
+  state.families.forEach((_family, index) => container.append(familyCard(state, index, context, updateTotal)));
 
   const addButton = element("button", "button", "Add family");
   addButton.type = "button";

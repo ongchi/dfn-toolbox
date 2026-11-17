@@ -15,14 +15,14 @@ inflow = ["north"]
 outflow = ["east"]
 
 [network]
-seed = 12
+seed = 11
 min_feature_size = 0.3
 domain = "L-shape.vtu"
 orientation_option = "theta_phi"
 number_of_points = 8
 
 [network.generation]
-n_poly = 35
+stop_condition = "n_poly"
 
 [network.mesh]
 max_size_factor = 5.0
@@ -32,7 +32,7 @@ slope = 0.5
 keep_only_largest = true
 
 [[network.family]]
-probability = 0.3333333333333333
+n_poly = 12
 aspect_ratio = 1.0
 region = "north_box"
 aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
@@ -40,7 +40,7 @@ radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }
 
 [[network.family]]
-probability = 0.3333333333333333
+n_poly = 12
 aspect_ratio = 1.0
 region = "east_box"
 aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
@@ -48,7 +48,7 @@ radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }
 
 [[network.family]]
-probability = 0.3333333333333333
+n_poly = 11
 aspect_ratio = 1.0
 region = "other_boxes"
 aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
