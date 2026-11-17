@@ -738,8 +738,8 @@ try {
     nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
   );
   check(
-    networkSections === "General, Generation, Fracture families" &&
-      advancedSections === "FRAM, Clusters, Triangle mesh for the flow" &&
+    networkSections === "General, Fracture families" &&
+      advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
       settingsSections === "Orientation of the fractures, Fracture shape" &&
       stepSettings === "Fluid; Intersections" &&

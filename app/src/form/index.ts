@@ -1,7 +1,7 @@
 // The input form of the network: one section for each part of `[network]`, in
 // three step panels (the domain, the user-defined fractures, and the other
-// sections, with FRAM, the clusters and the triangle mesh in its advanced
-// part) and the settings dialog (the fracture shape).
+// sections, with the stop condition, FRAM, the clusters and the triangle mesh
+// in its advanced part) and the settings dialog (the fracture shape).
 import { clustersSection } from "./clusters";
 import type { FormContext } from "./context";
 import { familiesSection } from "./families";
@@ -36,12 +36,12 @@ export function renderForm(tabs: NetworkTabs, state: FormState, context: FormCon
   replaceSections(
     tabs.network,
     generalSection(state, context),
-    generationSection(state, context),
     familiesSection(state, context),
   );
   replaceSections(tabs.settings, shapeSection(state, context));
   replaceSections(
     tabs.advanced,
+    generationSection(state, context),
     framSection(state, context),
     clustersSection(state, context),
     meshSection(state, context),
