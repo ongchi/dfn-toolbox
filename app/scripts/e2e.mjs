@@ -524,6 +524,7 @@ async function checkPhone() {
 
   // Landscape: the settings of a step above the run bar at the left of the view, as on a computer
   await page.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, isLandscape: true, deviceScaleFactor: 2 });
+  await openStepPanel(page, "fractures", true);
   await new Promise((resolve) => setTimeout(resolve, 500));
   const landscape = await page.evaluate(() => {
     const panel = document.querySelector("#step-panel").getBoundingClientRect();
