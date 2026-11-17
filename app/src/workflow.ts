@@ -47,13 +47,13 @@
 //   [transport.seeding]                # no [transport.tdrw], no [transport.control_planes], no [transport.output]
 //   points = []                        # only the release points (no `method`); none: no transport
 //   particles_per_point = 1
-import { boundariesTables, readBoundaries, type BoundaryRoles } from "./boundaryRoles";
+import { boundariesTables, defaultBoundaryRoles, readBoundaries, type BoundaryRoles } from "./boundaryRoles";
 import { flowTables, readFlow } from "./flow/toml";
-import type { FlowState } from "./flow/state";
+import { defaultFlowState, setDefaultInflowPressures, type FlowState } from "./flow/state";
 import { InputFormError, networkTables, parseToml, readNetwork, TableReader, tablesToToml, type Table } from "./form/toml";
-import type { FormState } from "./form/state";
+import { defaultFormState, type FormState } from "./form/state";
 import { readTransport, transportTables } from "./transport/toml";
-import type { TransportState } from "./transport/state";
+import { defaultTransportState, type TransportState } from "./transport/state";
 
 const DESCRIPTION_WIDTH = 76;
 
@@ -67,8 +67,24 @@ export interface Workflow {
   transport: TransportState;
 }
 
+/** The default forms on a predefined mesh: the start of the page */
+export function defaultWorkflow(domain: string, boundarySurfaceNames: string[]): Workflow {
+  const network = defaultFormState();
+  network.domain = domain;
+  const boundaries = defaultBoundaryRoles(boundarySurfaceNames);
+  const flow = defaultFlowState();
+  setDefaultInflowPressures(flow, boundaries.inflow);
+  return {
+    description: "",
+    boundaries,
+    network,
+    flow,
+    transport: defaultTransportState(),
+  };
+}
+
 /** The comment at the top of a TOML text, as one line, or "" */
-export function readDescription(toml: string): string {
+function readDescription(toml: string): string {
   const lines = toml.split("\n");
   const end = lines.findIndex((line) => !line.startsWith("#"));
   return lines

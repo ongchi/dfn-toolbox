@@ -1,5 +1,5 @@
 // The network of the workflow file: the dfngen input made from `[network]`
-// of each example is valid and gives the output of the native binary, and
+// of each test workflow is valid and gives the output of the native binary, and
 // the reader of the workflow file refuses what the forms cannot show.
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,10 +10,10 @@ import { check_input, MeshStep, run_generation } from "../src/pkg/dfn_wasm.js";
 import { tomlToWorkflow } from "../src/workflow";
 import {
   compareOutputFolders,
-  exampleNames,
+  workflowNames,
   initWasm,
   meshPath,
-  readExample,
+  readWorkflowFile,
   readMesh,
   runNativeDfngen,
   userFracturesFile,
@@ -22,30 +22,30 @@ import { USER_FRACTURES_FILE } from "../src/userFractures";
 
 beforeAll(initWasm);
 
-// Milliseconds: two generations of an example (WebAssembly and native)
+// Milliseconds: two generations of a workflow (WebAssembly and native)
 const GENERATION_TIMEOUT = 60000;
 
-describe.each(exampleNames)("example %s", (exampleName) => {
+describe.each(workflowNames)("workflow %s", (workflowName) => {
   test("the dfngen input of the network is valid", () => {
-    const example = readExample(exampleName);
-    const { network, boundaries } = tomlToWorkflow(example.toml);
+    const workflowFile = readWorkflowFile(workflowName);
+    const { network, boundaries } = tomlToWorkflow(workflowFile);
     expect(check_input(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFracturesFile(network))).toBeUndefined();
   });
 
   test("the dfngen input of the network gives the output of the native binary", () => {
-    const example = readExample(exampleName);
-    const { network, boundaries } = tomlToWorkflow(example.toml);
+    const workflowFile = readWorkflowFile(workflowName);
+    const { network, boundaries } = tomlToWorkflow(workflowFile);
     const userFractures = userFracturesFile(network);
     const result = run_generation(networkToLibraryToml(network, boundaries), readMesh(network.domain), userFractures, 1n, MeshStep.Make, () => {});
     expect(result.error).toBeUndefined();
-    const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${exampleName}-`));
+    const wasmDir = mkdtempSync(join(tmpdir(), `dfn-wasm-${workflowName}-`));
     for (const name of result.file_names) {
       writeFileSync(join(wasmDir, name), result.file(name) ?? "");
     }
 
     // The native binary reads the mesh at its full path, and the fracture file next to its input
     network.domain = meshPath(network.domain);
-    const inputDir = mkdtempSync(join(tmpdir(), `dfngen-input-${exampleName}-`));
+    const inputDir = mkdtempSync(join(tmpdir(), `dfngen-input-${workflowName}-`));
     writeFileSync(join(inputDir, USER_FRACTURES_FILE), userFractures);
     writeFileSync(join(inputDir, "input.toml"), networkToLibraryToml(network, boundaries));
     const nativeDir = runNativeDfngen(join(inputDir, "input.toml"));
@@ -65,7 +65,7 @@ function problemsOf(toml: string): string[] {
   return [];
 }
 
-const BOX = readExample("box_west_east").toml;
+const BOX = readWorkflowFile("box_west_east");
 
 /** The dfngen input of the network of a workflow file */
 function networkLibraryToml(toml: string): string {
@@ -172,9 +172,9 @@ test("an unknown aperture distribution is an error", () => {
   ]);
 });
 
-const USER_FRACTURES = readExample("user_fractures_stochastic").toml;
+const USER_FRACTURES = readWorkflowFile("user_fractures_stochastic");
 
-test("the user fracture of the example is read with all its keys", () => {
+test("the user fracture of the workflow file is read with all its keys", () => {
   expect(tomlToWorkflow(USER_FRACTURES).network.userFractures).toEqual([
     {
       region: "box",

@@ -1,8 +1,9 @@
 // End-to-end check of the web app in the local Chrome (headless).
 // Start the dev server first (npm run dev), then:
 //   node scripts/e2e.mjs [url] [screenshot folder]
-// It checks the default example, runs all steps (network, mesh, flow, and the
-// transport at a point clicked on a fracture) of each example, the live run (a
+// It checks the default forms on the first predefined mesh, runs all steps
+// (network, mesh, flow, and the transport at a point clicked on a fracture)
+// of the default forms on each predefined mesh, the live run (a
 // pressure change, a new user-defined fracture, a release point, "Clear
 // points", "Reset"), the choice of a predefined mesh, a bad input, the
 // fractures in the view during a run, "Pause" during the mesh, and "Pause"
@@ -17,12 +18,12 @@ const screenshotDir = process.argv[3] ?? ".";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const RUN_TIMEOUT = 300000;
 const TRANSPORT_REPEATS = 5;
-// The roles of the surfaces of the Box shape (example box_west_east, and a new shape)
+// The default roles of the surfaces of the Box shape
 const BOX_ROLES = "west: inflow, east: outflow, south: noflow, north: noflow, bottom: noflow, top: noflow";
 const FLOAT_BUFFER_EXTENSIONS = ["EXT_color_buffer_float", "EXT_color_buffer_half_float", "EXT_float_blend"];
 // Largest minus smallest of red, green and blue (0 to 255)
 const COLORED_PIXEL_CONTRAST = 30;
-// The highlighted south surface of the default example (the face to the camera) fills a part of the view
+// The highlighted south surface of the Box shape (the face to the camera) fills a part of the view
 const MINIMUM_SURFACE_PIXEL_SHARE = 0.05;
 // Two pictures of the view are the same with a small noise (the blur of the panels behind them):
 // a few pixels which differ by at most this value in each channel (0 to 255)
@@ -72,22 +73,26 @@ async function segmentStates(page) {
   return page.$$eval("[data-step-panel]", (nodes) => nodes.map((node) => `${node.dataset.stepPanel}=${node.dataset.stepState}`).join(" "));
 }
 
-/**
- * Selects a radio button of the Domain panel ("example" or "shape"); the panel can be hidden.
- * A switch resets the input: it waits until the example or the shape is loaded.
- */
-async function selectDomainSource(page, source) {
-  const selector = `input[name="domain-source"][value="${source}"]`;
-  if (await page.$eval(selector, (node) => node.checked)) {
-    return;
+/** Waits until the page has its forms on a predefined mesh and the 3D view */
+async function waitForStart(page) {
+  await page.waitForFunction(() => document.querySelector("#form").dataset.shape !== undefined, { timeout: 120000 });
+  await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+}
+
+/** Selects another predefined mesh in the Domain panel (the panel can be hidden); the forms stay */
+async function selectShape(page, meshName) {
+  await page.$eval("#form", (node) => delete node.dataset.shape);
+  await page.select("#domain-form select", meshName);
+  await page.waitForFunction((name) => document.querySelector("#form").dataset.shape === name, {}, meshName);
+}
+
+/** Opens the page again: the default forms on a predefined mesh, with no result */
+async function startOnShape(page, meshName = "Box.vtu") {
+  await page.reload();
+  await waitForStart(page);
+  if ((await page.$eval("#form", (node) => node.dataset.shape)) !== meshName) {
+    await selectShape(page, meshName);
   }
-  await page.$eval("#form", (node) => {
-    delete node.dataset.example;
-    delete node.dataset.shape;
-  });
-  await page.$eval(selector, (node) => node.click());
-  const key = source === "example" ? "example" : "shape";
-  await page.waitForFunction((datasetKey) => document.querySelector("#form").dataset[datasetKey] !== undefined, {}, key);
 }
 
 /** The value of the n_poly field of the DFN panel */
@@ -97,16 +102,7 @@ async function nPolyValue(page) {
   );
 }
 
-async function selectExample(page, name) {
-  await selectDomainSource(page, "example");
-  // A select of the same value sends no change event: select none first
-  await page.select("#example-select", "");
-  await page.$eval("#form", (node) => delete node.dataset.example);
-  await page.select("#example-select", name);
-  await page.waitForFunction((exampleName) => document.querySelector("#form").dataset.example === exampleName, {}, name);
-}
-
-/** Sets the FRAM checkbox of the advanced part of the DFN panel (the examples and the default forms have FRAM off) */
+/** Sets the FRAM checkbox of the advanced part of the DFN panel (the default forms have FRAM off) */
 async function setFram(page, isOn) {
   await page.evaluate((isFramOn) => {
     const input = [...document.querySelectorAll("#network-advanced-form .field-checkbox")]
@@ -321,8 +317,7 @@ async function checkPhone() {
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await page.goto(url);
-  await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
-  await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+  await waitForStart(page);
 
   // The 3D view fills the screen; the settings of a step are a bottom sheet with two heights, which a tap on its
   // handle changes; at the start the sheet is closed
@@ -541,8 +536,7 @@ async function checkTranslucentShapesWithoutFloatBuffers() {
     };
   }, FLOAT_BUFFER_EXTENSIONS);
   await page.goto(url);
-  await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined, { timeout: 120000 });
-  await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+  await waitForStart(page);
   await new Promise((resolve) => setTimeout(resolve, 3000));
   await openStepPanel(page, "domain");
   await (await page.evaluateHandle(() => document.querySelector('#boundary-surfaces select[data-surface="south"]').closest("label"))).hover();
@@ -568,15 +562,21 @@ try {
   });
 
   await page.goto(url);
-  await page.waitForFunction(() => document.querySelector("#example-select").options.length > 1);
-  await page.waitForFunction(() => document.querySelector("#viewer-message").hidden, { timeout: 120000 });
+  await waitForStart(page);
 
-  // The page opens the default example
-  await page.waitForFunction(() => document.querySelector("#form").dataset.example !== undefined);
-  const startExample = await page.$eval("#example-select", (node) => node.value);
-  check(startExample === "box_west_east", "default example", startExample);
-  const startExampleTitle = await page.$eval("#example-select", (node) => node.selectedOptions[0].textContent);
-  check(startExampleTitle === "Box west -> east", "example title", startExampleTitle);
+  // The page opens the default forms on the first predefined mesh; the Domain panel has only the mesh dropdown
+  const start = await page.evaluate(() => ({
+    shape: document.querySelector("#form").dataset.shape,
+    meshLabel: document.querySelector("#domain-form select").selectedOptions[0].textContent,
+    families: document.querySelectorAll("#form .family-card").length,
+    selects: document.querySelectorAll('[data-step-group="domain"] select:not([data-surface])').length,
+  }));
+  const startNPoly = await nPolyValue(page);
+  check(
+    start.shape === "Box.vtu" && start.meshLabel === "Box" && start.families === 1 && startNPoly === "100" && start.selects === 1,
+    "default forms on the first shape",
+    `${start.shape} (${start.meshLabel}), ${start.families} family, n_poly ${startNPoly}, ${start.selects} domain dropdowns`,
+  );
   // The settings of the steps are hidden at the start; a click on a segment of the run bar opens the panel of its
   // step, and a second click, the close button or Escape closes it
   const isStepPanelShown = () => page.$eval("#step-panel", (node) => !node.hidden);
@@ -649,9 +649,9 @@ try {
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_boundary_surfaces.png` });
 
-  // The roles of the boundary surfaces of the example
-  const exampleRoles = await domainRoles(page);
-  check(exampleRoles === BOX_ROLES, "boundary surface roles", exampleRoles);
+  // The default roles of the boundary surfaces: the first surface is in-flow, the second out-flow
+  const startRoles = await domainRoles(page);
+  check(startRoles === BOX_ROLES, "default roles of a shape", startRoles);
 
   // The pointer over the row of a surface highlights it; the view is the same again after it leaves.
   // The screenshots have the part of the view at the right of the settings of a step (if shown) and above the run bar.
@@ -724,41 +724,6 @@ try {
     `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
-  // The radio buttons of the Domain panel show the example dropdown or the mesh dropdown
-  const domainRows = async () =>
-    page.evaluate(
-      () => `example ${document.querySelector("#example-row").hidden ? "hidden" : "shown"}, mesh ${document.querySelector("#domain-form").hidden ? "hidden" : "shown"}`,
-    );
-  const exampleRows = await domainRows();
-  const exampleNPoly = await nPolyValue(page);
-  await selectDomainSource(page, "shape");
-  const shapeRows = await domainRows();
-  check(
-    exampleRows === "example shown, mesh hidden" && shapeRows === "example hidden, mesh shown",
-    "domain source radio buttons",
-    `${exampleRows}; ${shapeRows}`,
-  );
-  // A switch resets the input: the default forms on the first shape, then the example again
-  const shapeReset = await page.evaluate(() => ({
-    shape: document.querySelector("#form").dataset.shape,
-    families: document.querySelectorAll("#form .family-card").length,
-  }));
-  const shapeNPoly = await nPolyValue(page);
-  check(
-    shapeReset.shape === "Box.vtu" && shapeReset.families === 1 && exampleNPoly === "10" && shapeNPoly === "100",
-    "shape resets the input",
-    `${shapeReset.shape}, ${shapeReset.families} family, n_poly ${exampleNPoly} → ${shapeNPoly}`,
-  );
-  await page.screenshot({ path: `${screenshotDir}/e2e_domain_shape.png` });
-  await selectDomainSource(page, "example");
-  const exampleAgain = await page.$eval("#form", (node) => node.dataset.example);
-  const exampleAgainNPoly = await nPolyValue(page);
-  check(
-    exampleAgain === "box_west_east" && exampleAgainNPoly === "10",
-    "example loads again",
-    `${exampleAgain}, n_poly ${exampleAgainNPoly}`,
-  );
-
   // FRAM, clusters and mesh are in the closed advanced part of the DFN panel, the fluid in the Flow panel and the
   // routing in the Transport panel; the settings dialog has the orientation and the fracture shape. The forms
   // have no number of points.
@@ -796,14 +761,15 @@ try {
     runButtons.join(" | "),
   );
 
-  // The full workflow of each example
-  const examples = await page.$$eval("#example-select option", (options) =>
+  // The full workflow of the default forms on each predefined mesh
+  const meshNames = await page.$$eval("#domain-form select option", (options) =>
     options.map((option) => option.value).filter((value) => value !== ""),
   );
-  for (const name of examples) {
+  for (const meshName of meshNames) {
+    const name = meshName.replace(/\.vtu$/, "");
+    await startOnShape(page, meshName);
     await openStepPanel(page, "network");
-    await selectExample(page, name);
-    // "Run" runs the network, its mesh and the flow; the examples have no release point, thus no transport
+    // "Run" runs the network, its mesh and the flow; the default forms have no release point, thus no transport
     // The results of the Log view show only with a result
     const hasResults = () => page.$eval("#results", (node) => !node.hidden);
     const hasResultsBefore = await hasResults();
@@ -828,11 +794,11 @@ try {
     await openStepPanel(page, "flow");
     // The boundaries of the flow are the in-flow and out-flow surfaces; the flow form has no other section (the
     // fluid follows it)
-    const exampleSurfaces = await flowSurfaceNames(page);
+    const shapeSurfaces = await flowSurfaceNames(page);
     const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
     const flowSections = await sectionTitles("#flow-form");
     check(
-      exampleSurfaces !== "" && flowBoundaries === exampleSurfaces && flowSections === "Pressure boundaries",
+      shapeSurfaces !== "" && flowBoundaries === shapeSurfaces && flowSections === "Pressure boundaries",
       `${name}: flow boundaries`,
       `${flowBoundaries}; sections: ${flowSections}`,
     );
@@ -846,7 +812,7 @@ try {
     );
     await pressureField.hover();
     const flowViewOnHover = await viewerScreenshot();
-    if (name === "box_west_east") {
+    if (name === "Box") {
       await page.screenshot({ path: `${screenshotDir}/e2e_pressure_boundary_hover.png` });
     }
     await page.mouse.move(0, 0);
@@ -857,7 +823,7 @@ try {
       `hover ${isSameView(flowViewOnHover, flowViewBefore) ? "unchanged" : "changed"}, after ${isSameView(flowViewAfter, flowViewBefore) ? "same" : "different"}`,
     );
     // A click on the label of a pressure field keeps its surface highlighted, also on the Domain panel (one for the page)
-    if (name === "box_west_east") {
+    if (name === "Box") {
       // The pinned rows of one panel (the hidden panels also have their rows)
       const pinnedTargets = (container) =>
         page.$$eval(`${container} .is-pinned`, (nodes) => nodes.map((node) => node.dataset.highlightSurface).join(", "));
@@ -888,7 +854,7 @@ try {
     const particleFrame = await viewerScreenshot();
     await new Promise((resolve) => setTimeout(resolve, 300));
     check(!isSameView(particleFrame, await viewerScreenshot()), `${name}: moving particles`, "view changed");
-    if (name === "two_families") {
+    if (name === "L-shape") {
       await page.screenshot({ path: `${screenshotDir}/e2e_particles.png` });
     }
     await page.click("#show-particles");
@@ -908,7 +874,7 @@ try {
     const logLabels = await scalarBarLabels();
     const logView = await viewerScreenshot();
     check(logLabels !== linearLabels && !isSameView(logView, linearView), `${name}: log scale`, `${linearLabels} → ${logLabels}`);
-    if (name === "two_families") {
+    if (name === "L-shape") {
       await page.screenshot({ path: `${screenshotDir}/e2e_log_scale.png` });
     }
     await page.select("#color-select", "");
@@ -1009,8 +975,8 @@ try {
   check(isSameView(viewAfterLog, viewBeforeLog), "3D view after the Log panel", isSameView(viewAfterLog, viewBeforeLog) ? "same" : "different");
 
   // The live run: a change of a setting runs again the steps which it affects; the results before them stay
+  await startOnShape(page);
   await openStepPanel(page, "network");
-  await selectExample(page, "box_west_east");
   await runAll(page);
   await page.click("#run-button");
   await waitIdle(page);
@@ -1108,10 +1074,9 @@ try {
   );
   check(!isSameView(resetView, viewBeforeReset), "the view after reset has no network", "changed");
 
-  // The domain mesh dropdown: in the shape mode, a new shape replaces only the mesh
+  // The domain mesh dropdown: a new shape replaces only the mesh
   await openStepPanel(page, "domain");
-  await selectDomainSource(page, "shape");
-  // The description of the shape shows below the dropdown, only in the shape mode
+  // The description of the shape shows below the dropdown
   const shapeDescription = () =>
     page.$eval("#shape-description", (node) => (node.hidden ? "(hidden)" : node.textContent));
   const boxDescription = await shapeDescription();
@@ -1129,7 +1094,7 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_shape_description.png` });
 
   // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
-  await selectExample(page, "box_west_east");
+  await startOnShape(page);
   await openStepPanel(page, "fractures");
   await page.evaluate(() =>
     [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
@@ -1179,8 +1144,7 @@ try {
   );
 
   // Bad input: a family region of the L-shape mesh is not in the Box mesh: an error of the library
-  await selectDomainSource(page, "shape");
-  await page.select("#domain-form select", "L-shape.vtu");
+  await startOnShape(page, "L-shape.vtu");
   await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
   await page.evaluate(() => {
     const select = [...document.querySelectorAll("#form select")].find((node) =>
@@ -1228,8 +1192,7 @@ try {
   );
 
   // No cluster connects west and east (Box, default forms with FRAM on, this seed): the network shows, with a warning
-  await selectDomainSource(page, "example");
-  await selectDomainSource(page, "shape");
+  await startOnShape(page);
   await setFram(page, true);
   await page.evaluate(() => {
     const input = [...document.querySelectorAll("#form input")].find(
@@ -1254,10 +1217,6 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_no_connecting_cluster.png` });
 
-  // A predefined shape: the first surface is in-flow, the second out-flow
-  const shapeRoles = await domainRoles(page);
-  check(shapeRoles === BOX_ROLES, "default roles of a shape", shapeRoles);
-
   // With no out-flow surface, the generation asks for one
   await setRole(page, "east", "noflow");
   const noOutflowStatus = await runAll(page);
@@ -1269,7 +1228,7 @@ try {
 
   // A large run: the view shows the new fractures during the run; then "Pause". FRAM on: a slow run (with FRAM off
   // the intersections soon need more memory than WebAssembly has)
-  await selectExample(page, "box_west_east");
+  await startOnShape(page);
   await setFram(page, true);
   await setFractureCount(page, 100000);
   await page.click("#run-button");
@@ -1308,7 +1267,7 @@ try {
   );
 
   // The new worker runs the next input; "Pause" during the mesh keeps the network, and "Run" makes the mesh again
-  await selectExample(page, "box_west_east");
+  await startOnShape(page);
   await page.evaluate(() => {
     const observer = new MutationObserver(() => {
       if (document.querySelector("#status").textContent === "Meshing…") {
@@ -1335,10 +1294,11 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
 
   // "Pause" after the first checkpoint (5 s) keeps the fractures; "Run" continues: the network is that of a run with
-  // no stop. FRAM on and 95 fractures: the generation takes about 16 s on the Mac, longer than the first checkpoint
-  await selectExample(page, "box_west_east");
+  // no stop. Default forms, FRAM on and 1400 fractures: the generation takes about 25 s (WebAssembly in node on
+  // fungihouse; 1200: 8 s), longer than the first checkpoint and the pause at 9 s
+  await startOnShape(page);
   await setFram(page, true);
-  await setFractureCount(page, 95);
+  await setFractureCount(page, 1400);
   await runAll(page);
   const fullRunCount = await resultValue(page, "Final fractures");
   await page.click("#reset-button");
@@ -1515,7 +1475,14 @@ try {
     nodes.map((node) => node.id || node.classList[node.classList.length - 1]).join(", "),
   );
   check(toolbarItems === "color-panel, layer-rail, settings-button, repository-link", "the gear before the GitHub link", toolbarItems);
-  await selectExample(page, "user_fractures_stochastic");
+  // A user-defined fracture with a normal along y
+  await startOnShape(page);
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#fractures-form button")].find((node) => node.textContent === "Add fracture").click(),
+  );
+  await page.waitForFunction(() => [...document.querySelectorAll("#fractures-form h4")].some((node) => node.textContent === "Fracture 1"));
+  await setField(page, "#fractures-form", "Theta (°)", 90);
+  await setField(page, "#fractures-form", "Phi (°)", 90);
   // "Theta (°): 90" for each angle field of a form
   const angles = (form) =>
     page.$$eval(`${form} .field`, (fields) =>

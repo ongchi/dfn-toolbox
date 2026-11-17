@@ -1,4 +1,4 @@
-// The flow of fehm in WebAssembly, on the mesh of the example
+// The flow of fehm in WebAssembly, on the mesh of a test workflow
 // l_shape_north_east: the fehm input of the flow form, the output against
 // the native binary of fehm, and the errors.
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -9,17 +9,17 @@ import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
 import { defaultFlowState, FLOW_MESH_FILE, pressureOf } from "../src/flow/state";
 import { flowTables, flowToLibraryToml } from "../src/flow/toml";
 import { check_flow_input } from "../src/pkg/dfn_wasm.js";
-import { compareOutputFolders, generateExample, initWasm, runFlow, runNativeFehm, textBoundaries } from "./cases";
+import { compareOutputFolders, generateWorkflow, initWasm, runFlow, runNativeFehm, textBoundaries } from "./cases";
 
-// The example with the boundary arrays of the mesh surface, of the regions
+// The test workflow with the boundary arrays of the mesh surface, of the regions
 // west_box, east_box and other_boxes, and of the boundary surfaces north and east
-const EXAMPLE_NAME = "l_shape_north_east";
+const WORKFLOW_NAME = "l_shape_north_east";
 
 let mesh = "";
 
 beforeAll(() => {
   initWasm();
-  mesh = generateExample(EXAMPLE_NAME).mesh;
+  mesh = generateWorkflow(WORKFLOW_NAME).mesh;
 });
 
 /** The fehm input with these boundaries at their pressures (MPa) */
@@ -55,7 +55,7 @@ test("the workflow file has the pressures of the in-flow and out-flow surfaces o
 });
 
 test("the flow of the workflow file is a valid input", () => {
-  const { flow, boundaries } = generateExample(EXAMPLE_NAME).workflow;
+  const { flow, boundaries } = generateWorkflow(WORKFLOW_NAME).workflow;
   expect(check_flow_input(flowToLibraryToml(flow, flowSurfaces(boundaries)), mesh)).toBeUndefined();
 });
 

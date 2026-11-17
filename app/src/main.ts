@@ -12,9 +12,8 @@ import {
 } from "./boundaryRoles";
 import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
-import { listExamples, loadExample, loadExampleTitle } from "./examples";
 import { fluidSection, renderFlowForm, type FlowBoundary } from "./flow/form";
-import { defaultFlowState, type FlowState } from "./flow/state";
+import { defaultFlowState, setDefaultInflowPressures, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
@@ -63,11 +62,9 @@ import {
   type LayerShapes,
 } from "./viewer";
 import { vectorMagnitudes } from "./viewerGeometry";
-import type { Workflow } from "./workflow";
+import { defaultWorkflow, type Workflow } from "./workflow";
 
 const DEFAULT_COLOR_OPTION = "cell:fracture_id";
-// The example of the page at the start
-const DEFAULT_EXAMPLE = "box_west_east";
 const PRESSURE_OPTION = colorOptionValue(PRESSURE_ARRAY);
 const FLOW_VELOCITY_OPTION = colorOptionValue(FLOW_VELOCITY_ARRAY);
 const TRANSPORT_VELOCITY_OPTION = colorOptionValue(TRANSPORT_VELOCITY_ARRAY);
@@ -114,10 +111,6 @@ function byId<T extends HTMLElement>(id: string): T {
 }
 
 const ui = {
-  domainSource: byId<HTMLFieldSetElement>("domain-source"),
-  exampleSelect: byId<HTMLSelectElement>("example-select"),
-  exampleRow: byId<HTMLLabelElement>("example-row"),
-  exampleDescription: byId<HTMLParagraphElement>("example-description"),
   domainForm: byId<HTMLDivElement>("domain-form"),
   shapeDescription: byId<HTMLParagraphElement>("shape-description"),
   boundarySurfaces: byId<HTMLDivElement>("boundary-surfaces"),
@@ -179,8 +172,6 @@ let boundarySurfaceNames: string[] = [];
 /** The roles of the boundary surfaces (Domain panel) */
 let boundaryRoles: BoundaryRoles = { inflow: [], outflow: [] };
 let meshNames: string[] = [];
-/** The description (comment) of the workflow file */
-let description = "";
 let output: GenerationOutput | null = null;
 let flowState: FlowState = defaultFlowState();
 let flowOutput: FlowOutput | null = null;
@@ -198,8 +189,6 @@ let isPickingPoints = false;
 let openPanel: StepPanel | null = null;
 /** The step of the live run which failed last; null after a new start of a step */
 let failedChainStep: ChainStep | null = null;
-/** The last predefined mesh of the "Predefined domain shape" mode; null = none yet (the first mesh) */
-let lastShape: string | null = null;
 let isBusy = false;
 /** The checkpoint of a generation, with the accepted fractures until it and the input of the generation */
 interface SavedGeneration {
@@ -296,15 +285,13 @@ function durationText(milliseconds: number): string {
   return milliseconds < 1000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1000).toFixed(1)} s`;
 }
 
-/** A step runs in the worker: the progress bar shows, and a new example or domain waits for its end */
+/** A step runs in the worker: the progress bar shows */
 function setBusy(busy: boolean): void {
   isBusy = busy;
   // On a phone, the sheet goes down at a run: the view shows the fractures
   if (busy && window.matchMedia(SHEET_QUERY).matches) {
     setSheetSize("half");
   }
-  ui.exampleSelect.disabled = busy;
-  ui.domainSource.disabled = busy;
   ui.progress.hidden = !busy;
   updateRunBar();
 }
@@ -423,10 +410,11 @@ const fileHandlers: FileHandlers = {
     try {
       const mesh = await loadMesh(name);
       state.domain = name;
-      lastShape = name;
       boundaryRoles = defaultBoundaryRoles(domainBoundarySurfaceNames(mesh.text));
+      setDefaultInflowPressures(flowState, boundaryRoles.inflow);
       await setMesh(mesh);
       render();
+      ui.form.dataset.shape = name;
     } catch (error) {
       showStatus(errorText(error), true);
     }
@@ -540,18 +528,9 @@ function openStepPanel(name: StepPanel | null): void {
   }
 }
 
-/** The radio button "Example" of the Domain panel is selected (else "Predefined domain shape") */
-function isExampleSource(): boolean {
-  return ui.domainSource.querySelector<HTMLInputElement>("input:checked")?.value === "example";
-}
-
-/** The radio buttons of the Domain panel: the example dropdown and its description, or the predefined meshes */
-function updateDomainSource(): void {
-  const isExample = isExampleSource();
-  ui.exampleRow.hidden = !isExample;
-  ui.exampleDescription.hidden = !isExample || ui.exampleDescription.textContent === "";
-  ui.domainForm.hidden = isExample;
-  ui.shapeDescription.hidden = isExample || ui.shapeDescription.textContent === "";
+/** The Domain panel: the description of the mesh and the boundary surfaces show only when they have content */
+function updateDomainPanel(): void {
+  ui.shapeDescription.hidden = ui.shapeDescription.textContent === "";
   ui.boundarySurfaces.hidden = boundarySurfaceNames.length === 0;
 }
 
@@ -572,7 +551,7 @@ function renderBoundarySurfaces(): void {
       onHover: (name) => highlightBoundarySurface(name),
     }),
   );
-  updateDomainSource();
+  updateDomainPanel();
 }
 
 /** Shows the domain mesh and its boundary surfaces */
@@ -616,11 +595,8 @@ async function loadInput(workflow: Workflow, newFiles: InputFiles): Promise<void
   state = workflow.network;
   flowState = workflow.flow;
   transportState = workflow.transport;
-  description = workflow.description;
   files = { mesh: null };
   await setMesh(newFiles.mesh);
-  ui.exampleDescription.textContent = description;
-  updateDomainSource();
   showStatus("");
   render();
 }
@@ -1406,54 +1382,18 @@ async function updateViewer(action: (viewer: NetworkViewer) => void | Promise<vo
 
 // ---------------------------------------------------------------- events
 
-/** Loads an example into the forms; "" (no example) does nothing */
-async function openExample(name: string): Promise<void> {
-  if (name === "" || isBusy) {
-    return;
-  }
-  try {
-    const example = await loadExample(name);
-    await loadInput(example.workflow, example.files);
-    ui.form.dataset.example = name;
-  } catch (error) {
-    showStatus(errorText(error), true);
-  }
-}
-
-/** Default forms on a predefined mesh: the last selected shape, else the first one */
+/** The start of the page: default forms on the first predefined mesh */
 async function startFromShape(): Promise<void> {
-  const name = lastShape ?? meshNames[0];
-  if (name === undefined || isBusy) {
+  const name = meshNames[0];
+  if (name === undefined) {
     return;
   }
   try {
     const mesh = await loadMesh(name);
-    const network = defaultFormState();
-    network.domain = name;
-    await loadInput(
-      {
-        description: "",
-        boundaries: defaultBoundaryRoles(domainBoundarySurfaceNames(mesh.text)),
-        network,
-        flow: defaultFlowState(),
-        transport: defaultTransportState(),
-      },
-      { mesh },
-    );
+    await loadInput(defaultWorkflow(name, domainBoundarySurfaceNames(mesh.text)), { mesh });
     ui.form.dataset.shape = name;
   } catch (error) {
     showStatus(errorText(error), true);
-  }
-}
-
-/** A switch of the domain source resets the input: the example loads again, or the default forms on a shape */
-function switchDomainSource(): void {
-  updateDomainSource();
-  if (isExampleSource()) {
-    ui.exampleSelect.value ||= DEFAULT_EXAMPLE;
-    void openExample(ui.exampleSelect.value);
-  } else {
-    void startFromShape();
   }
 }
 
@@ -1509,8 +1449,6 @@ function updateCoveredArea(): void {
 }
 
 function bindEvents(): void {
-  ui.exampleSelect.addEventListener("change", () => void openExample(ui.exampleSelect.value));
-  ui.domainSource.addEventListener("change", () => switchDomainSource());
   ui.runButton.addEventListener("click", toggleLiveRun);
   ui.resetButton.addEventListener("click", resetAll);
 
@@ -1567,21 +1505,6 @@ function bindEvents(): void {
   window.addEventListener("resize", updateCoveredArea);
 }
 
-/** Fills the list of the examples, and opens the default example */
-async function fillExampleList(): Promise<void> {
-  try {
-    const names = await listExamples();
-    const titles = await Promise.all(names.map(loadExampleTitle));
-    names.forEach((name, index) => ui.exampleSelect.append(new Option(titles[index], name)));
-    if (names.includes(DEFAULT_EXAMPLE)) {
-      ui.exampleSelect.value = DEFAULT_EXAMPLE;
-      await openExample(DEFAULT_EXAMPLE);
-    }
-  } catch (error) {
-    showStatus(errorText(error), true);
-  }
-}
-
 async function fillMeshList(): Promise<void> {
   try {
     meshNames = await listMeshes();
@@ -1597,6 +1520,5 @@ updateRunBar();
 render();
 renderFlow();
 renderTransport();
-void fillExampleList();
-void fillMeshList();
+void fillMeshList().then(startFromShape);
 void startViewer();

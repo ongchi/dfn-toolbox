@@ -1,4 +1,4 @@
-// Test cases of tests/data and the workflow examples of ../examples, read in
+// Test cases of dfngen-rs/tests/data and the workflow files of tests/data/workflows, read in
 // Node, the WebAssembly module, and the native binaries of dfngen, fehm and
 // dfntrans.
 import { execFileSync } from "node:child_process";
@@ -77,7 +77,7 @@ export function inflowReleasePoints(meshText: string, inflow: string[], count = 
     .map((node) => points[node]);
 }
 
-/** A transport state with release points on the in-flow surfaces: the examples have none */
+/** A transport state with release points on the in-flow surfaces: the workflow files have none */
 export function withInflowReleasePoints(state: TransportState, meshText: string, inflow: string[]): TransportState {
   return { ...state, seeding: { ...state.seeding, points: inflowReleasePoints(meshText, inflow) } };
 }
@@ -139,32 +139,32 @@ export function readMesh(name: string): string {
   return readFileSync(meshPath(name), "utf8");
 }
 
+/** The file names of the predefined domain meshes */
+export const meshNames: string[] = readdirSync(meshesDir)
+  .filter((fileName) => fileName.endsWith(".vtu"))
+  .sort();
+
 /** The polygon file of the user-defined fractures of a network; empty (no polygon) without them */
 export function userFracturesFile(network: FormState): string {
   return userFracturesToVtp(network.userFractures, network, meshRegionNames(readMesh(network.domain)));
 }
 
-// The workflow examples of dfn-toolbox (../examples)
-const examplesDir = resolve(appDir, "../examples");
+// The workflow files of the tests (tests/data/workflows)
+const workflowsDir = join(appDir, "tests/data/workflows");
 
-export const exampleNames: string[] = readdirSync(examplesDir, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && existsSync(join(examplesDir, entry.name, `${entry.name}.toml`)))
-  .map((entry) => entry.name)
+export const workflowNames: string[] = readdirSync(workflowsDir)
+  .filter((fileName) => fileName.endsWith(".toml"))
+  .map((fileName) => fileName.slice(0, -".toml".length))
   .sort();
 
-export interface ExampleFiles {
-  /** The workflow file */
-  toml: string;
+/** The text of a workflow file of the tests */
+export function readWorkflowFile(workflowName: string): string {
+  return readFileSync(join(workflowsDir, `${workflowName}.toml`), "utf8");
 }
 
-export function readExample(exampleName: string): ExampleFiles {
-  return { toml: readFileSync(join(examplesDir, exampleName, `${exampleName}.toml`), "utf8") };
-}
-
-/** The workflow of an example and the triangle mesh of its network, in WebAssembly (needs `initWasm`). */
-export function generateExample(exampleName: string): { workflow: Workflow; mesh: string } {
-  const example = readExample(exampleName);
-  const workflow = tomlToWorkflow(example.toml);
+/** A workflow of the tests and the triangle mesh of its network, in WebAssembly (needs `initWasm`). */
+export function generateWorkflow(workflowName: string): { workflow: Workflow; mesh: string } {
+  const workflow = tomlToWorkflow(readWorkflowFile(workflowName));
   const network = workflow.network;
   const result = run_generation(
     networkToLibraryToml(network, workflow.boundaries),
@@ -175,7 +175,7 @@ export function generateExample(exampleName: string): { workflow: Workflow; mesh
     () => {},
   );
   if (result.error !== undefined) {
-    throw new Error(`the generation of ${exampleName} failed: ${result.error.message}`);
+    throw new Error(`the generation of ${workflowName} failed: ${result.error.message}`);
   }
   return { workflow, mesh: result.file(FLOW_MESH_FILE) ?? "" };
 }

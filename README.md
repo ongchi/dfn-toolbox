@@ -31,8 +31,10 @@ generation keeps the fractures until the last checkpoint (each 5 s); the next
 the seed. All input is in the page: the app does not save the input or the
 output.
 
-- **Domain**: select an example, or a predefined domain shape. Give each
-  boundary surface a role (in-flow, out-flow or no-flow). The pointer over the
+- **Domain**: select a predefined domain shape. At the start, the page has
+  the first shape with the default values of all forms. Give each
+  boundary surface a role (in-flow, out-flow or no-flow); a new shape gets
+  the default roles: the first surface is in-flow, the second out-flow. The pointer over the
   row of a surface highlights it in the 3D view; a click on the row keeps it
   highlighted until a second click.
 - **User fractures**: add fractures, each with a region, center, shape,
@@ -43,7 +45,8 @@ output.
   advanced part (closed at the start) has the FRAM rules of the generation,
   the choice of the clusters and the size of the triangles of the mesh for
   the flow.
-- **Flow**: set a pressure for each in-flow and out-flow surface, and the
+- **Flow**: set a pressure for each in-flow and out-flow surface (default:
+  11.0 MPa for the default in-flow surface, 10.0 MPa for the others), and the
   fluid (temperature and gravity).
 - **Transport**: the particles start only at release points. Click "Pick points", then click on a fracture of the 3D
   view: each click adds a release point and runs the particle tracking. With
@@ -77,21 +80,15 @@ For the same input and seed, the network and the mesh are those of the `dfngen`
 binary. The flow agrees with the `fehm` binary within 1e-9. The particles of
 the `dfntrans` binary have the same paths, and their times differ a little.
 
-## Examples
-
-| Example | Content |
-|---|---|
-| `box_west_east` | A cube of 10 m with one family. Flow and particles go from west to east. |
-| `two_families` | The same cube, with a family perpendicular and a family parallel to the flow, and a correlated aperture. |
-| `l_shape_north_east` | An L-shaped domain of 4 boxes, with one family in each of 3 regions. Flow with gravity and particles go from north to east. |
-| `user_fractures_stochastic` | The same cube, with a large user-defined fracture from west to east and a stochastic family. |
+## Domain meshes
 
 The domain meshes are in `meshes/`. Each has boundary surfaces: surface cells
 with the cell data arrays `boundary__<name>` (see
 [Domain mesh](https://github.com/ongchi/dfngen-rs#domain-mesh)).
 
-The seeds of the examples give a network which connects the in-flow and the
-out-flow boundaries. Many other seeds do not, and then "Solve flow" reports it.
+The default values of the forms give a network which connects the in-flow
+and the out-flow boundaries of each predefined shape. Many other seeds do
+not, and then the run stops after the fractures with a warning.
 
 ## Folders
 
@@ -99,7 +96,6 @@ out-flow boundaries. Many other seeds do not, and then "Solve flow" reports it.
 |---|---|
 | `app` | Vite + TypeScript front end, and its tests. |
 | `dfn-wasm` | Rust crate: the `wasm-bindgen` functions of the libraries. |
-| `examples` | The workflow examples. |
 | `meshes` | The predefined domain meshes. |
 
 ## Build
@@ -122,7 +118,7 @@ Then, in `app`:
 
 ```bash
 npm ci
-npm run setup     # WebAssembly module and examples
+npm run setup     # WebAssembly module and domain meshes
 npm run dev       # development server
 npm run build     # static files in dist/
 ```
@@ -155,7 +151,9 @@ npm test                # in app
 npm run dev & npm run e2e -- http://localhost:5173/
 ```
 
-`npm test` runs the `vitest` tests of `app/tests`. `npm run e2e` runs
+`npm test` runs the `vitest` tests of `app/tests`. The workflow files of
+`app/tests/data/workflows` are test inputs: each one runs the full workflow,
+as do the default forms on each predefined mesh. `npm run e2e` runs
 `app/scripts/e2e.mjs` in the local Chrome (headless) and saves screenshots.
 `E2E_REMOTE_HOST=<ssh host> E2E_REMOTE_ROOT=<folder> npm run e2e:remote` runs
 the same check on another computer with node, npm, Google Chrome and the tools

@@ -8,6 +8,10 @@
 export const FLOW_MESH_FILE = "dfn_mesh.vtu";
 
 const DEFAULT_PRESSURE = 10.0;
+// The default pressure of the default in-flow surfaces: 1 MPa (about 100 m of
+// water) is larger than the hydrostatic change over the height of a
+// predefined mesh, thus the particles go to the out-flow surfaces
+const DEFAULT_INFLOW_PRESSURE = 11.0;
 
 export interface FlowState {
   /** °C */
@@ -22,6 +26,13 @@ export interface FlowState {
 
 export function defaultFlowState(): FlowState {
   return { temperature: 20.0, hasGravity: true, pressures: {} };
+}
+
+/** The pressures of the default roles of a new domain mesh: the in-flow surfaces are higher */
+export function setDefaultInflowPressures(state: FlowState, inflow: string[]): void {
+  for (const name of inflow) {
+    state.pressures[name] = DEFAULT_INFLOW_PRESSURE;
+  }
 }
 
 /** The pressure of a boundary surface: the given one, else the default */

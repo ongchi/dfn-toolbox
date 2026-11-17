@@ -1,4 +1,4 @@
-// The arrays of the 3D view have the numbers of the output files, for each example.
+// The arrays of the 3D view have the numbers of the output files, for each test workflow.
 import { beforeAll, describe, expect, test } from "vitest";
 import { flowSurfaces, surfacesWithPoints } from "../src/boundaryRoles";
 import { FLOW_MESH_FILE } from "../src/flow/state";
@@ -19,9 +19,9 @@ import {
 } from "../src/pkg/dfn_wasm.js";
 import { transportToLibraryToml } from "../src/transport/toml";
 import { tomlToWorkflow } from "../src/workflow";
-import { exampleNames, initWasm, readExample, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile, withInflowReleasePoints } from "./cases";
+import { workflowNames, initWasm, readWorkflowFile, readMesh, runFlow, runTransport, textBoundaries, userFracturesFile, withInflowReleasePoints } from "./cases";
 
-// Milliseconds: the network, the flow and the transport of an example
+// Milliseconds: the network, the flow and the transport of a workflow
 const WORKFLOW_TIMEOUT = 60000;
 
 /** The numbers of <Points> of a VTK text */
@@ -54,11 +54,11 @@ function expectSameCellArrays(shapes: ViewShapes, text: string): void {
 
 beforeAll(initWasm);
 
-test("there are examples", () => {
-  expect(exampleNames.length).toBeGreaterThan(0);
+test("there are workflow files", () => {
+  expect(workflowNames.length).toBeGreaterThan(0);
 });
 
-describe.each(exampleNames)("%s", (exampleName) => {
+describe.each(workflowNames)("%s", (workflowName) => {
   let generation: GenerationResult;
   let flow: FlowResult;
   let transport: TransportResult;
@@ -66,7 +66,7 @@ describe.each(exampleNames)("%s", (exampleName) => {
   let domainMesh: string;
 
   beforeAll(() => {
-    const workflow = tomlToWorkflow(readExample(exampleName).toml);
+    const workflow = tomlToWorkflow(readWorkflowFile(workflowName));
     const network = workflow.network;
     const roles = workflow.boundaries;
     domainMesh = readMesh(network.domain);

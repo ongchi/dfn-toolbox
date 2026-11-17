@@ -1,5 +1,5 @@
 // The particle tracking of dfntrans in WebAssembly, on the flow of the mesh of
-// the example l_shape_north_east: the dfntrans input of the transport form,
+// the test workflow l_shape_north_east: the dfntrans input of the transport form,
 // the output against the native binary of dfntrans, and the errors.
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +15,7 @@ import { readTransport, transportTables, transportToLibraryToml } from "../src/t
 import { nodeVelocityMagnitudes } from "../src/transport/velocities";
 import {
   compareOutputFolders,
-  generateExample,
+  generateWorkflow,
   initWasm,
   meshPoints,
   runNativeDfntrans,
@@ -23,10 +23,10 @@ import {
   withInflowReleasePoints,
 } from "./cases";
 
-// The example with the boundary surfaces north and east
-const EXAMPLE_NAME = "l_shape_north_east";
+// The test workflow with the boundary surfaces north and east
+const WORKFLOW_NAME = "l_shape_north_east";
 
-/** The roles of the example: from north to east */
+/** The roles of the workflow: from north to east */
 const ROLES: BoundaryRoles = { inflow: ["north"], outflow: ["east"] };
 
 let mesh = "";
@@ -34,9 +34,9 @@ let flowToml = "";
 
 beforeAll(() => {
   initWasm();
-  const example = generateExample(EXAMPLE_NAME);
-  mesh = example.mesh;
-  flowToml = flowToLibraryToml(example.workflow.flow, flowSurfaces(ROLES));
+  const generated = generateWorkflow(WORKFLOW_NAME);
+  mesh = generated.mesh;
+  flowToml = flowToLibraryToml(generated.workflow.flow, flowSurfaces(ROLES));
 });
 
 /** The transport state with one particle at each of a few points on the in-flow surface */

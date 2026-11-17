@@ -26,9 +26,9 @@ function meshSelect(selected: string, meshNames: string[], onChoose: (name: stri
   return select;
 }
 
-/** The domain mesh: the dropdown of the predefined meshes shows the selected one; the style of the example row */
+/** The domain mesh: the dropdown of the predefined meshes shows the selected one */
 function meshRow(selected: string, meshNames: string[], onChoose: (name: string) => void): HTMLElement {
-  const row = element("label", "example-row");
+  const row = element("label", "mesh-row");
   row.append(element("span", "field-label", "Domain mesh"), meshSelect(selected, meshNames, onChoose));
   return row;
 }
