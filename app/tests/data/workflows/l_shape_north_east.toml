@@ -1,7 +1,7 @@
 # L shape north -> east: an L-shaped domain (the L-shape) of 4 boxes: the
 # west, middle and east boxes along x (y 20 to 25), and the north box at
-# +y of the west box (x 10 to 15, y 25 to 30). The regions are west_box,
-# east_box and other_boxes (the middle and the north box). Each plane of
+# +y of the west box (x 10 to 15, y 25 to 30). The regions are north_box,
+# east_box and other_boxes (the west and the middle box). Each plane of
 # the outer faces is a boundary surface. The end face of the north box
 # (y = 30), north, is the in-flow; the end face of the east box (x = 25),
 # east, is the out-flow; the other surfaces are no-flow. One family in each region:
@@ -15,7 +15,7 @@ inflow = ["north"]
 outflow = ["east"]
 
 [network]
-seed = 11
+seed = 12
 min_feature_size = 0.3
 domain = "L-shape.vtu"
 orientation_option = "theta_phi"
@@ -34,7 +34,7 @@ keep_only_largest = true
 [[network.family]]
 probability = 0.3333333333333333
 aspect_ratio = 1.0
-region = "west_box"
+region = "north_box"
 aperture = { distribution = "log_normal", log_mean = -9.0, sd = 0.3 }
 radius = { distribution = "truncated_power_law", alpha = 1.6, min = 1.5, max = 5.0 }
 orientation = { theta = 0.0, phi = 0.0, kappa = 0.1 }

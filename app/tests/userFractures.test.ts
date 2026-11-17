@@ -133,9 +133,9 @@ test("a region which is not in the mesh is an error", () => {
 
 test("the region boxes of the L-shape mesh are the boxes of their cells", () => {
   expect(meshRegionBounds(readMesh("L-shape.vtu"))).toEqual([
-    { name: "west_box", min: [10, 20, 30], max: [15, 25, 35] },
+    { name: "north_box", min: [10, 25, 30], max: [15, 30, 35] },
     { name: "east_box", min: [20, 20, 30], max: [25, 25, 35] },
-    { name: "other_boxes", min: [10, 20, 30], max: [20, 30, 35] },
+    { name: "other_boxes", min: [10, 20, 30], max: [20, 25, 35] },
   ]);
 });
 

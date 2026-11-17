@@ -4,7 +4,7 @@
      Cells 0 to 2: three hexahedra along x (y 20 to 25): the west box
      (x 10 to 15), the middle box (x 15 to 20) and the east box (x 20 to 25).
      Cell 3: a hexahedron in +y of the west box (the north box, y 25 to 30).
-     Regions: west_box = cell 0, east_box = cell 2, other_boxes = cells 1, 3.
+     Regions: north_box = cell 3, east_box = cell 2, other_boxes = cells 0, 1.
      Cells 4 to 21: the outer faces as quads; the faces on one plane are one
      boundary surface:
        north (y = 30): cell 4, the end face of the north box
@@ -20,8 +20,8 @@
      out-flow. -->
 <!-- Description: An L shape of four boxes of 5 m: the west, middle and east
      boxes along x, and the north box at +y of the west box; from
-     (10, 20, 30) to (25, 30, 35). Regions: west_box, east_box and
-     other_boxes (the middle and the north box). Each plane of the outer
+     (10, 20, 30) to (25, 30, 35). Regions: north_box, east_box and
+     other_boxes (the west and the middle box). Each plane of the outer
      faces is a boundary surface: north (end face of the north box, y = 30),
      east (end face of the east box, x = 25), west (x = 10), south (y = 20),
      inner_east and inner_north (the two faces of the inner corner, x = 15
@@ -29,15 +29,15 @@
 <VTKFile type="UnstructuredGrid" version="1.0" byte_order="LittleEndian">
 <UnstructuredGrid>
 <Piece NumberOfPoints="20" NumberOfCells="22">
-<CellData Scalars="region__west_box">
-<DataArray type="Int32" Name="region__west_box" format="ascii">
-1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+<CellData Scalars="region__north_box">
+<DataArray type="Int32" Name="region__north_box" format="ascii">
+0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="region__east_box" format="ascii">
 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="region__other_boxes" format="ascii">
-0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 </DataArray>
 <DataArray type="Int32" Name="boundary__north" format="ascii">
 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0

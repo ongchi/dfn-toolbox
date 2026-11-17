@@ -12,7 +12,7 @@ import { check_flow_input } from "../src/pkg/dfn_wasm.js";
 import { compareOutputFolders, generateWorkflow, initWasm, runFlow, runNativeFehm, textBoundaries } from "./cases";
 
 // The test workflow with the boundary arrays of the mesh surface, of the regions
-// west_box, east_box and other_boxes, and of the boundary surfaces north and east
+// north_box, east_box and other_boxes, and of the boundary surfaces north and east
 const WORKFLOW_NAME = "l_shape_north_east";
 
 let mesh = "";

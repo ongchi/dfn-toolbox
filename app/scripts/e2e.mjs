@@ -1082,7 +1082,7 @@ try {
   const boxDescription = await shapeDescription();
   await page.select("#domain-form select", "L-shape.vtu");
   // The form shows the regions of the mesh when it is loaded
-  await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
+  await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "north_box"));
   const meshLabel = await page.$eval("#domain-form select", (node) => node.selectedOptions[0].textContent);
   check(meshLabel === "L-shape", "choose a predefined mesh", meshLabel);
   const lShapeDescription = await shapeDescription();
@@ -1145,12 +1145,12 @@ try {
 
   // Bad input: a family region of the L-shape mesh is not in the Box mesh: an error of the library
   await startOnShape(page, "L-shape.vtu");
-  await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "west_box"));
+  await page.waitForFunction(() => [...document.querySelectorAll("#form option")].some((node) => node.value === "north_box"));
   await page.evaluate(() => {
     const select = [...document.querySelectorAll("#form select")].find((node) =>
-      [...node.options].some((option) => option.value === "west_box"),
+      [...node.options].some((option) => option.value === "north_box"),
     );
-    select.value = "west_box";
+    select.value = "north_box";
     select.dispatchEvent(new Event("change"));
   });
   await page.select("#domain-form select", "Box.vtu");
@@ -1163,7 +1163,7 @@ try {
   const badInputStatus = await statusText(page);
   check(
     (await isStatusError(page)) &&
-      badInputStatus === "Family 1 (DFN panel): the domain has no region west_box. Choose another region.",
+      badInputStatus === "Family 1 (DFN panel): the domain has no region north_box. Choose another region.",
     "generate with a bad input",
     badInputStatus,
   );
