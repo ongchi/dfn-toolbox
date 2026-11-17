@@ -148,12 +148,9 @@ const ui = {
   dock: byId<HTMLDivElement>("dock"),
   runPanel: byId<HTMLDivElement>("run-panel"),
   stepPanel: byId<HTMLElement>("step-panel"),
-  stepPanelTitle: byId<HTMLHeadingElement>("step-panel-title"),
-  panelClose: byId<HTMLButtonElement>("panel-close"),
   stepSegments: [...document.querySelectorAll<HTMLButtonElement>("[data-step-panel]")],
   stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
   sheetSize: byId<HTMLButtonElement>("sheet-size"),
-  stepPanelHeader: document.querySelector<HTMLElement>("#step-panel .panel-header")!,
   stepPanelBody: byId<HTMLDivElement>("step-panel-body"),
   logButton: byId<HTMLButtonElement>("log-button"),
   settingsButton: byId<HTMLButtonElement>("settings-button"),
@@ -527,7 +524,7 @@ function openStepPanel(name: StepPanel | null): void {
   ui.stepPanel.hidden = name === null;
   ui.layout.classList.toggle("has-step-panel", name !== null);
   if (name !== null) {
-    ui.stepPanelTitle.textContent = STEP_PANEL_TITLES[name];
+    ui.stepPanel.setAttribute("aria-label", STEP_PANEL_TITLES[name]);
   }
   for (const segment of ui.stepSegments) {
     const isOpen = segment.dataset.stepPanel === name;
@@ -1448,39 +1445,43 @@ function moveSheet(direction: 1 | -1): void {
 }
 
 /**
- * The header of the bottom sheet: a tap at "peek" raises it to "half", a tap on the handle changes "half" and
- * "full", and a vertical swipe moves it one height
+ * The handle bar of the bottom sheet: a tap raises "peek" to "half" and changes "half" and "full", and a
+ * vertical swipe moves the sheet one height
  */
 function bindSheetHeader(): void {
-  let swipeStart: number | null = null;
+  // The start and the last vertical position of a pointer on the bar; the browser can end a touch with
+  // `pointercancel`, and the position of `pointerup` can be that of the start
+  let swipe: { start: number; last: number } | null = null;
   let isSwiped = false;
-  ui.stepPanelHeader.addEventListener("pointerdown", (event) => {
-    swipeStart = event.clientY;
+  ui.sheetSize.addEventListener("pointerdown", (event) => {
+    swipe = { start: event.clientY, last: event.clientY };
     isSwiped = false;
+    ui.sheetSize.setPointerCapture(event.pointerId);
   });
-  ui.stepPanelHeader.addEventListener("pointerup", (event) => {
-    if (swipeStart === null) {
+  ui.sheetSize.addEventListener("pointermove", (event) => {
+    if (swipe !== null) {
+      swipe.last = event.clientY;
+    }
+  });
+  const endSwipe = () => {
+    if (swipe === null) {
       return;
     }
-    const distance = event.clientY - swipeStart;
-    swipeStart = null;
+    const distance = swipe.last - swipe.start;
+    swipe = null;
     if (Math.abs(distance) > SHEET_SWIPE_DISTANCE) {
       isSwiped = true;
       moveSheet(distance < 0 ? 1 : -1);
     }
-  });
-  ui.stepPanelHeader.addEventListener("pointercancel", () => (swipeStart = null));
-  ui.stepPanelHeader.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (isSwiped || target?.closest("#panel-close")) {
+  };
+  ui.sheetSize.addEventListener("pointerup", endSwipe);
+  ui.sheetSize.addEventListener("pointercancel", endSwipe);
+  ui.sheetSize.addEventListener("click", () => {
+    if (isSwiped) {
       isSwiped = false;
       return;
     }
-    if (sheetSize() === "peek") {
-      setSheetSize("half");
-    } else if (target?.closest("#sheet-size")) {
-      setSheetSize(sheetSize() === "full" ? "half" : "full");
-    }
+    setSheetSize(sheetSize() === "half" ? "full" : "half");
   });
   // A touch on the 3D view lowers the sheet: the view shows the model (the touch also turns or zooms it)
   ui.canvas.addEventListener(
@@ -1563,16 +1564,13 @@ function bindEvents(): void {
       }
     });
   }
-  ui.panelClose.addEventListener("click", () => {
-    const segment = ui.stepSegments.find((candidate) => candidate.dataset.stepPanel === openPanel);
-    openStepPanel(null);
-    segment?.focus();
-  });
   // Escape closes the settings of a step; the settings dialog closes itself, and a field keeps its own Escape
   document.addEventListener("keydown", (event) => {
     const isInField = event.target instanceof Element && event.target.matches("input, select, textarea");
     if (event.key === "Escape" && openPanel !== null && !ui.settingsDialog.open && !isInField) {
-      ui.panelClose.click();
+      const segment = ui.stepSegments.find((candidate) => candidate.dataset.stepPanel === openPanel);
+      openStepPanel(null);
+      segment?.focus();
     }
   });
   bindSheetHeader();

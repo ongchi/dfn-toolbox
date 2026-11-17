@@ -18,8 +18,8 @@ show the direction and the speed of the flow.
 The run bar at the bottom is a media player. Its timeline has one segment
 for each step of the workflow; the segment shows the state of its step (not
 run, running with its progress, done, or failed). A click on a segment opens
-the settings of its step above the bar; a second click, the close button or
-Escape closes them. At the start, no settings show. One "Run" button (▶) runs
+the settings of its step above the bar (the panel has no title: the open
+segment shows the step); a second click or Escape closes them. At the start, no settings show. One "Run" button (▶) runs
 all steps: the fractures, their triangle mesh, the flow and the transport.
 While the run is on (the pause button ❚❚ shows), a change of a setting runs the steps again from the
 first step which the change affects, 0.5 s after the last change; the results
@@ -83,7 +83,7 @@ red or yellow dot on the Log button shows an error or a warning. The
 settings of a step cover the view and do not move it. On a phone, the run bar
 is at the bottom over the full width, and the settings of a step are a sheet
 above it with three heights. A touch on the 3D view lowers the sheet to its
-header; a tap on the header raises it again, and a swipe on the header moves
+handle bar; a tap on the bar raises it again, and a swipe on the bar moves
 it up or down. One finger turns the model, two fingers zoom it, and a
 tap on the row of a boundary surface keeps the surface highlighted until a
 second tap.

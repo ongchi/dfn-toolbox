@@ -103,14 +103,9 @@
       <!-- The run bar (a media player: run, reset, the steps, the log) and the settings of the open step above it;
            a bottom sheet on a phone -->
       <div id="dock" class="dock">
-        <section id="step-panel" class="panel step-panel" aria-labelledby="step-panel-title" hidden>
-          <header class="panel-header">
-            <button id="sheet-size" class="sheet-handle" type="button" aria-label="Larger settings" aria-expanded="true" aria-controls="step-panel-body"></button>
-            <h2 id="step-panel-title"></h2>
-            <button id="panel-close" class="icon-button" type="button" aria-label="Close the settings" title="Close the settings">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-            </button>
-          </header>
+        <!-- No title: the open segment of the run bar shows the step; the handle bar of the sheet only on a phone -->
+        <section id="step-panel" class="panel step-panel" hidden>
+          <button id="sheet-size" class="sheet-handle" type="button" aria-label="Larger settings" aria-expanded="true" aria-controls="step-panel-body"></button>
           <div id="step-panel-body" class="step-panel-body">
             <div data-step-group="domain">
               <div id="domain-form" class="form"></div>

@@ -68,6 +68,11 @@ async function openStepPanel(page, name, isTap = false) {
   await (isTap ? page.tap(selector) : page.click(selector));
 }
 
+/** Closes the open step panel: a second click on its segment (the panel has no close button) */
+async function closeStepPanel(page) {
+  await page.$eval('[data-step-panel][aria-expanded="true"]', (node) => node.click());
+}
+
 /** The state of each segment of the run bar, as "name=state" */
 async function segmentStates(page) {
   return page.$$eval("[data-step-panel]", (nodes) => nodes.map((node) => `${node.dataset.stepPanel}=${node.dataset.stepState}`).join(" "));
@@ -353,7 +358,7 @@ async function checkPhone() {
   sheetStates.push(await sheetState());
   await page.tap("#sheet-size");
   sheetStates.push(await sheetState());
-  await page.tap("#panel-close");
+  await page.tap('[data-step-panel="domain"]');
   sheetStates.push(await sheetState());
   await openStepPanel(page, "domain", true);
   sheetStates.push(await sheetState());
@@ -383,50 +388,60 @@ async function checkPhone() {
     `tap ${isSameView(viewAfterTap, viewBeforeTap) ? "unchanged" : "changed"}, second tap ${isSameView(viewAfterSecondTap, viewBeforeTap) ? "same" : "different"}`,
   );
 
-  // A touch on the 3D view lowers the sheet to "peek" (only its header shows), a tap on the header raises it to
-  // "half", the handle changes "half" and "full", a vertical swipe on the header moves it one height, and a tap on
-  // a segment at "peek" shows the settings of its step
+  // A touch on the 3D view lowers the sheet to "peek" (only its handle bar shows), a tap on the bar raises it to
+  // "half" and changes "half" and "full", a vertical swipe on the bar moves it one height, and a tap on a
+  // segment at "peek" shows the settings of its step. The panel has no title row: the first field is at its top.
   const dockTop = () => page.$eval("#dock", (node) => Math.round(node.getBoundingClientRect().top));
-  const swipeHeader = async (distance) => {
-    const box = await page.$eval("#step-panel-title", (node) => {
+  const handleCenter = () =>
+    page.$eval("#sheet-size", (node) => {
       const { left, top, width, height } = node.getBoundingClientRect();
       return { x: left + width / 2, y: top + height / 2 };
     });
-    await page.touchscreen.touchStart(box.x, box.y);
+  const swipeHandle = async (distance) => {
+    const { x, y } = await handleCenter();
+    await page.touchscreen.touchStart(x, y);
     for (let step = 1; step <= 5; step++) {
-      await page.touchscreen.touchMove(box.x, box.y + (distance * step) / 5);
+      await page.touchscreen.touchMove(x, y + (distance * step) / 5);
     }
     await page.touchscreen.touchEnd();
     await new Promise((resolve) => setTimeout(resolve, 100));
   };
+  // A point of the view above the sheet at "half"
+  const tapView = () => page.touchscreen.tap(100, 150);
   const peekStates = [await sheetState()];
   const dockTopAtHalf = await dockTop();
-  await page.touchscreen.tap(100, 400);
+  const fieldDistance = await page.$eval("#step-panel", (panel) => {
+    const field = panel.querySelector("#step-panel-body select");
+    return Math.round(field.getBoundingClientRect().top - document.querySelector("#sheet-size").getBoundingClientRect().bottom);
+  });
+  await tapView();
   peekStates.push(await sheetState());
   const dockTopAtPeek = await dockTop();
   await new Promise((resolve) => setTimeout(resolve, 300));
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_peek.png` });
-  await page.tap("#step-panel-title");
-  peekStates.push(await sheetState());
   await page.tap("#sheet-size");
   peekStates.push(await sheetState());
   await page.tap("#sheet-size");
   peekStates.push(await sheetState());
-  await swipeHeader(120);
+  await page.tap("#sheet-size");
   peekStates.push(await sheetState());
-  await swipeHeader(-120);
+  await swipeHandle(120);
   peekStates.push(await sheetState());
-  await swipeHeader(-120);
+  await swipeHandle(-120);
   peekStates.push(await sheetState());
-  await swipeHeader(120);
+  await swipeHandle(-120);
   peekStates.push(await sheetState());
-  await page.touchscreen.tap(100, 400);
+  await swipeHandle(120);
+  peekStates.push(await sheetState());
+  await tapView();
   await page.tap('[data-step-panel="flow"]');
-  peekStates.push(`${await sheetState()} (${await page.$eval("#step-panel-title", (node) => node.textContent)})`);
+  peekStates.push(`${await sheetState()} (${await page.$eval("#step-panel", (node) => node.getAttribute("aria-label"))})`);
   check(
-    peekStates.join(", ") === "half, peek, half, full, half, peek, half, full, half, half (Flow)" && dockTopAtPeek > dockTopAtHalf + 200,
+    peekStates.join(", ") === "half, peek, half, full, half, peek, half, full, half, half (Flow)" &&
+      dockTopAtPeek > dockTopAtHalf + 200 &&
+      fieldDistance <= 16,
     "phone: the low height of the sheet",
-    `${peekStates.join(", ")}; top of the sheet at half ${dockTopAtHalf}, at peek ${dockTopAtPeek}`,
+    `${peekStates.join(", ")}; top of the sheet at half ${dockTopAtHalf}, at peek ${dockTopAtPeek}; first field ${fieldDistance} px below the bar`,
   );
 
   for (const step of ["domain", "fractures", "flow", "transport"]) {
@@ -650,23 +665,20 @@ try {
     `${start.shape} (${start.meshLabel}), ${start.families} family, n_poly ${startNPoly}, ${start.selects} domain dropdowns, family card: ${start.familyNumberInputs} number inputs, ${start.familySliders} sliders`,
   );
   // The settings of the steps are hidden at the start; a click on a segment of the run bar opens the panel of its
-  // step, and a second click, the close button or Escape closes it
+  // step, and a second click or Escape closes it
   const isStepPanelShown = () => page.$eval("#step-panel", (node) => !node.hidden);
   const openSegments = () =>
     page.$$eval("[data-step-panel]", (nodes) => nodes.filter((node) => node.getAttribute("aria-expanded") === "true").map((node) => node.dataset.stepPanel).join(", "));
   const panelStates = [`${await isStepPanelShown()} (${await openSegments()})`];
   await page.click('[data-step-panel="flow"]');
-  panelStates.push(`${await isStepPanelShown()} (${await openSegments()}: ${await page.$eval("#step-panel-title", (node) => node.textContent)})`);
+  panelStates.push(`${await isStepPanelShown()} (${await openSegments()}: ${await page.$eval("#step-panel", (node) => node.getAttribute("aria-label"))})`);
   await page.click('[data-step-panel="flow"]');
-  panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
-  await page.click('[data-step-panel="flow"]');
-  await page.click("#panel-close");
   panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
   await page.click('[data-step-panel="flow"]');
   await page.keyboard.press("Escape");
   panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
   check(
-    panelStates.join(" | ") === "false () | true (flow: Flow) | false () | false () | false ()",
+    panelStates.join(" | ") === "false () | true (flow: Flow) | false () | false ()",
     "step panels: hidden at the start, a segment opens one",
     panelStates.join(" | "),
   );
@@ -1619,7 +1631,7 @@ try {
       return count === 0 ? null : sum / count;
     }, image, await freeColumns());
   };
-  await page.click("#panel-close");
+  await closeStepPanel(page);
   await page.click("#reset-camera");
   await page.mouse.move(700, 450);
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -1637,7 +1649,7 @@ try {
     return Buffer.from(await page.screenshot({ clip: clipRightOfPanel }));
   };
   const viewWithPanel = await viewRightOfPanel();
-  await page.click("#panel-close");
+  await closeStepPanel(page);
   await page.mouse.move(700, 450);
   const isViewKept = isSameView(viewWithPanel, await viewRightOfPanel());
   check(
