@@ -1276,6 +1276,20 @@ input[type="radio"] {
     height: 45dvh;
   }
 
+  /* "peek": only the header of the sheet shows above the run bar */
+  .layout[data-sheet="peek"] .step-panel {
+    flex: none;
+  }
+
+  .layout[data-sheet="peek"] .step-panel-body {
+    display: none;
+  }
+
+  /* A vertical swipe on the header changes the height of the sheet */
+  .panel-header {
+    touch-action: none;
+  }
+
   .layout[data-sheet="full"].has-step-panel .dock {
     top: calc(env(safe-area-inset-top) + 56px);
   }

@@ -82,7 +82,9 @@ Log has the status of the steps (progress, results, warnings and errors); a
 red or yellow dot on the Log button shows an error or a warning. The
 settings of a step cover the view and do not move it. On a phone, the run bar
 is at the bottom over the full width, and the settings of a step are a sheet
-above it with two heights. One finger turns the model, two fingers zoom it, and a
+above it with three heights. A touch on the 3D view lowers the sheet to its
+header; a tap on the header raises it again, and a swipe on the header moves
+it up or down. One finger turns the model, two fingers zoom it, and a
 tap on the row of a boundary surface keeps the surface highlighted until a
 second tap.
 

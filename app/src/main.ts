@@ -99,8 +99,11 @@ type SegmentState = "empty" | "stale" | "running" | "failed" | "done";
 
 /** The screens with the settings in a bottom sheet: the condition of this layout in `style.css` */
 const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
-/** The heights of the bottom sheet */
-type SheetSize = "half" | "full";
+/** The heights of the bottom sheet; "peek" shows only its header */
+type SheetSize = "peek" | "half" | "full";
+const SHEET_SIZES: SheetSize[] = ["peek", "half", "full"];
+/** The vertical move (pixels) of a swipe on the header of the sheet */
+const SHEET_SWIPE_DISTANCE = 30;
 
 function byId<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -150,6 +153,8 @@ const ui = {
   stepSegments: [...document.querySelectorAll<HTMLButtonElement>("[data-step-panel]")],
   stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
   sheetSize: byId<HTMLButtonElement>("sheet-size"),
+  stepPanelHeader: document.querySelector<HTMLElement>("#step-panel .panel-header")!,
+  stepPanelBody: byId<HTMLDivElement>("step-panel-body"),
   logButton: byId<HTMLButtonElement>("log-button"),
   settingsButton: byId<HTMLButtonElement>("settings-button"),
   settingsDialog: byId<HTMLDialogElement>("settings-dialog"),
@@ -189,6 +194,8 @@ let transportTimeUnit: TimeUnit = "days";
 let isPickingPoints = false;
 /** The step whose settings show above the run bar; null: none (the start) */
 let openPanel: StepPanel | null = null;
+/** The scroll position of the settings while the sheet is at "peek" (its body does not show) */
+let peekScrollTop = 0;
 /** The step of the live run which failed last; null after a new start of a step */
 let failedChainStep: ChainStep | null = null;
 let isBusy = false;
@@ -291,7 +298,7 @@ function durationText(milliseconds: number): string {
 function setBusy(busy: boolean): void {
   isBusy = busy;
   // On a phone, the sheet goes down at a run: the view shows the fractures
-  if (busy && window.matchMedia(SHEET_QUERY).matches) {
+  if (busy && window.matchMedia(SHEET_QUERY).matches && ui.layout.dataset.sheet === "full") {
     setSheetSize("half");
   }
   ui.progress.hidden = !busy;
@@ -1414,8 +1421,77 @@ async function startFromShape(): Promise<void> {
 
 /** The height of the bottom sheet of a phone; `style.css` uses it only on such a screen */
 function setSheetSize(size: SheetSize): void {
+  const oldSize = sheetSize();
+  if (size === oldSize) {
+    return;
+  }
+  if (size === "peek") {
+    peekScrollTop = ui.stepPanelBody.scrollTop;
+  }
   ui.layout.dataset.sheet = size;
-  ui.sheetSize.setAttribute("aria-label", size === "half" ? "Larger settings" : "Smaller settings");
+  if (oldSize === "peek") {
+    ui.stepPanelBody.scrollTop = peekScrollTop;
+  }
+  const labels: Record<SheetSize, string> = { peek: "Show the settings", half: "Larger settings", full: "Smaller settings" };
+  ui.sheetSize.setAttribute("aria-label", labels[size]);
+  ui.sheetSize.setAttribute("aria-expanded", String(size !== "peek"));
+}
+
+function sheetSize(): SheetSize {
+  return SHEET_SIZES.find((size) => size === ui.layout.dataset.sheet) ?? "half";
+}
+
+/** The sheet one height up (+1) or down (-1) */
+function moveSheet(direction: 1 | -1): void {
+  const index = SHEET_SIZES.indexOf(sheetSize()) + direction;
+  setSheetSize(SHEET_SIZES[Math.min(Math.max(index, 0), SHEET_SIZES.length - 1)]);
+}
+
+/**
+ * The header of the bottom sheet: a tap at "peek" raises it to "half", a tap on the handle changes "half" and
+ * "full", and a vertical swipe moves it one height
+ */
+function bindSheetHeader(): void {
+  let swipeStart: number | null = null;
+  let isSwiped = false;
+  ui.stepPanelHeader.addEventListener("pointerdown", (event) => {
+    swipeStart = event.clientY;
+    isSwiped = false;
+  });
+  ui.stepPanelHeader.addEventListener("pointerup", (event) => {
+    if (swipeStart === null) {
+      return;
+    }
+    const distance = event.clientY - swipeStart;
+    swipeStart = null;
+    if (Math.abs(distance) > SHEET_SWIPE_DISTANCE) {
+      isSwiped = true;
+      moveSheet(distance < 0 ? 1 : -1);
+    }
+  });
+  ui.stepPanelHeader.addEventListener("pointercancel", () => (swipeStart = null));
+  ui.stepPanelHeader.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (isSwiped || target?.closest("#panel-close")) {
+      isSwiped = false;
+      return;
+    }
+    if (sheetSize() === "peek") {
+      setSheetSize("half");
+    } else if (target?.closest("#sheet-size")) {
+      setSheetSize(sheetSize() === "full" ? "half" : "full");
+    }
+  });
+  // A touch on the 3D view lowers the sheet: the view shows the model (the touch also turns or zooms it)
+  ui.canvas.addEventListener(
+    "pointerdown",
+    () => {
+      if (openPanel !== null && window.matchMedia(SHEET_QUERY).matches) {
+        setSheetSize("peek");
+      }
+    },
+    { capture: true },
+  );
 }
 
 function openSettings(): void {
@@ -1480,8 +1556,11 @@ function bindEvents(): void {
   for (const segment of ui.stepSegments) {
     segment.addEventListener("click", () => {
       const name = STEP_PANELS.find((candidate) => candidate === segment.dataset.stepPanel) ?? null;
-      // A second click on the open step closes its settings
+      // A second click on the open step closes its settings; a new step shows its settings
       openStepPanel(name === openPanel ? null : name);
+      if (openPanel !== null && sheetSize() === "peek") {
+        setSheetSize("half");
+      }
     });
   }
   ui.panelClose.addEventListener("click", () => {
@@ -1496,7 +1575,7 @@ function bindEvents(): void {
       ui.panelClose.click();
     }
   });
-  ui.sheetSize.addEventListener("click", () => setSheetSize(ui.layout.dataset.sheet === "full" ? "half" : "full"));
+  bindSheetHeader();
   ui.logButton.addEventListener("click", toggleLog);
   ui.settingsButton.addEventListener("click", openSettings);
   ui.orientationOption.addEventListener("change", () => {

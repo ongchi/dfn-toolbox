@@ -336,8 +336,8 @@ async function checkPhone() {
   await page.goto(url);
   await waitForStart(page);
 
-  // The 3D view fills the screen; the settings of a step are a bottom sheet with two heights, which a tap on its
-  // handle changes; at the start the sheet is closed
+  // The 3D view fills the screen; the settings of a step are a bottom sheet, whose handle changes the heights
+  // "half" and "full"; at the start the sheet is closed
   const sheetState = () =>
     page.evaluate(() => {
       const layout = document.querySelector("#layout");
@@ -381,6 +381,52 @@ async function checkPhone() {
     !isSameView(viewAfterTap, viewBeforeTap) && isSameView(viewAfterSecondTap, viewBeforeTap),
     "phone: a tap highlights the surface, a second tap removes it",
     `tap ${isSameView(viewAfterTap, viewBeforeTap) ? "unchanged" : "changed"}, second tap ${isSameView(viewAfterSecondTap, viewBeforeTap) ? "same" : "different"}`,
+  );
+
+  // A touch on the 3D view lowers the sheet to "peek" (only its header shows), a tap on the header raises it to
+  // "half", the handle changes "half" and "full", a vertical swipe on the header moves it one height, and a tap on
+  // a segment at "peek" shows the settings of its step
+  const dockTop = () => page.$eval("#dock", (node) => Math.round(node.getBoundingClientRect().top));
+  const swipeHeader = async (distance) => {
+    const box = await page.$eval("#step-panel-title", (node) => {
+      const { left, top, width, height } = node.getBoundingClientRect();
+      return { x: left + width / 2, y: top + height / 2 };
+    });
+    await page.touchscreen.touchStart(box.x, box.y);
+    for (let step = 1; step <= 5; step++) {
+      await page.touchscreen.touchMove(box.x, box.y + (distance * step) / 5);
+    }
+    await page.touchscreen.touchEnd();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  };
+  const peekStates = [await sheetState()];
+  const dockTopAtHalf = await dockTop();
+  await page.touchscreen.tap(100, 400);
+  peekStates.push(await sheetState());
+  const dockTopAtPeek = await dockTop();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_peek.png` });
+  await page.tap("#step-panel-title");
+  peekStates.push(await sheetState());
+  await page.tap("#sheet-size");
+  peekStates.push(await sheetState());
+  await page.tap("#sheet-size");
+  peekStates.push(await sheetState());
+  await swipeHeader(120);
+  peekStates.push(await sheetState());
+  await swipeHeader(-120);
+  peekStates.push(await sheetState());
+  await swipeHeader(-120);
+  peekStates.push(await sheetState());
+  await swipeHeader(120);
+  peekStates.push(await sheetState());
+  await page.touchscreen.tap(100, 400);
+  await page.tap('[data-step-panel="flow"]');
+  peekStates.push(`${await sheetState()} (${await page.$eval("#step-panel-title", (node) => node.textContent)})`);
+  check(
+    peekStates.join(", ") === "half, peek, half, full, half, peek, half, full, half, half (Flow)" && dockTopAtPeek > dockTopAtHalf + 200,
+    "phone: the low height of the sheet",
+    `${peekStates.join(", ")}; top of the sheet at half ${dockTopAtHalf}, at peek ${dockTopAtPeek}`,
   );
 
   for (const step of ["domain", "fractures", "flow", "transport"]) {
