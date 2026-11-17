@@ -99,10 +99,7 @@ type SegmentState = "empty" | "stale" | "running" | "failed" | "done";
 
 /** The screens with the settings in a bottom sheet: the condition of this layout in `style.css` */
 const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
-/** The heights of the bottom sheet; "peek" shows only its header */
-type SheetSize = "peek" | "half" | "full";
-const SHEET_SIZES: SheetSize[] = ["peek", "half", "full"];
-/** The vertical move (pixels) of a swipe on the header of the sheet */
+/** The vertical move (pixels) of a swipe down on the handle bar of the sheet */
 const SHEET_SWIPE_DISTANCE = 30;
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -150,8 +147,7 @@ const ui = {
   stepPanel: byId<HTMLElement>("step-panel"),
   stepSegments: [...document.querySelectorAll<HTMLButtonElement>("[data-step-panel]")],
   stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
-  sheetSize: byId<HTMLButtonElement>("sheet-size"),
-  stepPanelBody: byId<HTMLDivElement>("step-panel-body"),
+  sheetHandle: byId<HTMLButtonElement>("sheet-handle"),
   logButton: byId<HTMLButtonElement>("log-button"),
   settingsButton: byId<HTMLButtonElement>("settings-button"),
   settingsDialog: byId<HTMLDialogElement>("settings-dialog"),
@@ -191,8 +187,6 @@ let transportTimeUnit: TimeUnit = "days";
 let isPickingPoints = false;
 /** The step whose settings show above the run bar; null: none (the start) */
 let openPanel: StepPanel | null = null;
-/** The scroll position of the settings while the sheet is at "peek" (its body does not show) */
-let peekScrollTop = 0;
 /** The step of the live run which failed last; null after a new start of a step */
 let failedChainStep: ChainStep | null = null;
 let isBusy = false;
@@ -294,10 +288,6 @@ function durationText(milliseconds: number): string {
 /** A step runs in the worker: the progress bar shows */
 function setBusy(busy: boolean): void {
   isBusy = busy;
-  // On a phone, the sheet goes down at a run: the view shows the fractures
-  if (busy && window.matchMedia(SHEET_QUERY).matches && ui.layout.dataset.sheet === "full") {
-    setSheetSize("half");
-  }
   ui.progress.hidden = !busy;
   updateRunBar();
 }
@@ -1416,83 +1406,43 @@ async function startFromShape(): Promise<void> {
   }
 }
 
-/** The height of the bottom sheet of a phone; `style.css` uses it only on such a screen */
-function setSheetSize(size: SheetSize): void {
-  const oldSize = sheetSize();
-  if (size === oldSize) {
-    return;
-  }
-  if (size === "peek") {
-    peekScrollTop = ui.stepPanelBody.scrollTop;
-  }
-  ui.layout.dataset.sheet = size;
-  if (oldSize === "peek") {
-    ui.stepPanelBody.scrollTop = peekScrollTop;
-  }
-  const labels: Record<SheetSize, string> = { peek: "Show the settings", half: "Larger settings", full: "Smaller settings" };
-  ui.sheetSize.setAttribute("aria-label", labels[size]);
-  ui.sheetSize.setAttribute("aria-expanded", String(size !== "peek"));
-}
-
-function sheetSize(): SheetSize {
-  return SHEET_SIZES.find((size) => size === ui.layout.dataset.sheet) ?? "half";
-}
-
-/** The sheet one height up (+1) or down (-1) */
-function moveSheet(direction: 1 | -1): void {
-  const index = SHEET_SIZES.indexOf(sheetSize()) + direction;
-  setSheetSize(SHEET_SIZES[Math.min(Math.max(index, 0), SHEET_SIZES.length - 1)]);
+/** Closes the settings of the open step: the focus goes to its segment of the run bar */
+function closeStepPanel(): void {
+  const segment = ui.stepSegments.find((candidate) => candidate.dataset.stepPanel === openPanel);
+  openStepPanel(null);
+  segment?.focus();
 }
 
 /**
- * The handle bar of the bottom sheet: a tap raises "peek" to "half" and changes "half" and "full", and a
- * vertical swipe moves the sheet one height
+ * The handle bar of the bottom sheet of a phone: a tap or a swipe down closes the settings (the run bar is
+ * hidden while they show)
  */
-function bindSheetHeader(): void {
+function bindSheetHandle(): void {
   // The start and the last vertical position of a pointer on the bar; the browser can end a touch with
   // `pointercancel`, and the position of `pointerup` can be that of the start
   let swipe: { start: number; last: number } | null = null;
-  let isSwiped = false;
-  ui.sheetSize.addEventListener("pointerdown", (event) => {
+  ui.sheetHandle.addEventListener("pointerdown", (event) => {
     swipe = { start: event.clientY, last: event.clientY };
-    isSwiped = false;
-    ui.sheetSize.setPointerCapture(event.pointerId);
+    ui.sheetHandle.setPointerCapture(event.pointerId);
   });
-  ui.sheetSize.addEventListener("pointermove", (event) => {
+  ui.sheetHandle.addEventListener("pointermove", (event) => {
     if (swipe !== null) {
       swipe.last = event.clientY;
     }
   });
   const endSwipe = () => {
-    if (swipe === null) {
-      return;
+    if (swipe !== null && swipe.last - swipe.start > SHEET_SWIPE_DISTANCE && openPanel !== null) {
+      closeStepPanel();
     }
-    const distance = swipe.last - swipe.start;
     swipe = null;
-    if (Math.abs(distance) > SHEET_SWIPE_DISTANCE) {
-      isSwiped = true;
-      moveSheet(distance < 0 ? 1 : -1);
-    }
   };
-  ui.sheetSize.addEventListener("pointerup", endSwipe);
-  ui.sheetSize.addEventListener("pointercancel", endSwipe);
-  ui.sheetSize.addEventListener("click", () => {
-    if (isSwiped) {
-      isSwiped = false;
-      return;
+  ui.sheetHandle.addEventListener("pointerup", endSwipe);
+  ui.sheetHandle.addEventListener("pointercancel", endSwipe);
+  ui.sheetHandle.addEventListener("click", () => {
+    if (openPanel !== null) {
+      closeStepPanel();
     }
-    setSheetSize(sheetSize() === "half" ? "full" : "half");
   });
-  // A touch on the 3D view lowers the sheet: the view shows the model (the touch also turns or zooms it)
-  ui.canvas.addEventListener(
-    "pointerdown",
-    () => {
-      if (openPanel !== null && window.matchMedia(SHEET_QUERY).matches) {
-        setSheetSize("peek");
-      }
-    },
-    { capture: true },
-  );
 }
 
 function openSettings(): void {
@@ -1557,23 +1507,18 @@ function bindEvents(): void {
   for (const segment of ui.stepSegments) {
     segment.addEventListener("click", () => {
       const name = STEP_PANELS.find((candidate) => candidate === segment.dataset.stepPanel) ?? null;
-      // A second click on the open step closes its settings; a new step shows its settings
+      // A second click on the open step closes its settings
       openStepPanel(name === openPanel ? null : name);
-      if (openPanel !== null && sheetSize() === "peek") {
-        setSheetSize("half");
-      }
     });
   }
   // Escape closes the settings of a step; the settings dialog closes itself, and a field keeps its own Escape
   document.addEventListener("keydown", (event) => {
     const isInField = event.target instanceof Element && event.target.matches("input, select, textarea");
     if (event.key === "Escape" && openPanel !== null && !ui.settingsDialog.open && !isInField) {
-      const segment = ui.stepSegments.find((candidate) => candidate.dataset.stepPanel === openPanel);
-      openStepPanel(null);
-      segment?.focus();
+      closeStepPanel();
     }
   });
-  bindSheetHeader();
+  bindSheetHandle();
   ui.logButton.addEventListener("click", toggleLog);
   ui.settingsButton.addEventListener("click", openSettings);
   ui.orientationOption.addEventListener("change", () => {

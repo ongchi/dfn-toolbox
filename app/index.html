@@ -7,7 +7,7 @@
     <link rel="icon" href="data:," />
   </head>
   <body>
-    <main id="layout" class="layout" data-sheet="half">
+    <main id="layout" class="layout">
       <div id="viewer" class="viewer">
         <div class="viewer-canvas">
           <canvas id="viewer-canvas"></canvas>
@@ -105,7 +105,7 @@
       <div id="dock" class="dock">
         <!-- No title: the open segment of the run bar shows the step; the handle bar of the sheet only on a phone -->
         <section id="step-panel" class="panel step-panel" hidden>
-          <button id="sheet-size" class="sheet-handle" type="button" aria-label="Larger settings" aria-expanded="true" aria-controls="step-panel-body"></button>
+          <button id="sheet-handle" class="sheet-handle" type="button" aria-label="Close the settings"></button>
           <div id="step-panel-body" class="step-panel-body">
             <div data-step-group="domain">
               <div id="domain-form" class="form"></div>

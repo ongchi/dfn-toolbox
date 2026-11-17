@@ -1259,41 +1259,47 @@ input[type="radio"] {
     box-shadow: none;
   }
 
+  /* The settings take half of the screen, and the run bar is hidden while they show; the handle bar can touch
+     12 px above the sheet */
   .step-panel {
-    flex: 1;
+    flex: none;
+    height: 50dvh;
     max-height: none;
+    overflow: visible;
   }
 
-  .layout[data-sheet="half"] .step-panel {
-    flex: none;
-    height: 45dvh;
-  }
-
-  /* "peek": only the header of the sheet shows above the run bar */
-  .layout[data-sheet="peek"] .step-panel {
-    flex: none;
-  }
-
-  .layout[data-sheet="peek"] .step-panel-body {
+  .has-step-panel .run-panel {
     display: none;
   }
 
-  .layout[data-sheet="full"].has-step-panel .dock {
-    top: calc(env(safe-area-inset-top) + 56px);
+  /* The view controls and the legend are hidden too: the model has the upper half */
+  .layout.has-step-panel .viewer-toolbar,
+  .layout.has-step-panel .scalar-bar {
+    display: none;
   }
 
-  /* The bar at the top of the sheet, over its full width: a tap changes the height of the sheet, and a vertical
-     swipe moves it one height */
+  /* The bar at the top of the sheet, over its full width: a tap or a swipe down closes the settings. Its touch
+     area (`::after`) goes 12 px above and below the bar: 44 px */
   .sheet-handle {
     display: block;
     position: relative;
+    z-index: 1;
     flex: none;
     width: 100%;
-    height: 44px;
+    height: 20px;
     border: none;
     background: none;
     cursor: pointer;
     touch-action: none;
+  }
+
+  .sheet-handle::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -12px;
+    bottom: -12px;
   }
 
   .sheet-handle::before {

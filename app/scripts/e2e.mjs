@@ -65,6 +65,10 @@ async function openStepPanel(page, name, isTap = false) {
   if (await page.$eval(selector, (node) => node.getAttribute("aria-expanded") === "true")) {
     return;
   }
+  // On a phone the settings sheet hides the run bar: its handle bar closes it
+  if (await page.$eval("#run-panel", (node) => getComputedStyle(node).display === "none")) {
+    await (isTap ? page.tap("#sheet-handle") : page.click("#sheet-handle"));
+  }
   await (isTap ? page.tap(selector) : page.click(selector));
 }
 
@@ -323,8 +327,9 @@ async function touchProblems(page) {
     const controls = document.querySelectorAll(
       "button, select, input:not([type=checkbox], [type=radio]), label:has(> input[type=checkbox], > input[type=radio])",
     );
+    // The handle bar of the sheet is thin: its touch area has its own check
     const small = [...controls]
-      .filter((node) => isShown(node) && node.getBoundingClientRect().height < 44)
+      .filter((node) => isShown(node) && node.id !== "sheet-handle" && node.getBoundingClientRect().height < 44)
       .map((node) => `${node.id || node.textContent.trim().slice(0, 20)} ${node.getBoundingClientRect().height}`);
     const smallText = [...document.querySelectorAll("select, input[type=number], input[type=text]")]
       .filter((node) => isShown(node) && Number.parseFloat(getComputedStyle(node).fontSize) < 16)
@@ -341,28 +346,19 @@ async function checkPhone() {
   await page.goto(url);
   await waitForStart(page);
 
-  // The 3D view fills the screen; the settings of a step are a bottom sheet, whose handle changes the heights
-  // "half" and "full"; at the start the sheet is closed
-  const sheetState = () =>
-    page.evaluate(() => {
-      const layout = document.querySelector("#layout");
-      const isPanelShown = !document.querySelector("#step-panel").hidden;
-      return `${isPanelShown ? layout.dataset.sheet : "closed"}`;
-    });
+  // The 3D view fills the screen; the settings of a step are a bottom sheet, which a tap on its handle bar closes;
+  // at the start the sheet is closed
+  const sheetState = () => page.$eval("#step-panel", (node) => (node.hidden ? "closed" : "open"));
   const canvasSize = () => page.$eval("#viewer-canvas", (node) => `${node.clientWidth} x ${node.clientHeight}`);
   const sizeAtStart = await canvasSize();
   const sheetStates = [await sheetState()];
   await openStepPanel(page, "domain", true);
   sheetStates.push(await sheetState());
-  await page.tap("#sheet-size");
-  sheetStates.push(await sheetState());
-  await page.tap("#sheet-size");
-  sheetStates.push(await sheetState());
-  await page.tap('[data-step-panel="domain"]');
+  await page.tap("#sheet-handle");
   sheetStates.push(await sheetState());
   await openStepPanel(page, "domain", true);
   sheetStates.push(await sheetState());
-  check(sheetStates.join(", ") === "closed, half, full, half, closed, half", "phone: the heights of the sheet", sheetStates.join(", "));
+  check(sheetStates.join(", ") === "closed, open, closed, open", "phone: the handle bar closes the sheet", sheetStates.join(", "));
   check(
     (await canvasSize()) === sizeAtStart && sizeAtStart === "390 x 844",
     "phone: the canvas fills the screen and keeps its size",
@@ -388,60 +384,65 @@ async function checkPhone() {
     `tap ${isSameView(viewAfterTap, viewBeforeTap) ? "unchanged" : "changed"}, second tap ${isSameView(viewAfterSecondTap, viewBeforeTap) ? "same" : "different"}`,
   );
 
-  // A touch on the 3D view lowers the sheet to "peek" (only its handle bar shows), a tap on the bar raises it to
-  // "half" and changes "half" and "full", a vertical swipe on the bar moves it one height, and a tap on a
-  // segment at "peek" shows the settings of its step. The panel has no title row: the first field is at its top.
-  const dockTop = () => page.$eval("#dock", (node) => Math.round(node.getBoundingClientRect().top));
-  const handleCenter = () =>
-    page.$eval("#sheet-size", (node) => {
-      const { left, top, width, height } = node.getBoundingClientRect();
-      return { x: left + width / 2, y: top + height / 2 };
+  // The sheet takes half of the screen and hides the run bar, the view controls and the legend; a touch on the 3D
+  // view keeps it, and a swipe down on its handle bar closes it (the run bar and the view controls show again). The bar is thin, with a touch area of 44 px, and the first
+  // field is at most 16 px below it.
+  const isRunBarShown = () => page.$eval("#run-panel", (node) => getComputedStyle(node).display !== "none");
+  const isViewToolbarShown = () => page.$eval("#viewer-toolbar", (node) => getComputedStyle(node).display !== "none");
+  // The legend is hidden with no color array: its CSS rule is the check
+  const isLegendRuleOn = () =>
+    page.evaluate(() => {
+      const legend = document.createElement("div");
+      legend.className = "scalar-bar";
+      document.querySelector("#layout").append(legend);
+      const isShown = getComputedStyle(legend).display !== "none";
+      legend.remove();
+      return isShown;
     });
-  const swipeHandle = async (distance) => {
-    const { x, y } = await handleCenter();
-    await page.touchscreen.touchStart(x, y);
-    for (let step = 1; step <= 5; step++) {
-      await page.touchscreen.touchMove(x, y + (distance * step) / 5);
-    }
-    await page.touchscreen.touchEnd();
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  };
-  // A point of the view above the sheet at "half"
-  const tapView = () => page.touchscreen.tap(100, 150);
-  const peekStates = [await sheetState()];
-  const dockTopAtHalf = await dockTop();
-  const fieldDistance = await page.$eval("#step-panel", (panel) => {
-    const field = panel.querySelector("#step-panel-body select");
-    return Math.round(field.getBoundingClientRect().top - document.querySelector("#sheet-size").getBoundingClientRect().bottom);
+  const handle = await page.$eval("#sheet-handle", (node) => {
+    const { left, top, bottom, height } = node.getBoundingClientRect();
+    const x = left + 40;
+    const isHandle = (y) => document.elementFromPoint(x, y) === node;
+    const field = document.querySelector("#step-panel-body select");
+    return {
+      height: Math.round(height),
+      isTouchArea: isHandle(top - 11) && isHandle(bottom + 11),
+      fieldDistance: Math.round(field.getBoundingClientRect().top - bottom),
+      sheetTop: Math.round(document.querySelector("#dock").getBoundingClientRect().top),
+    };
   });
-  await tapView();
-  peekStates.push(await sheetState());
-  const dockTopAtPeek = await dockTop();
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  await page.screenshot({ path: `${screenshotDir}/e2e_phone_peek.png` });
-  await page.tap("#sheet-size");
-  peekStates.push(await sheetState());
-  await page.tap("#sheet-size");
-  peekStates.push(await sheetState());
-  await page.tap("#sheet-size");
-  peekStates.push(await sheetState());
-  await swipeHandle(120);
-  peekStates.push(await sheetState());
-  await swipeHandle(-120);
-  peekStates.push(await sheetState());
-  await swipeHandle(-120);
-  peekStates.push(await sheetState());
-  await swipeHandle(120);
-  peekStates.push(await sheetState());
-  await tapView();
-  await page.tap('[data-step-panel="flow"]');
-  peekStates.push(`${await sheetState()} (${await page.$eval("#step-panel", (node) => node.getAttribute("aria-label"))})`);
+  const isRunBarShownWithSheet = await isRunBarShown();
+  const viewControlsWithSheet = `${await isViewToolbarShown()} ${await isLegendRuleOn()}`;
+  await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
+  // A point of the view above the sheet
+  await page.touchscreen.tap(100, 150);
+  const stateAfterViewTouch = await sheetState();
+  const { x, y } = await page.$eval("#sheet-handle", (node) => {
+    const { left, top, width, height } = node.getBoundingClientRect();
+    return { x: left + width / 2, y: top + height / 2 };
+  });
+  await page.touchscreen.touchStart(x, y);
+  for (let step = 1; step <= 5; step++) {
+    await page.touchscreen.touchMove(x, y + (120 * step) / 5);
+  }
+  await page.touchscreen.touchEnd();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const stateAfterSwipe = await sheetState();
+  const isRunBarShownAfterSwipe = await isRunBarShown();
+  const viewControlsAfterSwipe = `${await isViewToolbarShown()} ${await isLegendRuleOn()}`;
   check(
-    peekStates.join(", ") === "half, peek, half, full, half, peek, half, full, half, half (Flow)" &&
-      dockTopAtPeek > dockTopAtHalf + 200 &&
-      fieldDistance <= 16,
-    "phone: the low height of the sheet",
-    `${peekStates.join(", ")}; top of the sheet at half ${dockTopAtHalf}, at peek ${dockTopAtPeek}; first field ${fieldDistance} px below the bar`,
+    handle.sheetTop >= 844 / 2 - 1 &&
+      !isRunBarShownWithSheet &&
+      stateAfterViewTouch === "open" &&
+      stateAfterSwipe === "closed" &&
+      isRunBarShownAfterSwipe &&
+      viewControlsWithSheet === "false false" &&
+      viewControlsAfterSwipe === "true true" &&
+      handle.height <= 20 &&
+      handle.isTouchArea &&
+      handle.fieldDistance <= 16,
+    "phone: the sheet on half of the screen",
+    `top ${handle.sheetTop}, run bar ${isRunBarShownWithSheet ? "shown" : "hidden"}; after a touch on the view ${stateAfterViewTouch}; after a swipe down ${stateAfterSwipe}, run bar ${isRunBarShownAfterSwipe ? "shown" : "hidden"}; view controls and legend shown: with the sheet ${viewControlsWithSheet}, after ${viewControlsAfterSwipe}; handle bar ${handle.height} px, touch area 44 px ${handle.isTouchArea}, first field ${handle.fieldDistance} px below it`,
   );
 
   for (const step of ["domain", "fractures", "flow", "transport"]) {
@@ -451,16 +452,12 @@ async function checkPhone() {
     await page.screenshot({ path: `${screenshotDir}/e2e_phone_${step}.png` });
   }
 
-  // A run lowers the full sheet to half: the view shows the fractures
-  await openStepPanel(page, "fractures", true);
-  await page.tap("#sheet-size");
-  const sheetBeforeRun = await sheetState();
+  // A run with the settings closed: the view shows the fractures
+  await page.tap("#sheet-handle");
   await page.tap("#run-button");
   await page.waitForFunction(() => !document.querySelector("#results").hidden, { timeout: RUN_TIMEOUT });
   await waitIdle(page);
   await page.tap("#run-button");
-  const sheetAfterRun = await sheetState();
-  check(sheetBeforeRun === "full" && sheetAfterRun === "half", "phone: the sheet at a run", `${sheetBeforeRun} → ${sheetAfterRun}`);
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_view.png` });
 
   // The Log panel opens over the view, above the sheet
