@@ -245,10 +245,9 @@ export function powerOfTenText(exponent: number): string {
   return `10${exponent < 0 ? "⁻" : ""}${digits}`;
 }
 
-/** The title of a scalar bar: `name (×10⁻² unit)`, without the parts which it does not have */
-export function scalarBarTitle(name: string, unit: string | null, factorExponent: number | null): string {
-  const parts = [factorExponent === null ? "" : `×${powerOfTenText(factorExponent)}`, unit ?? ""].filter((part) => part !== "");
-  return parts.length === 0 ? name : `${name} (${parts.join(" ")})`;
+/** The unit text of a scalar bar: `×10⁻² unit`, without the parts which it does not have; "" for none */
+export function scalarBarUnitText(unit: string | null, factorExponent: number | null): string {
+  return [factorExponent === null ? "" : `×${powerOfTenText(factorExponent)}`, unit ?? ""].filter((part) => part !== "").join(" ");
 }
 
 /** A value with 3 significant digits, without trailing zeros */

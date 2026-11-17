@@ -389,16 +389,8 @@ async function checkPhone() {
   // field is at most 16 px below it.
   const isRunBarShown = () => page.$eval("#run-panel", (node) => getComputedStyle(node).display !== "none");
   const isViewToolbarShown = () => page.$eval("#viewer-toolbar", (node) => getComputedStyle(node).display !== "none");
-  // The legend is hidden with no color array: its CSS rule is the check
-  const isLegendRuleOn = () =>
-    page.evaluate(() => {
-      const legend = document.createElement("div");
-      legend.className = "scalar-bar";
-      document.querySelector("#layout").append(legend);
-      const isShown = getComputedStyle(legend).display !== "none";
-      legend.remove();
-      return isShown;
-    });
+  // The color panel: the color select, and the legend of an array
+  const isColorPanelShown = () => page.$eval("#color-panel", (node) => getComputedStyle(node).display !== "none");
   const handle = await page.$eval("#sheet-handle", (node) => {
     const { left, top, bottom, height } = node.getBoundingClientRect();
     const x = left + 40;
@@ -412,7 +404,7 @@ async function checkPhone() {
     };
   });
   const isRunBarShownWithSheet = await isRunBarShown();
-  const viewControlsWithSheet = `${await isViewToolbarShown()} ${await isLegendRuleOn()}`;
+  const viewControlsWithSheet = `${await isViewToolbarShown()} ${await isColorPanelShown()}`;
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_sheet.png` });
   // A point of the view above the sheet
   await page.touchscreen.tap(100, 150);
@@ -429,7 +421,7 @@ async function checkPhone() {
   await new Promise((resolve) => setTimeout(resolve, 100));
   const stateAfterSwipe = await sheetState();
   const isRunBarShownAfterSwipe = await isRunBarShown();
-  const viewControlsAfterSwipe = `${await isViewToolbarShown()} ${await isLegendRuleOn()}`;
+  const viewControlsAfterSwipe = `${await isViewToolbarShown()} ${await isColorPanelShown()}`;
   check(
     handle.sheetTop >= 844 / 2 - 1 &&
       !isRunBarShownWithSheet &&
@@ -942,6 +934,29 @@ try {
     await page.click("#show-particles");
     const colorAfterRun = await page.$eval("#color-select", (node) => node.value);
     check(colorAfterRun === "point:pressure", `${name}: pressure colors after the flow`, colorAfterRun);
+    // One color panel at the bottom right: the color select, and below it the legend of the array
+    const colorPanel = await page.$eval("#color-panel", (panel) => {
+      const box = panel.getBoundingClientRect();
+      const select = panel.querySelector("#color-select").getBoundingClientRect();
+      const legend = panel.querySelector(".color-legend");
+      return {
+        hasParts: panel.contains(document.querySelector("#log-scale")) && legend !== null && !legend.hidden,
+        // No "Color by" text and no legend title: the unit is in the row of the select
+        texts: [...panel.querySelectorAll(".color-panel-row > :not(select)")].map((node) => node.textContent.trim()).join(" | "),
+        isLegendBelowSelect: legend !== null && legend.getBoundingClientRect().top >= select.bottom,
+        rightGap: Math.round(window.innerWidth - box.right),
+        bottomGap: Math.round(window.innerHeight - box.bottom),
+      };
+    });
+    check(
+      colorPanel.hasParts &&
+        colorPanel.texts === "MPa | Log" &&
+        colorPanel.isLegendBelowSelect &&
+        colorPanel.rightGap <= 16 &&
+        colorPanel.bottomGap <= 16,
+      `${name}: the color select and the legend in one panel`,
+      JSON.stringify(colorPanel),
+    );
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.screenshot({ path: `${screenshotDir}/e2e_${name}_flow.png` });
     const hasFlowVelocity = (await colorOptions(page)).includes("cell:flow_velocity");
@@ -1661,7 +1676,7 @@ try {
   const toolbarItems = await page.$$eval("#viewer-toolbar > *", (nodes) =>
     nodes.map((node) => node.id || node.classList[node.classList.length - 1]).join(", "),
   );
-  check(toolbarItems === "color-panel, layer-rail, settings-button, repository-link", "the gear before the GitHub link", toolbarItems);
+  check(toolbarItems === "layer-rail, settings-button, repository-link", "the gear before the GitHub link", toolbarItems);
   // A user-defined fracture with a normal along y
   await startOnShape(page);
   await page.evaluate(() =>

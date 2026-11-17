@@ -126,6 +126,8 @@ const ui = {
   resetButton: byId<HTMLButtonElement>("reset-button"),
   progress: byId<HTMLProgressElement>("progress"),
   status: byId<HTMLPreElement>("status"),
+  colorPanel: byId<HTMLDivElement>("color-panel"),
+  colorUnit: byId<HTMLSpanElement>("color-unit"),
   colorSelect: byId<HTMLSelectElement>("color-select"),
   logScale: byId<HTMLInputElement>("log-scale"),
   showDomain: byId<HTMLInputElement>("show-domain"),
@@ -1364,7 +1366,7 @@ function updateUserFracturesInViewer(): void {
 
 async function startViewer(): Promise<void> {
   try {
-    viewer = NetworkViewer.create(ui.canvas);
+    viewer = NetworkViewer.create(ui.canvas, { legendParent: ui.colorPanel, unitText: ui.colorUnit });
   } catch (error) {
     ui.viewerMessage.textContent = `The 3D viewer is not available: ${errorText(error)}`;
     return;
@@ -1483,9 +1485,7 @@ function updateCoveredArea(): void {
   ui.layout.style.setProperty("--run-panel-height", `${ui.runPanel.offsetHeight}px`);
   viewer?.setCoveredArea({
     left: 0,
-    top: isSheet
-      ? (ui.viewerToolbar.querySelector(".color-panel")?.getBoundingClientRect().bottom ?? 0)
-      : ui.titlePanel.getBoundingClientRect().bottom,
+    top: isSheet ? 0 : ui.titlePanel.getBoundingClientRect().bottom,
     bottom: coveredBottom,
   });
 }

@@ -13,7 +13,7 @@ import {
   pathTubes,
   powerOfTenText,
   scalarBarTicks,
-  scalarBarTitle,
+  scalarBarUnitText,
   tableColor,
 } from "../src/viewerGeometry";
 
@@ -122,12 +122,13 @@ test("one value gives one tick", () => {
   expect(scalarBarTicks(colorRange([7, 7], false), 5).ticks).toEqual([{ fraction: 0, text: "7" }]);
 });
 
-test("the title has the power of 10 before the unit", () => {
-  expect([scalarBarTitle("flow velocity", "m/s", -4), scalarBarTitle("aperture", null, -4), scalarBarTitle("pressure", "MPa", null)]).toEqual([
-    "flow velocity (×10⁻⁴ m/s)",
-    "aperture (×10⁻⁴)",
-    "pressure (MPa)",
-  ]);
+test("the unit text has the power of 10 before the unit", () => {
+  expect([
+    scalarBarUnitText("m/s", -4),
+    scalarBarUnitText(null, -4),
+    scalarBarUnitText("MPa", null),
+    scalarBarUnitText(null, null),
+  ]).toEqual(["×10⁻⁴ m/s", "×10⁻⁴", "MPa", ""]);
 });
 
 test("the powers 0 and 1 are 1 and 10", () => {

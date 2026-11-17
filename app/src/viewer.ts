@@ -59,7 +59,7 @@ import {
   localPositions,
   pathTubes,
   scalarBarTicks,
-  scalarBarTitle,
+  scalarBarUnitText,
   smallestPositiveValue,
   tableColor,
   type CellShapes,
@@ -167,12 +167,20 @@ export const FLOW_VELOCITY_ARRAY: ColorArray = { name: "flow_velocity", associat
 /** The mean speed of the particle tracking at each point */
 export const TRANSPORT_VELOCITY_ARRAY: ColorArray = { name: "transport_velocity", association: "point" };
 
-/** The name and the unit in the scalar bar of the arrays which the app adds; other arrays: their name, no unit */
-const SCALAR_BARS = new Map<string, { name: string; unit: string }>([
-  [PRESSURE_ARRAY.name, { name: "pressure", unit: "MPa" }],
-  [FLOW_VELOCITY_ARRAY.name, { name: "flow velocity", unit: "m/s" }],
-  [TRANSPORT_VELOCITY_ARRAY.name, { name: "transport velocity", unit: "m/s" }],
+/** The unit of the arrays which the app adds; other arrays have no unit */
+const SCALAR_BAR_UNITS = new Map<string, string>([
+  [PRESSURE_ARRAY.name, "MPa"],
+  [FLOW_VELOCITY_ARRAY.name, "m/s"],
+  [TRANSPORT_VELOCITY_ARRAY.name, "m/s"],
 ]);
+
+/** The places of the color panel of the page which the viewer fills */
+export interface ColorPanelParts {
+  /** The parent of the legend (ramp, marks, labels) */
+  legendParent: HTMLElement;
+  /** The unit and the power of 10 of the labels; hidden with the legend or with no text */
+  unitText: HTMLElement;
+}
 
 /** A boundary surface of the domain mesh, or the outer faces of a region: its polygons */
 export interface BoundarySurface {
@@ -344,18 +352,18 @@ interface ShapeLayer {
   triangles: CellTriangles;
 }
 
-/** The scalar bar: an overlay on the view, with the text of the page */
+/** The scalar bar: the legend part of the color panel of the page, with the text of the page */
 class ScalarBar {
   private readonly root = document.createElement("div");
-  private readonly title = document.createElement("div");
+  private readonly unitText: HTMLElement;
   private readonly marks = document.createElement("div");
   private readonly labels = document.createElement("div");
 
-  constructor(parent: HTMLElement) {
-    this.root.className = "scalar-bar";
+  constructor({ legendParent, unitText }: ColorPanelParts) {
+    this.unitText = unitText;
+    this.root.className = "color-legend";
     this.root.dataset.testid = "scalar-bar";
     this.root.hidden = true;
-    this.title.className = "scalar-bar-title";
     const body = document.createElement("div");
     body.className = "scalar-bar-body";
     const ramp = document.createElement("div");
@@ -368,16 +376,17 @@ class ScalarBar {
     this.marks.className = "scalar-bar-marks";
     this.labels.className = "scalar-bar-labels";
     body.append(ramp, this.marks, this.labels);
-    this.root.append(this.title, body);
-    parent.append(this.root);
+    this.root.append(body);
+    legendParent.append(this.root);
   }
 
   /**
    * Each tick has a mark under the ramp at its place; its label moves from
    * centered by its fraction, thus the labels at the ends stay in the bar
    */
-  show(title: string, ticks: ScalarBarTick[]): void {
-    this.title.textContent = title;
+  show(unitText: string, ticks: ScalarBarTick[]): void {
+    this.unitText.textContent = unitText;
+    this.unitText.hidden = unitText === "";
     this.marks.replaceChildren(
       ...ticks.map(({ fraction }) => {
         const mark = document.createElement("span");
@@ -399,6 +408,7 @@ class ScalarBar {
 
   hide(): void {
     this.root.hidden = true;
+    this.unitText.hidden = true;
   }
 }
 
@@ -565,10 +575,10 @@ export class NetworkViewer {
   private onPick: ((point: [number, number, number]) => void) | null = null;
   private pointerDown: { x: number; y: number } | null = null;
 
-  private constructor(canvas: HTMLCanvasElement, renderer: WebGLRenderer, parent: HTMLElement) {
+  private constructor(canvas: HTMLCanvasElement, renderer: WebGLRenderer, parent: HTMLElement, colorPanel: ColorPanelParts) {
     this.canvas = canvas;
     this.renderer = renderer;
-    this.scalarBar = new ScalarBar(parent);
+    this.scalarBar = new ScalarBar(colorPanel);
 
     const light = new DirectionalLight(0xffffff, CAMERA_LIGHT);
     this.camera.add(light, light.target);
@@ -600,7 +610,8 @@ export class NetworkViewer {
     this.renderer.setAnimationLoop((time) => this.animate(time));
   }
 
-  static create(canvas: HTMLCanvasElement): NetworkViewer {
+  /** `colorPanel`: the places of the scalar bar in the color panel of the page */
+  static create(canvas: HTMLCanvasElement, colorPanel: ColorPanelParts): NetworkViewer {
     const parent = canvas.parentElement;
     if (parent === null) {
       throw new Error("the canvas has no parent");
@@ -611,7 +622,7 @@ export class NetworkViewer {
     renderer.outputColorSpace = LinearSRGBColorSpace;
     renderer.setClearColor(BACKGROUND_COLOR);
     renderer.autoClear = false;
-    return new NetworkViewer(canvas, renderer, parent);
+    return new NetworkViewer(canvas, renderer, parent, colorPanel);
   }
 
   private resize(): void {
@@ -832,18 +843,17 @@ export class NetworkViewer {
     return values;
   }
 
-  /** The scalar bar of the color array; the arrays of `SCALAR_BARS` have their name and unit */
+  /** The scalar bar of the color array; the arrays of `SCALAR_BAR_UNITS` have a unit */
   private updateScalarBar(): void {
     if (this.colorArray === null || !this.layers.has("final") || !this.isScalarBarShown) {
       this.scalarBar.hide();
       return;
     }
-    const style = SCALAR_BARS.get(this.colorArray.name);
     const { factorExponent, ticks } = scalarBarTicks(
       colorRange(this.colorValues(this.colorArray), this.isLogScale),
       SCALAR_BAR_TICK_COUNT,
     );
-    this.scalarBar.show(scalarBarTitle(style?.name ?? this.colorArray.name, style?.unit ?? null, factorExponent), ticks);
+    this.scalarBar.show(scalarBarUnitText(SCALAR_BAR_UNITS.get(this.colorArray.name) ?? null, factorExponent), ticks);
   }
 
   /** The next `colorBy` uses a log scale of the values */

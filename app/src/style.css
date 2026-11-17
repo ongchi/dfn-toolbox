@@ -116,7 +116,7 @@ pre {
 
 /* ---------------------------------------------------------------- layer rail and color panel */
 
-/* The top right: the colors of the view, and below them the layers */
+/* The top right: the layers, the settings and the link */
 .viewer-toolbar {
   position: absolute;
   top: calc(var(--gap) + env(safe-area-inset-top));
@@ -133,11 +133,40 @@ pre {
   pointer-events: auto;
 }
 
+/* The bottom right: the color select, the unit of the legend and "Log", and below them the legend of an array */
 .color-panel {
+  position: absolute;
+  right: calc(var(--gap) + env(safe-area-inset-right));
+  bottom: calc(var(--gap) + env(safe-area-inset-bottom));
+  width: var(--scalar-bar-width);
+  max-width: calc(100% - 2 * var(--gap));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px;
+}
+
+.color-panel-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 12px;
+}
+
+.color-select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The unit and the power of 10 of the legend labels */
+.color-unit {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.color-unit[hidden] {
+  display: none;
 }
 
 .toolbar-field {
@@ -983,33 +1012,19 @@ input[type="radio"] {
 }
 
 /* The colors of the view and their values: the legend at the bottom right */
-.scalar-bar {
-  position: absolute;
-  right: calc(var(--gap) + env(safe-area-inset-right));
-  bottom: calc(var(--gap) + env(safe-area-inset-bottom));
-  width: var(--scalar-bar-width);
-  max-width: calc(100% - 2 * var(--gap));
+/* The legend part of the color panel */
+.color-legend {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--panel-radius);
-  background: var(--panel);
-  -webkit-backdrop-filter: var(--panel-blur);
-  backdrop-filter: var(--panel-blur);
-  box-shadow: var(--panel-shadow);
+  padding-bottom: 2px;
   color: var(--text);
   font-size: 12px;
   pointer-events: none;
 }
 
-.scalar-bar[hidden] {
+.color-legend[hidden] {
   display: none;
-}
-
-.scalar-bar-title {
-  font-weight: 700;
 }
 
 .scalar-bar-body {
@@ -1205,10 +1220,6 @@ input[type="radio"] {
     display: none;
   }
 
-  .color-panel {
-    padding: 0 10px;
-  }
-
 }
 
 /* A low landscape screen: the layer rail is a row */
@@ -1274,7 +1285,7 @@ input[type="radio"] {
 
   /* The view controls and the legend are hidden too: the model has the upper half */
   .layout.has-step-panel .viewer-toolbar,
-  .layout.has-step-panel .scalar-bar {
+  .layout.has-step-panel .color-panel {
     display: none;
   }
 
@@ -1334,30 +1345,6 @@ input[type="radio"] {
     margin-left: auto;
   }
 
-  /* The view settings at the top: the colors at the left of the layers, the round buttons below the layers */
-  .viewer-toolbar {
-    left: calc(var(--gap) + env(safe-area-inset-left));
-    display: grid;
-    grid-template-columns: minmax(0, auto) auto;
-    align-items: start;
-    justify-content: space-between;
-  }
-
-  .viewer-toolbar .round-button {
-    grid-column: 2;
-  }
-
-  .color-panel {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    min-width: 0;
-  }
-
-  .toolbar-field select {
-    flex: 1;
-    min-width: 0;
-  }
 
   /* The icons have no label here: the rail can scroll */
   .layer-rail {
@@ -1377,7 +1364,7 @@ input[type="radio"] {
   }
 
   /* At the left of the layer rail (44px icons, padding and border) */
-  .scalar-bar {
+  .color-panel {
     left: calc(var(--gap) + env(safe-area-inset-left));
     right: auto;
     max-width: calc(100% - 58px - 3 * var(--gap));

@@ -15,19 +15,22 @@
         </div>
       </div>
 
-      <div id="viewer-toolbar" class="viewer-toolbar">
-        <div class="panel color-panel">
-          <label class="toolbar-field">
-            Color by
-            <select id="color-select" disabled>
-              <option value="">One color</option>
-            </select>
-          </label>
-          <label class="toolbar-field">
+      <!-- The colors of the view: the array, the scale, and the legend (viewer.ts) while an array colors the mesh -->
+      <div id="color-panel" class="panel color-panel">
+        <div class="color-panel-row">
+          <select id="color-select" class="color-select" aria-label="Color by" title="Color by" disabled>
+            <option value="">One color</option>
+          </select>
+          <!-- The unit and the power of 10 of the legend labels (viewer.ts) -->
+          <span id="color-unit" class="color-unit" hidden></span>
+          <label class="toolbar-field" title="Log scale">
             <input id="log-scale" type="checkbox" disabled />
-            Log scale
+            Log
           </label>
         </div>
+      </div>
+
+      <div id="viewer-toolbar" class="viewer-toolbar">
         <div class="panel layer-rail">
           <label class="icon-toggle" title="Color bar">
             <input id="show-color-bar" type="checkbox" checked aria-label="Color bar" />
