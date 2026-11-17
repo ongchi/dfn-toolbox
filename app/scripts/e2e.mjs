@@ -1163,6 +1163,65 @@ try {
     `hover ${isSameView(regionViewOnHover, regionViewBefore) ? "unchanged" : "changed"}, after ${isSameView(regionViewAfterHover, regionViewBefore) ? "same" : "different"}, click ${isSameView(regionViewPinned, regionViewBefore) ? "unchanged" : "kept"} (${regionPinAfterClick}), new choice ${isSameView(regionViewMoved, regionViewPinned) ? "unchanged" : "moved"} (${regionPinAfterChoice}), second click ${isSameView(regionViewUnpinned, regionViewBefore) ? "removed" : "different"} (${regionPinAfterSecondClick})`,
   );
 
+  // The cards of the families and of the user fractures are an accordion: a new card opens and closes the others,
+  // a click on the header of the open card closes it, a button of a header does not open or close its card, the
+  // open card stays open after the form is rendered again, and the header of a card has its values
+  await startOnShape(page);
+  await openStepPanel(page, "network");
+  const cardStates = (formSelector) =>
+    page.$$eval(`${formSelector} .family-card`, (nodes) => nodes.map((node) => (node.open ? "open" : "closed")).join(" "));
+  const clickButton = (formSelector, label, index = 0) =>
+    page.evaluate(
+      (selector, buttonLabel, buttonIndex) =>
+        [...document.querySelectorAll(`${selector} button`)].filter((node) => node.textContent === buttonLabel)[buttonIndex].click(),
+      formSelector,
+      label,
+      index,
+    );
+  // The toggle events of the cards come after the click
+  const clickHeader = async (formSelector, index) => {
+    await (await page.$$(`${formSelector} .family-card > summary`))[index].click();
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 50)));
+  };
+  const familyCards = [await cardStates("#form")];
+  await clickButton("#form", "Add family");
+  await page.waitForFunction(() => document.querySelectorAll("#form .family-card").length === 2);
+  familyCards.push(await cardStates("#form"));
+  const closedSummary = await page.$eval("#form .family-card .card-summary", (node) => node.textContent);
+  await clickHeader("#form", 1);
+  familyCards.push(await cardStates("#form"));
+  await clickHeader("#form", 0);
+  familyCards.push(await cardStates("#form"));
+  await clickButton("#form", "Duplicate", 1);
+  await page.waitForFunction(() => document.querySelectorAll("#form .family-card").length === 3);
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 50)));
+  familyCards.push(await cardStates("#form"));
+  await setField(page, "#network-advanced-form", "Stop condition", "p32");
+  await page.waitForFunction(() => [...document.querySelectorAll("#form .field-label")].some((node) => node.textContent === "P32 target"));
+  familyCards.push(await cardStates("#form"));
+  const p32Summary = await page.$eval("#form .family-card .card-summary", (node) => node.textContent);
+  await clickButton("#form", "Remove", 2);
+  await page.waitForFunction(() => document.querySelectorAll("#form .family-card").length === 2);
+  familyCards.push(await cardStates("#form"));
+  await openStepPanel(page, "fractures");
+  const userCards = [];
+  for (let count = 1; count <= 2; count++) {
+    await clickButton("#fractures-form", "Add fracture");
+    await page.waitForFunction((cards) => document.querySelectorAll("#fractures-form .family-card").length === cards, {}, count);
+    userCards.push(await cardStates("#fractures-form"));
+  }
+  const userSummary = await page.$eval("#fractures-form .family-card .card-summary", (node) => node.textContent);
+  check(
+    familyCards.join(" | ") === "open | closed open | closed closed | open closed | closed closed open | closed closed open | closed open" &&
+      closedSummary === "100 fractures · whole mesh" &&
+      /^P32 [0-9.e-]+ · whole mesh$/.test(p32Summary) &&
+      userCards.join(" | ") === "open | closed open" &&
+      /^box · r [0-9.]+ m$/.test(userSummary),
+    "accordion of the family and user fracture cards",
+    `families: ${familyCards.join(" | ")}; summaries "${closedSummary}", "${p32Summary}"; user fractures: ${userCards.join(" | ")}, "${userSummary}"`,
+  );
+  await page.screenshot({ path: `${screenshotDir}/e2e_accordion.png` });
+
   // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
   await startOnShape(page);
   await openStepPanel(page, "fractures");

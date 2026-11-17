@@ -345,6 +345,79 @@ export function selectField<T extends string>(
   return fieldShell(options, select);
 }
 
+export interface AccordionCardOptions {
+  /** The `name` of the `<details>` of one list: opening a card closes the others */
+  group: string;
+  title: string;
+  /** The short summary of the values, shown in the header of a closed card */
+  summary: () => string;
+  /** Buttons of the header; a click on them does not open or close the card */
+  actions: HTMLButtonElement[];
+  isOpen: boolean;
+  onToggle: (isOpen: boolean) => void;
+}
+
+/** A card of a list (families, user fractures) which opens and closes by its header; the caller appends the fields */
+export function accordionCard(options: AccordionCardOptions): HTMLDetailsElement {
+  const card = element("details", "family-card");
+  card.setAttribute("name", options.group);
+  card.open = options.isOpen;
+  const header = element("summary", "family-header");
+  const summary = element("span", "card-summary", options.summary());
+  const title = element("span", "card-title");
+  title.append(element("h4", undefined, options.title), summary);
+  header.append(title);
+  if (options.actions.length > 0) {
+    const actions = element("div", "family-actions");
+    actions.append(...options.actions);
+    // A click on a button does not open or close the card
+    actions.addEventListener("click", (event) => event.preventDefault());
+    header.append(actions);
+  }
+  card.append(header);
+  card.addEventListener("toggle", () => {
+    // The values can have changed while the card was open
+    summary.textContent = options.summary();
+    options.onToggle(card.open);
+  });
+  return card;
+}
+
+/** The index of the open card of each list (page state); a list not in the map has its first card open */
+const openCards = new Map<string, number | null>();
+
+export function getOpenCard(group: string): number | null {
+  return openCards.has(group) ? (openCards.get(group) ?? null) : 0;
+}
+
+export function setOpenCard(group: string, index: number | null): void {
+  openCards.set(group, index);
+}
+
+/** A new domain mesh: the first card of each list is open */
+export function resetOpenCards(): void {
+  openCards.clear();
+}
+
+/** The open card of a list after the card `removed` was removed: the next card if it was the open one; null = none */
+export function openCardAfterRemove(open: number | null, removed: number, remainingCount: number): number | null {
+  if (open === null || remainingCount === 0) {
+    return null;
+  }
+  if (removed < open) {
+    return open - 1;
+  }
+  return removed === open ? Math.min(removed, remainingCount - 1) : open;
+}
+
+/** The open card of a list after a toggle of the card `index`: a closed card keeps the open index of another card */
+export function openCardAfterToggle(open: number | null, index: number, isOpen: boolean): number | null {
+  if (isOpen) {
+    return index;
+  }
+  return open === index ? null : open;
+}
+
 /** A group of fields with a title */
 export function section(title: string, ...children: HTMLElement[]): HTMLElement {
   const group = element("section", "form-section");

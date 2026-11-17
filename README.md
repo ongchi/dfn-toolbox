@@ -38,7 +38,9 @@ output.
   row of a surface highlights it in the 3D view; a click on the row keeps it
   highlighted until a second click.
 - **User fractures**: add fractures, each with a region, center, shape,
-  aperture and orientation. The pointer over a Region field (also of a
+  aperture and orientation. The cards of the user fractures (and of the
+  families) are an accordion: a click on the header of a card opens it and
+  closes the others; a closed card shows its main values in its header. The pointer over a Region field (also of a
   family) highlights its region in the 3D view; a click on its name keeps it
   highlighted until a second click, and a new choice moves the highlight to
   the new region.

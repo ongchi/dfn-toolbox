@@ -1,6 +1,20 @@
 import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
-import { bindRegionHighlight, checkboxField, element, lengthStep, row, section, selectField, sliderField } from "./fields";
+import {
+  accordionCard,
+  bindRegionHighlight,
+  checkboxField,
+  element,
+  getOpenCard,
+  lengthStep,
+  openCardAfterRemove,
+  openCardAfterToggle,
+  row,
+  section,
+  selectField,
+  setOpenCard,
+  sliderField,
+} from "./fields";
 import { angleFields } from "./orientation";
 import { totalFractureCount } from "./toml";
 import {
@@ -158,31 +172,44 @@ function regionField(family: FamilyState, context: FormContext): HTMLElement {
   return field;
 }
 
+/** The accordion of the family cards */
+const FAMILY_CARDS = "families";
+
+/** The values of a family in the header of its card */
+function familySummary(state: FormState, family: FamilyState): string {
+  const amount = state.generation.stopCondition === "p32" ? `P32 ${family.p32Target}` : `${family.nPoly} fractures`;
+  return `${amount} · ${family.region ?? "whole mesh"}`;
+}
+
 function familyCard(state: FormState, index: number, context: FormContext, updateTotal: () => void): HTMLElement {
   const family = state.families[index];
-  const card = element("div", "family-card");
-
-  const header = element("div", "family-header");
-  header.append(element("h4", undefined, `Family ${index + 1}`));
-  const actions = element("div", "family-actions");
-  const addAction = (label: string, title: string, action: () => void) => {
+  const action = (label: string, title: string, run: () => void) => {
     const button = element("button", "button-small", label);
     button.type = "button";
     button.title = title;
     button.addEventListener("click", () => {
-      action();
+      run();
       context.rerender();
     });
-    actions.append(button);
+    return button;
   };
-  addAction("Duplicate", "Add a copy of this family", () => {
-    state.families.splice(index + 1, 0, structuredClone(family));
+  const card = accordionCard({
+    group: FAMILY_CARDS,
+    title: `Family ${index + 1}`,
+    summary: () => familySummary(state, family),
+    actions: [
+      action("Duplicate", "Add a copy of this family", () => {
+        state.families.splice(index + 1, 0, structuredClone(family));
+        setOpenCard(FAMILY_CARDS, index + 1);
+      }),
+      action("Remove", "Remove this family", () => {
+        state.families.splice(index, 1);
+        setOpenCard(FAMILY_CARDS, openCardAfterRemove(getOpenCard(FAMILY_CARDS), index, state.families.length));
+      }),
+    ],
+    isOpen: getOpenCard(FAMILY_CARDS) === index,
+    onToggle: (isOpen) => setOpenCard(FAMILY_CARDS, openCardAfterToggle(getOpenCard(FAMILY_CARDS), index, isOpen)),
   });
-  addAction("Remove", "Remove this family", () => {
-    state.families.splice(index, 1);
-  });
-  header.append(actions);
-  card.append(header);
 
   const firstRow = row(
     state.generation.stopCondition === "p32"
@@ -302,6 +329,7 @@ export function familiesSection(state: FormState, context: FormContext): HTMLEle
   addButton.type = "button";
   addButton.addEventListener("click", () => {
     state.families.push(defaultFamily());
+    setOpenCard(FAMILY_CARDS, state.families.length - 1);
     context.rerender();
   });
   container.append(addButton);

@@ -1,7 +1,20 @@
 // The user-defined fractures: one card for each `[[network.user_fracture]]`.
 import type { RegionBounds } from "../inputFiles";
 import type { FormContext } from "./context";
-import { bindRegionHighlight, element, lengthStep, row, section, selectField, sliderField } from "./fields";
+import {
+  accordionCard,
+  bindRegionHighlight,
+  element,
+  getOpenCard,
+  lengthStep,
+  openCardAfterRemove,
+  openCardAfterToggle,
+  row,
+  section,
+  selectField,
+  setOpenCard,
+  sliderField,
+} from "./fields";
 import { angleFields } from "./orientation";
 import { defaultUserFracture, type FormState, type UserFractureState } from "./state";
 
@@ -77,6 +90,9 @@ function radiusField(fracture: UserFractureState, bounds: RegionBounds | undefin
   });
 }
 
+/** The accordion of the user fracture cards */
+const USER_FRACTURE_CARDS = "user-fractures";
+
 function fractureCard(state: FormState, index: number, formContext: FormContext): HTMLElement {
   const fracture = state.userFractures[index];
   // A change of a value of the card shows the polygon of this fracture
@@ -92,22 +108,24 @@ function fractureCard(state: FormState, index: number, formContext: FormContext)
     },
   };
   const bounds = context.regionBounds.find((candidate) => candidate.name === fracture.region);
-  const card = element("div", "family-card");
-
-  const header = element("div", "family-header");
-  header.append(element("h4", undefined, `Fracture ${index + 1}`));
-  const actions = element("div", "family-actions");
   const removeButton = element("button", "button-small", "Remove");
   removeButton.type = "button";
   removeButton.title = "Remove this fracture";
   removeButton.addEventListener("click", () => {
     state.userFractures.splice(index, 1);
+    setOpenCard(USER_FRACTURE_CARDS, openCardAfterRemove(getOpenCard(USER_FRACTURE_CARDS), index, state.userFractures.length));
     formContext.previewUserFracture?.(null);
     formContext.rerender();
   });
-  actions.append(removeButton);
-  header.append(actions);
-  card.append(header);
+  const card = accordionCard({
+    group: USER_FRACTURE_CARDS,
+    title: `Fracture ${index + 1}`,
+    summary: () => `${fracture.region} · r ${fracture.radius} m`,
+    actions: [removeButton],
+    isOpen: getOpenCard(USER_FRACTURE_CARDS) === index,
+    onToggle: (isOpen) =>
+      setOpenCard(USER_FRACTURE_CARDS, openCardAfterToggle(getOpenCard(USER_FRACTURE_CARDS), index, isOpen)),
+  });
 
   card.append(
     row(regionField(fracture, context)),
@@ -179,6 +197,7 @@ export function userFracturesSection(state: FormState, context: FormContext): HT
   addButton.addEventListener("click", () => {
     const bounds = context.regionBounds[0];
     state.userFractures.push(defaultUserFracture(bounds.name, boxCenter(bounds)));
+    setOpenCard(USER_FRACTURE_CARDS, state.userFractures.length - 1);
     context.previewUserFracture?.(state.userFractures.length - 1);
     context.rerender();
   });

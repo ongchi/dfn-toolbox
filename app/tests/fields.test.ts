@@ -1,6 +1,17 @@
 // The values of the slider positions of the form fields, and the pin of the highlight.
 import { expect, test } from "vitest";
-import { pinAfterChoice, pinAfterClick, sliderPosition, sliderValue, type HighlightItem } from "../src/form/fields";
+import {
+  getOpenCard,
+  openCardAfterRemove,
+  openCardAfterToggle,
+  pinAfterChoice,
+  pinAfterClick,
+  resetOpenCards,
+  setOpenCard,
+  sliderPosition,
+  sliderValue,
+  type HighlightItem,
+} from "../src/form/fields";
 
 test("a linear slider position has no rounding noise of the steps", () => {
   expect(sliderValue(0.1 + 0.2, false)).toBe(0.3);
@@ -56,4 +67,52 @@ test("a new choice does not change the pin of another item", () => {
 
 test("a new choice from no region does not change the pin", () => {
   expect(pinAfterChoice(WEST, null, EAST_BOX)).toEqual(WEST);
+});
+
+test("removing a card before the open card keeps that card open", () => {
+  expect(openCardAfterRemove(2, 0, 3)).toBe(1);
+});
+
+test("removing the open card opens the next card", () => {
+  expect(openCardAfterRemove(1, 1, 2)).toBe(1);
+});
+
+test("removing the open last card opens the new last card", () => {
+  expect(openCardAfterRemove(2, 2, 2)).toBe(1);
+});
+
+test("removing a card after the open card keeps the open index", () => {
+  expect(openCardAfterRemove(0, 2, 2)).toBe(0);
+});
+
+test("removing the only card leaves no open card", () => {
+  expect(openCardAfterRemove(0, 0, 0)).toBeNull();
+});
+
+test("with all cards closed, a remove opens no card", () => {
+  expect(openCardAfterRemove(null, 0, 2)).toBeNull();
+});
+
+test("closing the open card leaves no open card", () => {
+  expect(openCardAfterToggle(1, 1, false)).toBeNull();
+});
+
+test("the close event of another card keeps the open card", () => {
+  expect(openCardAfterToggle(2, 0, false)).toBe(2);
+});
+
+test("opening a card makes it the open card", () => {
+  expect(openCardAfterToggle(0, 3, true)).toBe(3);
+});
+
+test("a list with no stored state has its first card open", () => {
+  resetOpenCards();
+  expect(getOpenCard("families")).toBe(0);
+});
+
+test("a stored closed state stays until a new mesh", () => {
+  setOpenCard("families", null);
+  const closed = getOpenCard("families");
+  resetOpenCards();
+  expect([closed, getOpenCard("families")]).toEqual([null, 0]);
 });

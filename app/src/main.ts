@@ -17,7 +17,7 @@ import { defaultFlowState, setDefaultInflowPressures, type FlowState } from "./f
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
-import { clearPinnedItem, getPinnedItem, type HighlightItem } from "./form/fields";
+import { clearPinnedItem, getPinnedItem, resetOpenCards, type HighlightItem } from "./form/fields";
 import { boundarySurfaceSection, type FileHandlers } from "./form/files";
 import { defaultFormState, ORIENTATION_KEYS, type FormState, type OrientationConvention } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
@@ -590,6 +590,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   domainSize = mesh === null ? 0 : meshLargestSide(mesh.text);
   boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
   clearPinnedItem();
+  resetOpenCards();
   ui.shapeDescription.textContent = mesh === null ? "" : meshDescription(mesh.text);
   renderBoundarySurfaces();
   // A new domain: no result stays

@@ -645,16 +645,61 @@ input[type="radio"] {
   margin-bottom: 10px;
 }
 
+.family-card {
+  padding-bottom: 8px;
+}
+
+.family-card[open] {
+  padding-bottom: 2px;
+}
+
+/* The header of a card of an accordion (a <summary>): arrow, title, values, buttons */
 .family-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.family-header::-webkit-details-marker {
+  display: none;
+}
+
+.family-header::before {
+  content: "▸";
+  color: var(--muted);
+}
+
+.family-card[open] > .family-header {
   margin-bottom: 8px;
+}
+
+.family-card[open] > .family-header::before {
+  content: "▾";
+}
+
+.card-title {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .family-header h4 {
   margin: 0;
   font-size: 13px;
+  white-space: nowrap;
+}
+
+.card-summary {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .family-actions {
