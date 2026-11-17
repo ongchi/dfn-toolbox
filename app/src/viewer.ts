@@ -174,7 +174,7 @@ const SCALAR_BARS = new Map<string, { name: string; unit: string }>([
   [TRANSPORT_VELOCITY_ARRAY.name, { name: "transport velocity", unit: "m/s" }],
 ]);
 
-/** A boundary surface of the domain mesh: its polygons */
+/** A boundary surface of the domain mesh, or the outer faces of a region: its polygons */
 export interface BoundarySurface {
   name: string;
   cells: CellShapes;
@@ -545,6 +545,10 @@ export class NetworkViewer {
   private domain: LineSegments | null = null;
   /** The boundary surfaces of the domain mesh, by name; part of the layer "domain" */
   private readonly boundarySurfaces = new Map<string, Mesh<BufferGeometry, MeshLambertMaterial>>();
+  /** The outer faces of each region of the domain mesh, by name; part of the layer "domain", shown only when highlighted */
+  private readonly regions = new Map<string, Mesh<BufferGeometry, MeshLambertMaterial>>();
+  private highlightedRegion: string | null = null;
+  private isDomainShown = true;
   /** Tubes and cones */
   private trajectories: Group | null = null;
   private particleLines: ParticleLines | null = null;
@@ -680,6 +684,33 @@ export class NetworkViewer {
       const mesh = placed(new Mesh(geometry, surfaceMaterial(BOUNDARY_SURFACE_COLOR, BOUNDARY_SURFACE_OPACITY)), origin);
       this.scene.add(mesh);
       this.boundarySurfaces.set(name, mesh);
+    }
+  }
+
+  /** The regions of the domain mesh, hidden until one is highlighted; replaces the old ones */
+  setRegions(regions: BoundarySurface[]): void {
+    for (const object of this.regions.values()) {
+      this.removeObject(object);
+    }
+    this.regions.clear();
+    for (const { name, cells } of regions) {
+      const { geometry, origin } = triangleGeometry(cells.points, cellTriangles(cells));
+      const mesh = placed(new Mesh(geometry, surfaceMaterial(HIGHLIGHT_COLOR, HIGHLIGHT_OPACITY)), origin);
+      this.scene.add(mesh);
+      this.regions.set(name, mesh);
+    }
+    this.showHighlightedRegion();
+  }
+
+  /** Shows one region in the highlight color; null = no region */
+  highlightRegion(name: string | null): void {
+    this.highlightedRegion = name;
+    this.showHighlightedRegion();
+  }
+
+  private showHighlightedRegion(): void {
+    for (const [region, mesh] of this.regions) {
+      mesh.visible = this.isDomainShown && region === this.highlightedRegion;
     }
   }
 
@@ -958,6 +989,8 @@ export class NetworkViewer {
       for (const mesh of this.boundarySurfaces.values()) {
         mesh.visible = isVisible;
       }
+      this.isDomainShown = isVisible;
+      this.showHighlightedRegion();
       if (this.domain) {
         this.domain.visible = isVisible;
       }

@@ -677,20 +677,24 @@ input[type="radio"] {
   margin-bottom: 2px;
 }
 
-/* A row or field of a boundary surface (Domain and Flow tabs): a click keeps
-   its surface highlighted. The padding is in the margin: the text does not move. */
-[data-highlight-surface] {
+/* A row or field of a boundary surface (Domain and Flow tabs) or a Region
+   field: a click keeps its surface or region highlighted. The padding is in
+   the margin: the text does not move. */
+[data-highlight-surface],
+[data-highlight-region] {
   margin-inline: -8px;
   padding: 2px 8px;
   border-radius: var(--radius);
   cursor: pointer;
 }
 
-[data-highlight-surface]:hover {
+[data-highlight-surface]:hover,
+[data-highlight-region]:hover {
   background: var(--surface);
 }
 
-[data-highlight-surface].is-pinned {
+[data-highlight-surface].is-pinned,
+[data-highlight-region].is-pinned {
   background: var(--accent-background);
   box-shadow: inset 3px 0 0 var(--accent);
 }

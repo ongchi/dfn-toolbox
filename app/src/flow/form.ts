@@ -64,7 +64,7 @@ function boundariesSection(state: FlowState, boundaries: FlowBoundary[], context
         context.changed();
       },
     });
-    bindSurfaceHighlight(field, boundary.name, context.highlightBoundarySurface);
+    bindSurfaceHighlight(field, boundary.name, context.highlight);
     container.append(field);
   }
   return container;

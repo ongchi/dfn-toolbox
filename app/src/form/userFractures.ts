@@ -1,7 +1,7 @@
 // The user-defined fractures: one card for each `[[network.user_fracture]]`.
 import type { RegionBounds } from "../inputFiles";
 import type { FormContext } from "./context";
-import { element, row, section, selectField, sliderField } from "./fields";
+import { bindRegionHighlight, element, row, section, selectField, sliderField } from "./fields";
 import { angleFields } from "./orientation";
 import { defaultUserFracture, type FormState, type UserFractureState } from "./state";
 
@@ -17,10 +17,10 @@ function regionField(fracture: UserFractureState, context: FormContext): HTMLEle
   if (!names.includes(fracture.region)) {
     choices.push([fracture.region, `${fracture.region} (not in the mesh)`]);
   }
-  return selectField<string>({
+  const field = selectField<string>({
     label: "Region",
     key: "region",
-    help: "the center is in the bounding box of its cells",
+    help: "the center is in the bounding box of its cells; the pointer highlights it in the 3D view",
     value: fracture.region,
     choices,
     onInput: (value) => {
@@ -32,6 +32,8 @@ function regionField(fracture: UserFractureState, context: FormContext): HTMLEle
       context.rerender();
     },
   });
+  bindRegionHighlight(field, names, context.highlight);
+  return field;
 }
 
 /** A step of the sliders of lengths: the power of 10 near a thousandth of the size */

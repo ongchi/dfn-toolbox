@@ -47,53 +47,126 @@ function fieldShell(options: FieldOptions, input: HTMLElement): HTMLElement {
   return field;
 }
 
-/** The surface which a click on its row or field keeps highlighted (one for the page); null = none */
-let pinnedSurface: string | null = null;
-
-export function getPinnedSurface(): string | null {
-  return pinnedSurface;
+/** A boundary surface or a region of the domain mesh, which the 3D view can highlight */
+export interface HighlightItem {
+  kind: "surface" | "region";
+  name: string;
 }
 
-/** Another domain mesh: its surfaces are other surfaces */
-export function clearPinnedSurface(): void {
-  pinnedSurface = null;
+/** The surface or region which a click on its row or field keeps highlighted (one for the page); null = none */
+let pinnedItem: HighlightItem | null = null;
+
+export function getPinnedItem(): HighlightItem | null {
+  return pinnedItem;
 }
 
-/** The rows and fields of the surfaces show the pin */
+/** Another domain mesh: its surfaces and regions are others */
+export function clearPinnedItem(): void {
+  pinnedItem = null;
+}
+
+export function isSameItem(first: HighlightItem | null, second: HighlightItem | null): boolean {
+  return first?.kind === second?.kind && first?.name === second?.name;
+}
+
+/** The pin after a click on the row or field of `item`: a second click removes it */
+export function pinAfterClick(pinned: HighlightItem | null, item: HighlightItem): HighlightItem | null {
+  return isSameItem(pinned, item) ? null : item;
+}
+
+/** The pin after a new choice in a dropdown: the pin of the old choice goes to the new one (none: no pin) */
+export function pinAfterChoice(
+  pinned: HighlightItem | null,
+  oldItem: HighlightItem | null,
+  newItem: HighlightItem | null,
+): HighlightItem | null {
+  return oldItem !== null && isSameItem(pinned, oldItem) ? newItem : pinned;
+}
+
+/** The highlight item of a row or field: its attribute `data-highlight-surface` or `data-highlight-region` */
+function targetItem(target: HTMLElement): HighlightItem | null {
+  const { highlightSurface, highlightRegion } = target.dataset;
+  if (highlightSurface !== undefined) {
+    return { kind: "surface", name: highlightSurface };
+  }
+  return highlightRegion === undefined ? null : { kind: "region", name: highlightRegion };
+}
+
+/** The rows and fields of the surfaces and regions show the pin */
 function markPinnedTargets(): void {
-  for (const target of document.querySelectorAll<HTMLElement>("[data-highlight-surface]")) {
-    const isPinned = target.dataset.highlightSurface === pinnedSurface;
-    target.classList.toggle("is-pinned", isPinned);
-    target.setAttribute("aria-pressed", String(isPinned));
+  for (const target of document.querySelectorAll<HTMLElement>("[data-highlight-surface], [data-highlight-region]")) {
+    markPin(target);
   }
 }
 
+function markPin(target: HTMLElement): void {
+  const item = targetItem(target);
+  const isPinned = item !== null && isSameItem(item, pinnedItem);
+  target.classList.toggle("is-pinned", isPinned);
+  target.setAttribute("aria-pressed", String(isPinned));
+}
+
 /**
- * Highlights a surface while the pointer is over `target`; then the pinned
- * surface shows again. A click on `target` pins the surface, a second click
+ * Highlights the item of `target` while the pointer is over it; then the
+ * pinned item shows again. A click on `target` pins the item, a second click
  * unpins it; a click in a dropdown or an input only edits its value. On a
  * touch screen the tap is the click, and the hover is not used: the mouse
  * events which a browser makes from a tap must not change the highlight.
  */
-export function bindSurfaceHighlight(target: HTMLElement, name: string, highlight: (name: string | null) => void): void {
-  target.dataset.highlightSurface = name;
-  target.classList.toggle("is-pinned", name === pinnedSurface);
-  target.setAttribute("aria-pressed", String(name === pinnedSurface));
+function bindHighlight(target: HTMLElement, highlight: (item: HighlightItem | null) => void): void {
+  markPin(target);
   target.addEventListener("click", (event) => {
-    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement) {
+    const item = targetItem(target);
+    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement || item === null) {
       return;
     }
     // The label does not focus its input: on a phone that opens the keyboard
     event.preventDefault();
-    pinnedSurface = pinnedSurface === name ? null : name;
+    pinnedItem = pinAfterClick(pinnedItem, item);
     markPinnedTargets();
-    highlight(pinnedSurface);
+    highlight(pinnedItem);
   });
   if (globalThis.matchMedia?.("(hover: none)").matches) {
     return;
   }
-  target.addEventListener("mouseenter", () => highlight(name));
-  target.addEventListener("mouseleave", () => highlight(pinnedSurface));
+  target.addEventListener("mouseenter", () => highlight(targetItem(target)));
+  target.addEventListener("mouseleave", () => highlight(pinnedItem));
+}
+
+/** The highlight of a boundary surface by its row or field (see `bindHighlight`) */
+export function bindSurfaceHighlight(target: HTMLElement, name: string, highlight: (item: HighlightItem | null) => void): void {
+  target.dataset.highlightSurface = name;
+  bindHighlight(target, highlight);
+}
+
+/**
+ * The highlight of the region of a Region field (see `bindHighlight`): the
+ * region of its dropdown, none for a value which is not in `regionNames`
+ * ("Whole mesh", a region which is not in the mesh). A new choice shows the
+ * new region at once, and takes the pin of the old one.
+ */
+export function bindRegionHighlight(field: HTMLElement, regionNames: string[], highlight: (item: HighlightItem | null) => void): void {
+  const select = field.querySelector("select");
+  if (select === null) {
+    return;
+  }
+  const setRegion = () => {
+    if (regionNames.includes(select.value)) {
+      field.dataset.highlightRegion = select.value;
+    } else {
+      delete field.dataset.highlightRegion;
+    }
+  };
+  setRegion();
+  select.addEventListener("change", () => {
+    const oldItem = targetItem(field);
+    setRegion();
+    const newItem = targetItem(field);
+    pinnedItem = pinAfterChoice(pinnedItem, oldItem, newItem);
+    markPinnedTargets();
+    highlight(newItem ?? pinnedItem);
+  });
+  bindHighlight(field, highlight);
 }
 
 /** Help text: the key and the help, with `code` in backticks; null without both */

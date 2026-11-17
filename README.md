@@ -38,7 +38,10 @@ output.
   row of a surface highlights it in the 3D view; a click on the row keeps it
   highlighted until a second click.
 - **User fractures**: add fractures, each with a region, center, shape,
-  aperture and orientation.
+  aperture and orientation. The pointer over a Region field (also of a
+  family) highlights its region in the 3D view; a click on its name keeps it
+  highlighted until a second click, and a new choice moves the highlight to
+  the new region.
 - **DFN**: set the fracture families. The network keeps only the clusters
   which connect an in-flow and an out-flow surface. If there is no such
   cluster, a warning shows, and the run stops after the fractures. The

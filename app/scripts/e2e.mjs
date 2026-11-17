@@ -1093,6 +1093,50 @@ try {
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_shape_description.png` });
 
+  // The pointer over the Region field of a family highlights its region; a click on its name keeps it highlighted,
+  // a new choice moves the kept highlight to the new region, and a second click removes it
+  await openStepPanel(page, "network");
+  const familyRegionField = () =>
+    page.evaluateHandle(() =>
+      [...document.querySelectorAll("#form .family-card .field")].find((node) => node.querySelector(".field-label")?.textContent === "Region"),
+    );
+  const pinnedRegion = () => page.$$eval("#form [data-highlight-region].is-pinned", (nodes) => nodes.map((node) => node.dataset.highlightRegion).join(", "));
+  await setField(page, "#form .family-card", "Region", "north_box");
+  // The new choice shows its region until the pointer leaves the field
+  await (await familyRegionField()).hover();
+  await page.mouse.move(0, 0);
+  const regionViewBefore = await stableViewerScreenshot();
+  await (await familyRegionField()).hover();
+  const regionViewOnHover = await viewerScreenshot();
+  await page.screenshot({ path: `${screenshotDir}/e2e_region_hover.png` });
+  await page.mouse.move(0, 0);
+  const regionViewAfterHover = await stableViewerScreenshot();
+  await page.click("#form .family-card [data-highlight-region] .field-label");
+  await page.mouse.move(0, 0);
+  const regionViewPinned = await stableViewerScreenshot();
+  const regionPinAfterClick = await pinnedRegion();
+  await setField(page, "#form .family-card", "Region", "east_box");
+  await page.mouse.move(0, 0);
+  const regionViewMoved = await stableViewerScreenshot();
+  const regionPinAfterChoice = await pinnedRegion();
+  await page.click("#form .family-card [data-highlight-region] .field-label");
+  await page.mouse.move(0, 0);
+  const regionViewUnpinned = await stableViewerScreenshot();
+  const regionPinAfterSecondClick = await pinnedRegion();
+  check(
+    !isSameView(regionViewOnHover, regionViewBefore) &&
+      isSameView(regionViewAfterHover, regionViewBefore) &&
+      !isSameView(regionViewPinned, regionViewBefore) &&
+      regionPinAfterClick === "north_box" &&
+      !isSameView(regionViewMoved, regionViewPinned) &&
+      !isSameView(regionViewMoved, regionViewBefore) &&
+      regionPinAfterChoice === "east_box" &&
+      isSameView(regionViewUnpinned, regionViewBefore) &&
+      regionPinAfterSecondClick === "",
+    "region highlight of a Region field",
+    `hover ${isSameView(regionViewOnHover, regionViewBefore) ? "unchanged" : "changed"}, after ${isSameView(regionViewAfterHover, regionViewBefore) ? "same" : "different"}, click ${isSameView(regionViewPinned, regionViewBefore) ? "unchanged" : "kept"} (${regionPinAfterClick}), new choice ${isSameView(regionViewMoved, regionViewPinned) ? "unchanged" : "moved"} (${regionPinAfterChoice}), second click ${isSameView(regionViewUnpinned, regionViewBefore) ? "removed" : "different"} (${regionPinAfterSecondClick})`,
+  );
+
   // A user-defined fracture: the center is limited to the box of its region (the cube of 10 m)
   await startOnShape(page);
   await openStepPanel(page, "fractures");

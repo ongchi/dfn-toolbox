@@ -17,7 +17,7 @@ import { defaultFlowState, setDefaultInflowPressures, type FlowState } from "./f
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
-import { clearPinnedSurface, getPinnedSurface } from "./form/fields";
+import { clearPinnedItem, getPinnedItem, type HighlightItem } from "./form/fields";
 import { boundarySurfaceSection, type FileHandlers } from "./form/files";
 import { defaultFormState, ORIENTATION_KEYS, type FormState, type OrientationConvention } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
@@ -47,6 +47,7 @@ import {
 } from "./inputFiles";
 import { CHAIN_STEPS, isSameFractureInput, LiveRun, networkChangeStep, type ChainStep, type StepResult } from "./liveRun";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
+import { regionOuterFaces } from "./regions";
 import { renderTransportForm, routingSection, type PointPicking } from "./transport/form";
 import { defaultTransportState, type ReleasePoint, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
@@ -391,7 +392,7 @@ const formContext: FormContext = {
   get regionBounds() {
     return regionBounds;
   },
-  highlightBoundarySurface: (name) => highlightBoundarySurface(name),
+  highlight: (item) => highlight(item),
   changed: () => {
     updateUserFracturesInViewer();
     networkChanged();
@@ -425,7 +426,7 @@ const flowContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
-  highlightBoundarySurface: (name) => highlightBoundarySurface(name),
+  highlight: (item) => highlight(item),
   changed: () => liveRun.changed("flow"),
   rerender: () => {
     renderFlow();
@@ -437,7 +438,7 @@ const transportContext: FormContext = {
   regionNames: [],
   meshNames: [],
   regionBounds: [],
-  highlightBoundarySurface: (name) => highlightBoundarySurface(name),
+  highlight: (item) => highlight(item),
   changed: () => liveRun.changed("transport"),
   rerender: () => {
     renderTransport();
@@ -534,9 +535,14 @@ function updateDomainPanel(): void {
   ui.boundarySurfaces.hidden = boundarySurfaceNames.length === 0;
 }
 
-/** Highlights a boundary surface in the 3D view (pointer over its row or field, or its pin); null = no surface */
-function highlightBoundarySurface(name: string | null): void {
-  void updateViewer((view) => view.highlightBoundarySurface(name));
+/** Highlights a boundary surface or a region in the 3D view (pointer over its row or field, or its pin); null = none */
+function highlight(item: HighlightItem | null): void {
+  void updateViewer((view) => showHighlight(view, item));
+}
+
+function showHighlight(view: NetworkViewer, item: HighlightItem | null): void {
+  view.highlightBoundarySurface(item?.kind === "surface" ? item.name : null);
+  view.highlightRegion(item?.kind === "region" ? item.name : null);
 }
 
 function renderBoundarySurfaces(): void {
@@ -548,13 +554,13 @@ function renderBoundarySurfaces(): void {
         // The network keeps the clusters which connect the in-flow and out-flow surfaces
         networkChanged();
       },
-      onHover: (name) => highlightBoundarySurface(name),
+      onHover: (item) => highlight(item),
     }),
   );
   updateDomainPanel();
 }
 
-/** Shows the domain mesh and its boundary surfaces */
+/** Shows the domain mesh, its boundary surfaces and its regions (hidden until highlighted) */
 function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["mesh"]>): void {
   view.setDomainMesh(domainWireframe(mesh.text));
   view.setBoundarySurfaces(
@@ -563,7 +569,8 @@ function showDomainInViewer(view: NetworkViewer, mesh: NonNullable<InputFiles["m
       cells: boundarySurfaceCells(mesh.text, name),
     })),
   );
-  view.highlightBoundarySurface(getPinnedSurface());
+  view.setRegions(regionNames.map((name) => ({ name, cells: regionOuterFaces(mesh.text, name) })));
+  showHighlight(view, getPinnedItem());
   view.setVisible("domain", ui.showDomain.checked);
 }
 
@@ -573,7 +580,7 @@ async function setMesh(mesh: InputFiles["mesh"]): Promise<void> {
   regionNames = mesh === null ? [] : meshRegionNames(mesh.text);
   regionBounds = mesh === null ? [] : meshRegionBounds(mesh.text);
   boundarySurfaceNames = mesh === null ? [] : domainBoundarySurfaceNames(mesh.text);
-  clearPinnedSurface();
+  clearPinnedItem();
   ui.shapeDescription.textContent = mesh === null ? "" : meshDescription(mesh.text);
   renderBoundarySurfaces();
   // A new domain: no result stays

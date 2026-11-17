@@ -1,6 +1,7 @@
 import type { SurfaceRole } from "../boundaryRoles";
 import { meshDisplayName } from "../meshes";
 import type { FormContext } from "./context";
+import type { HighlightItem } from "./fields";
 import { bindSurfaceHighlight, element, helpText, section } from "./fields";
 import type { FormState } from "./state";
 
@@ -43,8 +44,8 @@ const ROLE_CHOICES: [SurfaceRole, string][] = [
 export interface BoundarySurfaceHandlers {
   roleOf(name: string): SurfaceRole;
   onRole(name: string, role: SurfaceRole): void;
-  /** A surface is highlighted in the 3D view (`bindSurfaceHighlight`); null = no surface */
-  onHover(name: string | null): void;
+  /** A surface is highlighted in the 3D view (`bindSurfaceHighlight`), or the pinned item again; null = none */
+  onHover(item: HighlightItem | null): void;
 }
 
 /** A role for each boundary surface of the domain mesh */

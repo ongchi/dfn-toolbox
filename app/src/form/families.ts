@@ -1,6 +1,6 @@
 import { apertureFields } from "./aperture";
 import type { FormContext } from "./context";
-import { element, numberField, optionalNumberField, row, section, selectField } from "./fields";
+import { bindRegionHighlight, element, numberField, optionalNumberField, row, section, selectField } from "./fields";
 import { angleFields } from "./orientation";
 import {
   defaultFamily,
@@ -122,10 +122,10 @@ function regionField(family: FamilyState, context: FormContext): HTMLElement {
   if (family.region !== null && !context.regionNames.includes(family.region)) {
     choices.push([family.region, `${family.region} (not in the mesh)`]);
   }
-  return selectField<string>({
+  const field = selectField<string>({
     label: "Region",
     key: "region",
-    help: "the fracture centers are in the cells of the region",
+    help: "the fracture centers are in its cells; the pointer highlights it in the 3D view",
     value: family.region ?? "",
     choices,
     onInput: (value) => {
@@ -133,6 +133,8 @@ function regionField(family: FamilyState, context: FormContext): HTMLElement {
       context.changed();
     },
   });
+  bindRegionHighlight(field, context.regionNames, context.highlight);
+  return field;
 }
 
 function familyCard(state: FormState, index: number, context: FormContext, updateSum: () => void): HTMLElement {

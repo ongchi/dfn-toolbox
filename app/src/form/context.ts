@@ -1,5 +1,6 @@
 // What the form sections need besides the state.
 import type { RegionBounds } from "../inputFiles";
+import type { HighlightItem } from "./fields";
 
 export interface FormContext {
   /** Names of the regions of the domain mesh (`region__<name>` arrays) */
@@ -8,8 +9,8 @@ export interface FormContext {
   meshNames: string[];
   /** The bounding boxes of the regions of the domain mesh */
   regionBounds: RegionBounds[];
-  /** Highlights a boundary surface in the 3D view; null = no surface */
-  highlightBoundarySurface(name: string | null): void;
+  /** Highlights a boundary surface or a region in the 3D view; null = none */
+  highlight(item: HighlightItem | null): void;
   /** Call after a change of a value */
   changed(): void;
   /** Call after a change which shows or hides fields */
