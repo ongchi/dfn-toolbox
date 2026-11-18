@@ -86,7 +86,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "fehm.TemperatureRange": (f) => `Temperature (Flow panel, Fluid) must be ${f.min} to ${f.max} °C.`,
   "fehm.NoBoundaryDefined": () =>
     "The network has no point on an in-flow or out-flow surface. Change the roles of the surfaces (Domain panel), or generate another network.",
-  "fehm.PressureRange": (f) => `The pressure of the boundary ${f.boundary} (Flow panel) must be ${f.min} to ${f.max} MPa.`,
+  "fehm.PressureRange": (f) => `The pressure of the boundary ${f.boundary} (Domain panel) must be ${f.min} to ${f.max} MPa.`,
   "fehm.UnknownBoundary": (f) =>
     `The boundary ${f.boundary} is not in the network. Generate the network again.`,
   "fehm.EmptyBoundary": (f) =>
@@ -99,7 +99,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "fehm.NoBoundary": (f) =>
     `The fractures ${f.fractures} have no connection to an in-flow or out-flow surface, thus their pressure has no unique value. Change the roles of the surfaces (Domain panel), or generate another network.`,
   "fehm.NoConvergence": (f) =>
-    `The flow did not converge in ${f.iterations} iterations. Check the pressures (Flow panel), or generate another network.`,
+    `The flow did not converge in ${f.iterations} iterations. Check the pressures (Domain panel), or generate another network.`,
 
   "dfntrans.Porosity": () => "Porosity (Transport panel) must be above 0 and at most 1.",
   "dfntrans.MaxTimeSteps": () => "Maximum time steps (Transport panel) must be 1 or more.",
@@ -122,7 +122,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfntrans.SeedingPointOutsideMesh": (f) =>
     `Release point ${f.index} ${f.point} is not on the triangle mesh. Remove it (Transport panel, Seeding) and click on a fracture again.`,
   "dfntrans.NoInflowFlux": (f) =>
-    `The flow into the network at the in-flow surfaces is ${f.volume_flux} m³/s, not above 0. Change the pressures (Flow panel): the in-flow pressure must be higher.`,
+    `The flow into the network at the in-flow surfaces is ${f.volume_flux} m³/s, not above 0. Change the pressures (Domain panel): the in-flow pressure must be higher.`,
 };
 
 /** The text of an error for the user */

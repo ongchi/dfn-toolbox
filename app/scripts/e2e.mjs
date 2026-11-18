@@ -374,9 +374,9 @@ async function checkPhone() {
 
   // The highlight of a surface stays after a tap in the form, until a second tap
   const viewBeforeTap = await freeViewShot();
-  await page.tap("#boundary-surfaces .file-row-header .field-label");
+  await page.tap("#boundary-surfaces [data-highlight-surface] .field-label");
   const viewAfterTap = await freeViewShot();
-  await page.tap("#boundary-surfaces .file-row-header .field-label");
+  await page.tap("#boundary-surfaces [data-highlight-surface] .field-label");
   const viewAfterSecondTap = await freeViewShot();
   check(
     !isSameView(viewAfterTap, viewBeforeTap) && isSameView(viewAfterSecondTap, viewBeforeTap),
@@ -727,6 +727,23 @@ try {
   const startRoles = await domainRoles(page);
   check(startRoles === BOX_ROLES, "default roles of a shape", startRoles);
 
+  // The surfaces are in the groups of their roles; a new role moves a surface to its group, with a pressure field
+  const groupMembers = async () =>
+    `${await boundaryLabels(page, "#boundary-surfaces", "In-flow")}; ${await boundaryLabels(page, "#boundary-surfaces", "Out-flow")}; ${await boundaryLabels(page, "#boundary-surfaces", "No flow")}`;
+  const startGroups = await groupMembers();
+  await setRole(page, "south", "inflow");
+  const movedGroups = await groupMembers();
+  const hasSouthPressure = await page.$$eval('#boundary-surfaces [data-highlight-surface="south"] input[type=number]', (nodes) => nodes.length === 1);
+  await setRole(page, "south", "noflow");
+  check(
+    startGroups === "west; east; south, north, bottom, top" &&
+      movedGroups === "west, south; east; north, bottom, top" &&
+      hasSouthPressure &&
+      (await domainRoles(page)) === BOX_ROLES,
+    "boundary surface groups",
+    `${startGroups} → ${movedGroups} (south pressure ${hasSouthPressure}) → ${await groupMembers()}`,
+  );
+
   // The pointer over the row of a surface highlights it; the view is the same again after it leaves.
   // The screenshots have the part of the view at the right of the settings of a step (if shown) and above the run bar.
   const viewerScreenshot = async () => {
@@ -798,7 +815,7 @@ try {
     `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
-  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the fluid in the Flow panel and the
+  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the fluid in the Flow panel (the pressures in the Domain panel) and the
   // routing in the Transport panel; the settings dialog has the orientation and the fracture shape. The forms
   // have no number of points.
   const sectionTitles = (selector) =>
@@ -865,26 +882,23 @@ try {
       statesAfterRun,
     );
 
-    await openStepPanel(page, "flow");
-    // The boundaries of the flow are the in-flow and out-flow surfaces; the flow form has no other section (the
-    // fluid follows it)
+    await openStepPanel(page, "domain");
+    // The pressure boundaries of the flow are the in-flow and out-flow surfaces of the Domain panel, each with a
+    // pressure field; the Flow panel has only the fluid
     const shapeSurfaces = await flowSurfaceNames(page);
-    const flowBoundaries = await boundaryLabels(page, "#flow-form", "Pressure boundaries");
-    const flowSections = await sectionTitles("#flow-form");
-    check(
-      shapeSurfaces !== "" && flowBoundaries === shapeSurfaces && flowSections === "Pressure boundaries",
-      `${name}: flow boundaries`,
-      `${flowBoundaries}; sections: ${flowSections}`,
+    const pressureSurfaces = await page.$$eval("#boundary-surfaces .boundary-row", (nodes) =>
+      nodes.map((node) => node.dataset.highlightSurface).join(", "),
     );
-    // The pointer over a pressure field highlights its surface
+    const flowSections = await sectionTitles('[data-step-group="flow"]');
+    check(
+      shapeSurfaces !== "" && pressureSurfaces === shapeSurfaces && flowSections === "Fluid",
+      `${name}: pressure boundaries`,
+      `${pressureSurfaces}; Flow panel sections: ${flowSections}`,
+    );
+    // The pointer over a pressure row highlights its surface
     await page.mouse.move(0, 0);
     const flowViewBefore = await stableViewerScreenshot();
-    const pressureField = await page.evaluateHandle(() =>
-      [...document.querySelectorAll("#flow-form .form-section")]
-        .find((node) => node.querySelector("h3")?.textContent === "Pressure boundaries")
-        .querySelector(".field"),
-    );
-    await pressureField.hover();
+    await page.hover("#boundary-surfaces .boundary-row");
     const flowViewOnHover = await viewerScreenshot();
     if (name === "Box") {
       await page.screenshot({ path: `${screenshotDir}/e2e_pressure_boundary_hover.png` });
@@ -896,31 +910,26 @@ try {
       `${name}: pressure boundary highlight on hover`,
       `hover ${isSameView(flowViewOnHover, flowViewBefore) ? "unchanged" : "changed"}, after ${isSameView(flowViewAfter, flowViewBefore) ? "same" : "different"}`,
     );
-    // A click on the label of a pressure field keeps its surface highlighted, also on the Domain panel (one for the page)
+    // A click on the name of a pressure row keeps its surface highlighted, and does not focus the input
     if (name === "Box") {
-      // The pinned rows of one panel (the hidden panels also have their rows)
-      const pinnedTargets = (container) =>
-        page.$$eval(`${container} .is-pinned`, (nodes) => nodes.map((node) => node.dataset.highlightSurface).join(", "));
-      await page.click('#flow-form [data-highlight-surface="west"] .field-label');
-      const isInputFocused = await page.$eval('#flow-form [data-highlight-surface="west"] input', (node) => node === document.activeElement);
+      const pinnedTargets = () =>
+        page.$$eval("#boundary-surfaces .is-pinned", (nodes) => nodes.map((node) => node.dataset.highlightSurface).join(", "));
+      await page.click('#boundary-surfaces .boundary-row[data-highlight-surface="west"] .field-label');
+      const isInputFocused = await page.$eval('#boundary-surfaces [data-highlight-surface="west"] input', (node) => node === document.activeElement);
       await page.mouse.move(0, 0);
       const flowViewPinned = await viewerScreenshot();
-      const pinnedOnFlow = await pinnedTargets("#flow-form");
-      await openStepPanel(page, "domain");
-      const pinnedOnDomain = await pinnedTargets("#boundary-surfaces");
-      await openStepPanel(page, "flow");
-      await page.click('#flow-form [data-highlight-surface="west"] .field-label');
+      const pinnedOnDomain = await pinnedTargets();
+      await page.click('#boundary-surfaces .boundary-row[data-highlight-surface="west"] .field-label');
       await page.mouse.move(0, 0);
       const flowViewUnpinned = await stableViewerScreenshot();
       check(
         !isSameView(flowViewPinned, flowViewBefore) &&
           !isInputFocused &&
-          pinnedOnFlow === "west" &&
           pinnedOnDomain === "west" &&
           isSameView(flowViewUnpinned, flowViewBefore) &&
-          (await pinnedTargets("#layout")) === "",
-        `${name}: a click on a pressure field keeps its surface highlighted`,
-        `${isSameView(flowViewPinned, flowViewBefore) ? "unchanged" : "kept"}, input focus ${isInputFocused}, flow "${pinnedOnFlow}", domain "${pinnedOnDomain}", second click ${isSameView(flowViewUnpinned, flowViewBefore) ? "removed" : "different"}`,
+          (await pinnedTargets()) === "",
+        `${name}: a click on a pressure row keeps its surface highlighted`,
+        `${isSameView(flowViewPinned, flowViewBefore) ? "unchanged" : "kept"}, input focus ${isInputFocused}, pinned "${pinnedOnDomain}", second click ${isSameView(flowViewUnpinned, flowViewBefore) ? "removed" : "different"}`,
       );
     }
     // The moving particles change the view between two frames
@@ -1083,9 +1092,9 @@ try {
   const isFlowDone = (statuses) => (statuses.at(-1) ?? "").endsWith(NO_POINT_HINT);
   const startsStep = (statuses, text) => statuses.some((status) => status.startsWith(text));
   const acceptedBefore = Number(await resultValue(page, "Accepted fractures"));
-  await openStepPanel(page, "flow");
+  await openStepPanel(page, "domain");
   const pressureStatuses = await statusesDuring(page, async () => {
-    await page.$eval('#flow-form [data-highlight-surface="west"] input', (input) => {
+    await page.$eval('#boundary-surfaces [data-highlight-surface="west"] input', (input) => {
       input.value = String(Number(input.value) + 0.5);
       input.dispatchEvent(new Event("input"));
     });

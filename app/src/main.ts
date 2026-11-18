@@ -10,15 +10,16 @@ import {
   surfacesWithPoints,
   type BoundaryRoles,
 } from "./boundaryRoles";
+import { boundarySurfaceSections } from "./boundaryForm";
 import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
-import { fluidSection, renderFlowForm, type FlowBoundary } from "./flow/form";
-import { defaultFlowState, setDefaultInflowPressures, type FlowState } from "./flow/state";
+import { fluidSection } from "./flow/form";
+import { defaultFlowState, pressureOf, setDefaultInflowPressures, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
 import { clearPinnedItem, getPinnedItem, resetOpenCards, type HighlightItem } from "./form/fields";
-import { boundarySurfaceSection, type FileHandlers } from "./form/files";
+import type { FileHandlers } from "./form/files";
 import { defaultFormState, ORIENTATION_KEYS, type FormState, type OrientationConvention } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
 import {
@@ -120,7 +121,6 @@ const ui = {
   settingsForm: byId<HTMLDivElement>("settings-form"),
   flowSettingsForm: byId<HTMLDivElement>("flow-settings-form"),
   transportSettingsForm: byId<HTMLDivElement>("transport-settings-form"),
-  flowForm: byId<HTMLDivElement>("flow-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
   resetButton: byId<HTMLButtonElement>("reset-button"),
@@ -464,22 +464,9 @@ function render(): void {
   updateUserFracturesInViewer();
 }
 
-/** The pressure boundaries of the flow form; null without a triangle mesh */
-function flowBoundaries(): FlowBoundary[] | null {
-  const mesh = flowMesh();
-  if (mesh === null) {
-    return null;
-  }
-  const withPoints = surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles));
-  return flowSurfaces(boundaryRoles).map((name) => ({
-    name,
-    isInflow: roleOf(boundaryRoles, name) === "inflow",
-    hasPoints: withPoints.includes(name),
-  }));
-}
-
+/** The flow settings: the pressures of the boundary surfaces (Domain panel) and the fluid */
 function renderFlow(): void {
-  renderFlowForm(ui.flowForm, flowState, flowBoundaries(), flowContext);
+  renderBoundarySurfaces();
   ui.flowSettingsForm.replaceChildren(fluidSection(flowState, flowContext));
 }
 
@@ -548,14 +535,24 @@ function showHighlight(view: NetworkViewer, item: HighlightItem | null): void {
 }
 
 function renderBoundarySurfaces(): void {
+  const mesh = flowMesh();
+  // Before a triangle mesh, no surface shows a warning
+  const withPoints = mesh === null ? boundarySurfaceNames : surfacesWithPoints(mesh.boundaries, boundarySurfaceNames);
   ui.boundarySurfaces.replaceChildren(
-    boundarySurfaceSection(boundarySurfaceNames, {
+    ...boundarySurfaceSections(boundarySurfaceNames, {
       roleOf: (name) => roleOf(boundaryRoles, name),
       onRole: (name, role) => {
         setRole(boundaryRoles, name, role, boundarySurfaceNames);
+        renderBoundarySurfaces();
         // The network keeps the clusters which connect the in-flow and out-flow surfaces
         networkChanged();
       },
+      pressureOf: (name) => pressureOf(flowState, name),
+      onPressure: (name, pressure) => {
+        flowState.pressures[name] = pressure;
+        flowContext.changed();
+      },
+      hasPoints: (name) => withPoints.includes(name),
       onHover: (item) => highlight(item),
     }),
   );
@@ -931,8 +928,8 @@ function flowInput(): FlowInput | string {
   if (mesh === null) {
     return "The flow needs the triangle mesh of a network.";
   }
-  if (ui.flowForm.querySelector(".is-invalid")) {
-    return "A field of the form has an invalid value (red border). Correct it first.";
+  if (ui.boundarySurfaces.querySelector(".is-invalid")) {
+    return "A pressure of the Domain panel has an invalid value (red border). Correct it first.";
   }
   return { toml: flowToLibraryToml(flowState, surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles))), mesh };
 }

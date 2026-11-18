@@ -1,8 +1,6 @@
-import type { SurfaceRole } from "../boundaryRoles";
 import { meshDisplayName } from "../meshes";
 import type { FormContext } from "./context";
-import type { HighlightItem } from "./fields";
-import { bindSurfaceHighlight, element, helpText, section } from "./fields";
+import { element } from "./fields";
 import type { FormState } from "./state";
 
 export interface FileHandlers {
@@ -32,44 +30,6 @@ function meshRow(selected: string, meshNames: string[], onChoose: (name: string)
   const row = element("label", "mesh-row");
   row.append(element("span", "field-label", "Domain mesh"), meshSelect(selected, meshNames, onChoose));
   return row;
-}
-
-const ROLE_CHOICES: [SurfaceRole, string][] = [
-  ["inflow", "in-flow"],
-  ["outflow", "out-flow"],
-  ["noflow", "no-flow"],
-];
-
-/** The boundary surfaces of the domain mesh: their roles */
-export interface BoundarySurfaceHandlers {
-  roleOf(name: string): SurfaceRole;
-  onRole(name: string, role: SurfaceRole): void;
-  /** A surface is highlighted in the 3D view (`bindSurfaceHighlight`), or the pinned item again; null = none */
-  onHover(item: HighlightItem | null): void;
-}
-
-/** A role for each boundary surface of the domain mesh */
-export function boundarySurfaceSection(names: string[], handlers: BoundarySurfaceHandlers): HTMLElement {
-  const rows = names.map((name) => {
-    const role = element("select");
-    role.dataset.surface = name;
-    for (const [value, text] of ROLE_CHOICES) {
-      const option = element("option", undefined, text);
-      option.value = value;
-      option.selected = value === handlers.roleOf(name);
-      role.append(option);
-    }
-    role.addEventListener("change", () => handlers.onRole(name, role.value as SurfaceRole));
-    const label = element("label", "file-row-header");
-    label.append(element("span", "field-label", name), role);
-    bindSurfaceHighlight(label, name, handlers.onHover);
-    return label;
-  });
-  const help = helpText(
-    undefined,
-    "The role of each boundary surface; the pointer over a row highlights the surface in the 3D view, and a click (a tap) on the row keeps it highlighted until a second click. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure on each of them, and the particles go from the in-flow to the out-flow surfaces.",
-  );
-  return section("Boundary surfaces", ...rows, ...(help ? [help] : []));
 }
 
 export function domainSection(state: FormState, context: FormContext, handlers: FileHandlers): HTMLElement {

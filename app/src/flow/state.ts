@@ -2,7 +2,8 @@
 // format of `../fehm-rs/src/io/input.rs` (see "Input file" of
 // ../fehm-rs/README.md): a change of a key there needs a change here, in
 // `toml.ts` and in `form.ts`. The pressure boundaries are the in-flow and the
-// out-flow surfaces of `[boundaries]` (Domain panel).
+// out-flow surfaces of `[boundaries]`; their fields are on the Domain panel
+// (`../boundaryForm.ts`).
 
 /** Name of the mesh file in the TOML; the mesh is that of the last generation */
 export const FLOW_MESH_FILE = "dfn_mesh.vtu";

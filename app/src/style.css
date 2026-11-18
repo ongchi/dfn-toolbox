@@ -555,8 +555,7 @@ input[type="radio"] {
   padding: 0 16px 16px;
 }
 
-/* The fluid and the routing follow the form of their step */
-#flow-settings-form,
+/* The routing follows the form of its step */
 #transport-settings-form {
   margin-top: -16px;
 }
@@ -729,22 +728,61 @@ input[type="radio"] {
   gap: 6px;
 }
 
-.file-row-header {
-  display: flex;
+/* An in-flow or out-flow surface of the Domain panel: name, pressure, unit, role; a warning below */
+.boundary-row {
+  display: grid;
+  grid-template-columns: 1fr 7em auto auto;
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   margin-bottom: 3px;
 }
 
-.file-row-header .field-label {
-  flex: 1;
+.boundary-row .is-warning {
+  grid-column: 1 / -1;
+}
+
+.unit {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* The no-flow surfaces of the Domain panel: a name and a role select each */
+.surface-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.surface-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+/* The highlight margin of a chip is its border: no negative margin */
+.surface-chip[data-highlight-surface] {
+  margin-inline: 0;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+}
+
+.surface-chip[data-highlight-surface].is-pinned {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+.surface-chip select {
+  border: none;
+  border-radius: 999px;
 }
 
 .file-status {
   margin-bottom: 2px;
 }
 
-/* A row or field of a boundary surface (Domain and Flow tabs) or a Region
+/* A row or chip of a boundary surface (Domain panel) or a Region
    field: a click keeps its surface or region highlighted. The padding is in
    the margin: the text does not move. */
 [data-highlight-surface],
@@ -1195,7 +1233,7 @@ input[type="radio"] {
     min-height: 44px;
   }
 
-  .file-row-header {
+  .boundary-row {
     margin-bottom: 8px;
   }
 

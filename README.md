@@ -32,11 +32,16 @@ the seed. All input is in the page: the app does not save the input or the
 output.
 
 - **Domain**: select a predefined domain shape. At the start, the page has
-  the first shape with the default values of all forms. Give each
-  boundary surface a role (in-flow, out-flow or no-flow); a new shape gets
-  the default roles: the first surface is in-flow, the second out-flow. The pointer over the
-  row of a surface highlights it in the 3D view; a click on the row keeps it
-  highlighted until a second click.
+  the first shape with the default values of all forms. The boundary
+  surfaces are in three groups: in-flow, out-flow and no flow. Give each
+  surface a role with its dropdown: the surface moves to that group. A new
+  shape gets the default roles: the first surface is in-flow, the second
+  out-flow. Each in-flow and out-flow surface has the pressure of the flow
+  (default: 11.0 MPa for the default in-flow surface, 10.0 MPa for the
+  others); after a run, a surface with no point in the triangle mesh shows a
+  warning: the flow does not use it. The pointer over a surface highlights
+  it in the 3D view; a click on its name keeps it highlighted until a second
+  click.
 - **Fractures**: set the fracture families and the user-defined fractures.
   With the stop condition (advanced part) "Number of fractures of each
   family", each family has its number of fractures: the run stops at the
@@ -55,9 +60,8 @@ output.
   The advanced part (closed at the start) has the stop condition, the FRAM
   rules of the generation, the choice of the clusters and the size of the
   triangles of the mesh for the flow.
-- **Flow**: set a pressure for each in-flow and out-flow surface (default:
-  11.0 MPa for the default in-flow surface, 10.0 MPa for the others), and the
-  fluid (temperature and gravity).
+- **Flow**: set the fluid (temperature and gravity). The pressures are on
+  the Domain panel.
 - **Transport**: the particles start only at release points. Click "Pick points", then click on a fracture of the 3D
   view: each click adds a release point and runs the particle tracking. With
   no release point, the run ends after the flow. The path of each particle

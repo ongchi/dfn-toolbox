@@ -142,7 +142,7 @@ test("a porosity above 1 names the field of the form", () => {
 
 test("an error of the flow input of the transport is a text of the Flow panel", () => {
   const text = userText(check_transport_input(TRANSPORT_TOML, FLOW_TOML.replace("10.0", "200.0"), MESH));
-  expect(text).toBe("The pressure of the boundary west (Flow panel) must be 0.001 to 110 MPa.");
+  expect(text).toBe("The pressure of the boundary west (Domain panel) must be 0.001 to 110 MPa.");
 });
 
 test("an error of the file format is an internal error with the text of the library", () => {
