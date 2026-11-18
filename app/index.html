@@ -124,9 +124,6 @@
                 <div id="network-advanced-form" class="form"></div>
               </details>
             </div>
-            <div data-step-group="flow">
-              <div id="flow-settings-form" class="form"></div>
-            </div>
             <div data-step-group="transport">
               <div id="transport-form" class="form"></div>
               <div id="transport-settings-form" class="form"></div>
@@ -143,7 +140,7 @@
             <button id="reset-button" class="player-button" type="button" aria-label="Reset" title="Reset: remove all results; the next run starts from the seed">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14L8 12z" /></svg>
             </button>
-            <!-- One segment for each step: its state, and a click opens its settings -->
+            <!-- One segment for each step: its state, and a click opens its settings (not the flow) -->
             <div class="timeline" role="group" aria-label="Steps">
               <button class="step-segment" type="button" data-step-panel="domain" data-step-state="empty" aria-expanded="false" aria-controls="step-panel">
                 <span class="step-label">Domain</span><span class="step-strip"></span>
@@ -152,9 +149,10 @@
                 <span class="step-label">Fractures</span><span class="step-strip"></span>
                 <progress id="progress" max="1" value="0" hidden></progress>
               </button>
-              <button class="step-segment" type="button" data-step-panel="flow" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
+              <!-- The flow has no settings panel (its fluid is in the settings dialog): a status only -->
+              <div class="step-segment" data-step-panel="flow" data-step-state="stale">
                 <span class="step-label">Flow</span><span class="step-strip"></span>
-              </button>
+              </div>
               <button class="step-segment" type="button" data-step-panel="transport" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
                 <span class="step-label">Transport</span><span class="step-strip"></span>
               </button>
@@ -201,6 +199,8 @@
           </section>
           <!-- The section of the network input which is a setting: the fracture shape (form/index.ts) -->
           <div id="settings-form"></div>
+          <!-- The fluid of the flow (flow/form.ts) -->
+          <div id="flow-settings-form"></div>
           <div class="dialog-buttons">
             <button class="button" value="close">Close</button>
           </div>

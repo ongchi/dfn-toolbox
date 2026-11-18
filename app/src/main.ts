@@ -79,17 +79,19 @@ const NO_CONNECTING_CLUSTER =
 // The transport runs only with a release point (user decision)
 const NO_RELEASE_POINT = "To track particles, click “Pick points” (Transport panel), then click on a fracture.";
 
-// The steps of the run bar, each with a panel of its settings; the domain and the fractures are the network input
-const STEP_PANELS = ["domain", "fractures", "flow", "transport"] as const;
+// The steps of the run bar; the domain and the fractures are the network input
+const STEP_SEGMENTS = ["domain", "fractures", "flow", "transport"] as const;
+type StepSegment = (typeof STEP_SEGMENTS)[number];
+// The steps with a panel of their settings: the flow has none (its fluid is in the settings dialog)
+const STEP_PANELS = ["domain", "fractures", "transport"] as const satisfies readonly StepSegment[];
 type StepPanel = (typeof STEP_PANELS)[number];
 const STEP_PANEL_TITLES: Record<StepPanel, string> = {
   domain: "Domain",
   fractures: "Fractures",
-  flow: "Flow",
   transport: "Transport",
 };
 /** The steps of the live run of each segment of the run bar; the domain has none */
-const STEP_PANEL_CHAIN_STEPS: Record<StepPanel, ChainStep[]> = {
+const STEP_PANEL_CHAIN_STEPS: Record<StepSegment, ChainStep[]> = {
   domain: [],
   fractures: ["generation", "userFractures", "mesh"],
   flow: ["flow"],
@@ -147,7 +149,8 @@ const ui = {
   dock: byId<HTMLDivElement>("dock"),
   runPanel: byId<HTMLDivElement>("run-panel"),
   stepPanel: byId<HTMLElement>("step-panel"),
-  stepSegments: [...document.querySelectorAll<HTMLButtonElement>("[data-step-panel]")],
+  // The Flow segment is a status only: not a button
+  stepSegments: [...document.querySelectorAll<HTMLElement>("[data-step-panel]")],
   stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
   sheetHandle: byId<HTMLButtonElement>("sheet-handle"),
   logButton: byId<HTMLButtonElement>("log-button"),
@@ -295,7 +298,7 @@ function setBusy(busy: boolean): void {
 }
 
 /** The state of the segment of a step: from the live run, and from the domain mesh for the Domain step */
-function segmentState(panel: StepPanel): SegmentState {
+function segmentState(panel: StepSegment): SegmentState {
   const steps = STEP_PANEL_CHAIN_STEPS[panel];
   if (steps.length === 0) {
     return files.mesh === null ? "empty" : "done";
@@ -326,7 +329,7 @@ function updateRunBar(): void {
   // For the e2e check: "idle" when no step runs or waits
   ui.runButton.dataset.state = liveRun.isIdle && !isBusy ? "idle" : "running";
   for (const segment of ui.stepSegments) {
-    const panel = STEP_PANELS.find((candidate) => candidate === segment.dataset.stepPanel);
+    const panel = STEP_SEGMENTS.find((candidate) => candidate === segment.dataset.stepPanel);
     if (panel === undefined) {
       continue;
     }
@@ -464,7 +467,7 @@ function render(): void {
   updateUserFracturesInViewer();
 }
 
-/** The flow settings: the pressures of the boundary surfaces (Domain panel) and the fluid */
+/** The flow settings: the pressures of the boundary surfaces (Domain panel) and the fluid (settings dialog) */
 function renderFlow(): void {
   renderBoundarySurfaces();
   ui.flowSettingsForm.replaceChildren(fluidSection(flowState, flowContext));
@@ -505,7 +508,7 @@ function openStepPanel(name: StepPanel | null): void {
   if (name !== null) {
     ui.stepPanel.setAttribute("aria-label", STEP_PANEL_TITLES[name]);
   }
-  for (const segment of ui.stepSegments) {
+  for (const segment of ui.stepSegments.filter((candidate) => candidate instanceof HTMLButtonElement)) {
     const isOpen = segment.dataset.stepPanel === name;
     segment.classList.toggle("is-open", isOpen);
     segment.setAttribute("aria-expanded", String(isOpen));
@@ -1501,7 +1504,7 @@ function bindEvents(): void {
   ui.showColorBar.addEventListener("change", () => updateViewer((view) => view.setScalarBarShown(ui.showColorBar.checked)));
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
 
-  for (const segment of ui.stepSegments) {
+  for (const segment of ui.stepSegments.filter((candidate) => candidate instanceof HTMLButtonElement)) {
     segment.addEventListener("click", () => {
       const name = STEP_PANELS.find((candidate) => candidate === segment.dataset.stepPanel) ?? null;
       // A second click on the open step closes its settings

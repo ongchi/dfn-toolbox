@@ -125,7 +125,7 @@ test("a family with 2 points names the family", () => {
 
 test("a temperature outside the range gives the range of fehm", () => {
   const text = userText(check_flow_input(FLOW_TOML.replace("20.0", "400.0"), MESH));
-  expect(text).toBe("Temperature (Flow panel, Fluid) must be 15 to 360 °C.");
+  expect(text).toBe("Temperature (Settings, Fluid) must be 15 to 360 °C.");
 });
 
 test("a boundary with no point names the boundary", () => {
@@ -140,7 +140,7 @@ test("a porosity above 1 names the field of the form", () => {
   expect(text).toBe("Porosity (Transport panel) must be above 0 and at most 1.");
 });
 
-test("an error of the flow input of the transport is a text of the Flow panel", () => {
+test("an error of the flow input of the transport is a text of the flow", () => {
   const text = userText(check_transport_input(TRANSPORT_TOML, FLOW_TOML.replace("10.0", "200.0"), MESH));
   expect(text).toBe("The pressure of the boundary west (Domain panel) must be 0.001 to 110 MPa.");
 });

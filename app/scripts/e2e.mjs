@@ -437,7 +437,7 @@ async function checkPhone() {
     `top ${handle.sheetTop}, run bar ${isRunBarShownWithSheet ? "shown" : "hidden"}; after a touch on the view ${stateAfterViewTouch}; after a swipe down ${stateAfterSwipe}, run bar ${isRunBarShownAfterSwipe ? "shown" : "hidden"}; view controls and legend shown: with the sheet ${viewControlsWithSheet}, after ${viewControlsAfterSwipe}; handle bar ${handle.height} px, touch area 44 px ${handle.isTouchArea}, first field ${handle.fieldDistance} px below it`,
   );
 
-  for (const step of ["domain", "fractures", "flow", "transport"]) {
+  for (const step of ["domain", "fractures", "transport"]) {
     await openStepPanel(page, step, true);
     const problems = await touchProblems(page);
     check(problems.length === 0, `phone: touch sizes of the ${step} panel`, problems.join(", ") || "none");
@@ -660,17 +660,27 @@ try {
   const openSegments = () =>
     page.$$eval("[data-step-panel]", (nodes) => nodes.filter((node) => node.getAttribute("aria-expanded") === "true").map((node) => node.dataset.stepPanel).join(", "));
   const panelStates = [`${await isStepPanelShown()} (${await openSegments()})`];
-  await page.click('[data-step-panel="flow"]');
+  await page.click('[data-step-panel="transport"]');
   panelStates.push(`${await isStepPanelShown()} (${await openSegments()}: ${await page.$eval("#step-panel", (node) => node.getAttribute("aria-label"))})`);
-  await page.click('[data-step-panel="flow"]');
+  await page.click('[data-step-panel="transport"]');
   panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
-  await page.click('[data-step-panel="flow"]');
+  await page.click('[data-step-panel="transport"]');
   await page.keyboard.press("Escape");
   panelStates.push(`${await isStepPanelShown()} (${await openSegments()})`);
   check(
-    panelStates.join(" | ") === "false () | true (flow: Flow) | false () | false ()",
+    panelStates.join(" | ") === "false () | true (transport: Transport) | false () | false ()",
     "step panels: hidden at the start, a segment opens one",
     panelStates.join(" | "),
+  );
+  // The Flow segment is a status only: not a button, and a click opens no panel
+  const flowSegmentTag = await page.$eval('[data-step-panel="flow"]', (node) => node.tagName);
+  await page.click('[data-step-panel="flow"]');
+  const isPanelShownAfterFlowClick = await isStepPanelShown();
+  const flowGroupCount = await page.$$eval('[data-step-group="flow"]', (nodes) => nodes.length);
+  check(
+    flowSegmentTag === "DIV" && !isPanelShownAfterFlowClick && flowGroupCount === 0,
+    "the Flow segment has no panel",
+    `${flowSegmentTag}, panel ${isPanelShownAfterFlowClick ? "shown" : "hidden"}, ${flowGroupCount} flow groups`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_start.png` });
   const statesBeforeRun = await segmentStates(page);
@@ -815,8 +825,8 @@ try {
     `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
-  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the fluid in the Flow panel (the pressures in the Domain panel) and the
-  // routing in the Transport panel; the settings dialog has the orientation and the fracture shape. The forms
+  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the pressures in the Domain panel, the
+  // routing in the Transport panel; the settings dialog has the orientation, the fracture shape and the fluid. The forms
   // have no number of points.
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
@@ -824,7 +834,7 @@ try {
   const advancedSections = await sectionTitles("#network-advanced-form");
   const isAdvancedOpen = await page.$eval(".advanced-settings", (node) => node.open);
   const settingsSections = await sectionTitles("#settings-dialog");
-  const stepSettings = `${await sectionTitles("#flow-settings-form")}; ${await sectionTitles("#transport-settings-form")}`;
+  const stepSettings = await sectionTitles("#transport-settings-form");
   const pointFields = await page.$$eval(".field-label", (nodes) =>
     nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
   );
@@ -832,15 +842,15 @@ try {
     networkSections === "General, Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
-      settingsSections === "Orientation of the fractures, Fracture shape" &&
-      stepSettings === "Fluid; Intersections" &&
+      settingsSections === "Orientation of the fractures, Fracture shape, Fluid" &&
+      stepSettings === "Intersections" &&
       pointFields.join(", ") === "settings-dialog",
     "the places of the settings sections",
-    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; flow and transport: ${stepSettings}; number of points in ${pointFields.join(", ")}`,
+    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; transport: ${stepSettings}; number of points in ${pointFields.join(", ")}`,
   );
   // The run bar has one "Run" button, one "Reset" button and the Log button, with each panel
   const runButtons = [];
-  for (const step of ["domain", "fractures", "flow", "transport"]) {
+  for (const step of ["domain", "fractures", "transport"]) {
     await openStepPanel(page, step);
     runButtons.push(
       await page.$$eval(".player > button", (nodes) => nodes.map((node) => node.getAttribute("aria-label")).join(" ")),
@@ -884,17 +894,12 @@ try {
 
     await openStepPanel(page, "domain");
     // The pressure boundaries of the flow are the in-flow and out-flow surfaces of the Domain panel, each with a
-    // pressure field; the Flow panel has only the fluid
+    // pressure field
     const shapeSurfaces = await flowSurfaceNames(page);
     const pressureSurfaces = await page.$$eval("#boundary-surfaces .boundary-row", (nodes) =>
       nodes.map((node) => node.dataset.highlightSurface).join(", "),
     );
-    const flowSections = await sectionTitles('[data-step-group="flow"]');
-    check(
-      shapeSurfaces !== "" && pressureSurfaces === shapeSurfaces && flowSections === "Fluid",
-      `${name}: pressure boundaries`,
-      `${pressureSurfaces}; Flow panel sections: ${flowSections}`,
-    );
+    check(shapeSurfaces !== "" && pressureSurfaces === shapeSurfaces, `${name}: pressure boundaries`, pressureSurfaces);
     // The pointer over a pressure row highlights its surface
     await page.mouse.move(0, 0);
     const flowViewBefore = await stableViewerScreenshot();

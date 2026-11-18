@@ -1,10 +1,10 @@
-// The flow form: the fluid of the fehm input file, also before a triangle
-// mesh. The pressure boundaries are on the Domain panel (`boundaryForm.ts`).
+// The flow form: the fluid of the fehm input file, in the settings dialog.
+// The pressure boundaries are on the Domain panel (`boundaryForm.ts`).
 import type { FormContext } from "../form/context";
 import { checkboxField, numberField, row, section } from "../form/fields";
 import type { FlowState } from "./state";
 
-/** The fluid of the flow: also before a triangle mesh */
+/** The fluid of the flow (settings dialog) */
 export function fluidSection(state: FlowState, context: FormContext): HTMLElement {
   return section(
     "Fluid",

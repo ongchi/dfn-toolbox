@@ -951,7 +951,13 @@ input[type="radio"] {
   cursor: pointer;
 }
 
-.step-segment:hover {
+/* A status only (the flow): no click, the text centered as in a button */
+div.step-segment {
+  cursor: default;
+  text-align: center;
+}
+
+button.step-segment:hover {
   background: var(--surface);
   color: var(--text);
 }
