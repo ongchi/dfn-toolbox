@@ -1510,6 +1510,7 @@ function updateCoveredArea(): void {
   const coveredBottom = pageHeight - (isSheet ? ui.dock : ui.runPanel).getBoundingClientRect().top;
   ui.layout.style.setProperty("--covered-bottom", `${coveredBottom}px`);
   ui.layout.style.setProperty("--run-panel-height", `${ui.runPanel.offsetHeight}px`);
+  ui.layout.style.setProperty("--run-panel-width", `${ui.runPanel.offsetWidth}px`);
   viewer?.setCoveredArea({
     left: 0,
     top: isSheet ? 0 : ui.titlePanel.getBoundingClientRect().bottom,

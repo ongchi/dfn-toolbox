@@ -86,12 +86,15 @@ fractures, the mesh and the removed fractures are in the menu "More layers"
 of the layer buttons; the menu stays open while you change them.
 
 The 3D view fills the page, and the controls float over it: the title at the
-top left, the layers at the top right, the colors (the array select, the scale and
-the legend in one panel) at the bottom right, the run bar at the bottom left with the settings of the open step above it, and the Log. The
+top left, the run bar at the bottom left with the settings of the open step above
+it, the layers in one row at the right of the run bar, the link to the source
+code at the top right, the colors (the array
+select, the scale and the legend in one panel) at the bottom right, and the Log. The
 Log has the status of the steps (progress, results, warnings and errors); a
 red or yellow dot on the Log button shows an error or a warning. The
 settings of a step cover the view and do not move it. On a phone, the run bar
-is one row at the bottom over the full width, and the settings of a step are a sheet
+is one row at the bottom over the full width, the layers are one row above it
+and the colors above the layers, and the settings of a step are a sheet
 above it: the sheet and the run bar take the lower half of the screen, and
 the view controls and the colors are hidden while it shows. A tap or a
 swipe down on the handle bar at its top closes it. One finger turns the model, two fingers zoom it, and a

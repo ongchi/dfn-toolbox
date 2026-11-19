@@ -115,16 +115,14 @@ pre {
 
 /* ---------------------------------------------------------------- layer rail and color panel */
 
-/* The top right: the layers and the link */
+/* The bottom, at the right of the run bar (its width from main.ts): the layers in one row */
 .viewer-toolbar {
   position: absolute;
-  top: calc(var(--gap) + env(safe-area-inset-top));
-  right: calc(var(--gap) + env(safe-area-inset-right));
+  left: calc(2 * var(--gap) + var(--run-panel-width, 310px) + env(safe-area-inset-left));
+  bottom: calc(var(--gap) + env(safe-area-inset-bottom));
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
   gap: var(--gap);
-  max-height: calc(100% - 2 * var(--gap));
   pointer-events: none;
 }
 
@@ -177,12 +175,11 @@ pre {
 
 .layer-rail {
   display: flex;
-  flex-direction: column;
   gap: 4px;
   padding: 6px;
 }
 
-/* The link to the source code: a round panel below the layers, as wide as their rail */
+/* The link to the source code: a round panel as high as the rail of the layers */
 .round-button {
   display: inline-flex;
   align-items: center;
@@ -196,6 +193,12 @@ pre {
   cursor: pointer;
 }
 
+.repository-link {
+  position: absolute;
+  top: calc(var(--gap) + env(safe-area-inset-top));
+  right: calc(var(--gap) + env(safe-area-inset-right));
+}
+
 .round-button:hover {
   color: var(--text);
 }
@@ -206,14 +209,14 @@ pre {
 }
 
 .rail-separator {
-  height: 1px;
-  margin: 2px 4px;
+  width: 1px;
+  margin: 4px 2px;
   background: var(--border);
 }
 
 /* A checkbox or a button with an icon. The checkbox is invisible over the icon:
    it keeps its state, its disabled state and the keyboard. The label shows
-   at the left of the rail at the pointer, as on a map. */
+   above the icon at the pointer, as the step names of the run bar. */
 .icon-toggle {
   position: relative;
   display: inline-flex;
@@ -290,9 +293,9 @@ pre {
 
 .icon-label {
   position: absolute;
-  right: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
   padding: 3px 8px;
   border-radius: var(--radius);
   background: var(--panel-solid);
@@ -310,7 +313,7 @@ pre {
   opacity: 1;
 }
 
-/* The menu of more layers: at the left of its button, top aligned */
+/* The menu of more layers: above its button, left aligned with the rail */
 .layer-menu {
   position: relative;
 }
@@ -327,14 +330,16 @@ pre {
 
 .layer-menu-list {
   position: absolute;
-  top: -6px;
-  right: calc(100% + 12px);
+  bottom: calc(100% + 12px);
+  left: -6px;
   z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 200px;
   padding: 6px;
+  /* Solid: the blur of a panel in the rail panel has no effect, and the menu covers the color panel on a phone */
+  background: var(--panel-solid);
 }
 
 .layer-menu-list[hidden] {
@@ -1312,12 +1317,22 @@ button.step-segment:hover {
 
 }
 
-/* A low landscape screen: the layer rail is a row */
+/* A low landscape screen: the run bar, the view controls and the color panel do not fit in one row: the view
+   controls are at the top, at the left of the link to the source code */
 @media (max-height: 500px) and (orientation: landscape) {
-  /* The menu opens below its button: at its left it covers the row */
+  .viewer-toolbar {
+    top: calc(var(--gap) + env(safe-area-inset-top));
+    right: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+  }
+
+  /* The menu opens below its button */
   .layer-menu-list {
     top: calc(100% + 12px);
     right: -6px;
+    bottom: auto;
+    left: auto;
   }
 
   .layer-rail {
@@ -1327,11 +1342,6 @@ button.step-segment:hover {
     max-width: calc(100vw - 3 * var(--gap) - var(--settings-width));
   }
 
-  .rail-separator {
-    width: 1px;
-    height: auto;
-    margin: 4px 2px;
-  }
 }
 
 /* A phone in portrait: the run bar is at the bottom over the full width, the
@@ -1433,9 +1443,10 @@ button.step-segment:hover {
   }
 
 
-  /* The icons have no label here; the rail does not scroll: the menu of more layers shows at its left */
-  .layer-rail {
-    flex: none;
+  /* The view controls: one row above the run bar, at the left */
+  .viewer-toolbar {
+    left: calc(var(--gap) + env(safe-area-inset-left));
+    bottom: calc(var(--covered-bottom, 0px) + var(--gap));
   }
 
   .log-view {
@@ -1448,11 +1459,10 @@ button.step-segment:hover {
     z-index: 1;
   }
 
-  /* At the left of the layer rail (44px icons, padding and border) */
+  /* Above the row of the view controls (as high as the rail width) */
   .color-panel {
     left: calc(var(--gap) + env(safe-area-inset-left));
     right: auto;
-    max-width: calc(100% - 58px - 3 * var(--gap));
-    bottom: calc(var(--covered-bottom, 0px) + var(--gap));
+    bottom: calc(var(--covered-bottom, 0px) + 2 * var(--gap) + var(--rail-width));
   }
 }

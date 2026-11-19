@@ -289,7 +289,7 @@ async function pickReleasePoint(page) {
   const statuses = await statusesDuring(page, async () => {
     const { first, last, top, bottom } = await page.evaluate(() => ({
       first: Math.ceil(document.querySelector("#step-panel").getBoundingClientRect().right),
-      last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left),
+      last: window.innerWidth,
       top: window.innerHeight / 3,
       bottom: (2 * window.innerHeight) / 3,
     }));
@@ -476,6 +476,17 @@ async function checkPhone() {
     nodes.filter((node) => !node.closest(".layer-menu-list") && getComputedStyle(node).display !== "none").length,
   );
   check(phoneLabels === 0, "phone: no labels of the icons", String(phoneLabels));
+  // The view controls are one row above the run bar, the color panel above them; the GitHub link at the top right
+  const phoneOrder = await page.evaluate(() => {
+    const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+    const [color, rail, link, runBar] = ["#color-panel", ".layer-rail", ".repository-link", "#run-panel"].map(box);
+    return {
+      isLinkTopRight: link.top <= 16 && window.innerWidth - link.right <= 16,
+      isColorAbove: color.bottom <= rail.top,
+      isRunBarBelow: rail.bottom <= runBar.top,
+    };
+  });
+  check(Object.values(phoneOrder).every(Boolean), "phone: the color panel, the view controls, the run bar", JSON.stringify(phoneOrder));
   const box = await page.$eval("#viewer-canvas", (node) => {
     const { x, y, width, height } = node.getBoundingClientRect();
     return { x, y, width, height };
@@ -720,18 +731,18 @@ try {
   await openStepPanel(page, "domain");
   await page.screenshot({ path: `${screenshotDir}/e2e_domain.png` });
 
-  // The link to the repository is the last item of the view controls: below the layer rail, as wide as it
+  // The link to the repository is at the top right corner, as high as the layer rail
   const repositoryLink = await page.$eval(".repository-link", (node) => {
     const link = node.getBoundingClientRect();
     const rail = document.querySelector(".layer-rail").getBoundingClientRect();
     return {
       href: node.href,
-      isLastInToolbar: node.parentElement.id === "viewer-toolbar" && node.parentElement.lastElementChild === node,
-      isBelowRail: link.top >= rail.bottom && link.right === rail.right && link.width === rail.width,
+      isTopRight: link.top <= 16 && window.innerWidth - link.right <= 16,
+      isRailHigh: link.height === rail.height,
     };
   });
   check(
-    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.isLastInToolbar && repositoryLink.isBelowRail,
+    repositoryLink.href === "https://github.com/ongchi/dfn-toolbox" && repositoryLink.isTopRight && repositoryLink.isRailHigh,
     "repository link",
     JSON.stringify(repositoryLink),
   );
@@ -1688,10 +1699,9 @@ try {
   );
   await page.click("#log-button");
 
-  // "Reset view" puts the model in the middle of the part of the view at the left of the layer rail; the settings of
-  // a step cover the view and do not move it
-  const freeColumns = () =>
-    page.evaluate(() => ({ first: 0, last: Math.floor(document.querySelector(".layer-rail").getBoundingClientRect().left) }));
+  // "Reset view" puts the model in the middle of the view (the view controls are in the band of the run bar); the
+  // settings of a step cover the view and do not move it
+  const freeColumns = () => page.evaluate(() => ({ first: 0, last: window.innerWidth }));
   const modelCenter = async () => {
     const image = await page.screenshot({ encoding: "base64" });
     return page.evaluate(async (base64Image, { first, last }) => {
@@ -1742,12 +1752,12 @@ try {
     `center ${centerWithoutPanel?.toFixed(0)}; view with the panel ${isViewKept ? "same" : "different"}`,
   );
 
-  // The toolbar has the layer rail and the GitHub link (no settings dialog). The orientation option gives the angle
+  // The toolbar has only the layer rail (no settings dialog; the GitHub link is at the top right). The orientation option gives the angle
   // fields of the families and user fractures, with the angles of the same planes.
   const toolbarItems = await page.$$eval("#viewer-toolbar > *", (nodes) =>
     nodes.map((node) => node.id || node.classList[node.classList.length - 1]).join(", "),
   );
-  check(toolbarItems === "layer-rail, repository-link", "the layer rail and the GitHub link", toolbarItems);
+  check(toolbarItems === "layer-rail", "the layer rail in the toolbar", toolbarItems);
   // A user-defined fracture with a normal along y
   await startOnShape(page);
   await page.evaluate(() =>
