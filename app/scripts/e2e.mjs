@@ -65,7 +65,7 @@ async function openStepPanel(page, name, isTap = false) {
   if (await page.$eval(selector, (node) => node.getAttribute("aria-expanded") === "true")) {
     return;
   }
-  // On a phone the settings sheet hides the run bar: its handle bar closes it
+  // A hidden run bar: the handle bar closes the settings sheet first
   if (await page.$eval("#run-panel", (node) => getComputedStyle(node).display === "none")) {
     await (isTap ? page.tap("#sheet-handle") : page.click("#sheet-handle"));
   }
@@ -401,6 +401,9 @@ async function checkPhone() {
       isTouchArea: isHandle(top - 11) && isHandle(bottom + 11),
       fieldDistance: Math.round(field.getBoundingClientRect().top - bottom),
       sheetTop: Math.round(document.querySelector("#dock").getBoundingClientRect().top),
+      // The settings end above the run bar: they do not cover it
+      isAboveRunBar:
+        document.querySelector("#step-panel").getBoundingClientRect().bottom <= document.querySelector("#run-panel").getBoundingClientRect().top + 1,
     };
   });
   const isRunBarShownWithSheet = await isRunBarShown();
@@ -423,8 +426,9 @@ async function checkPhone() {
   const isRunBarShownAfterSwipe = await isRunBarShown();
   const viewControlsAfterSwipe = `${await isViewToolbarShown()} ${await isColorPanelShown()}`;
   check(
-    handle.sheetTop >= 844 / 2 - 1 &&
-      !isRunBarShownWithSheet &&
+    Math.abs(handle.sheetTop - 844 / 2) <= 1 &&
+      isRunBarShownWithSheet &&
+      handle.isAboveRunBar &&
       stateAfterViewTouch === "open" &&
       stateAfterSwipe === "closed" &&
       isRunBarShownAfterSwipe &&
@@ -433,8 +437,8 @@ async function checkPhone() {
       handle.height <= 20 &&
       handle.isTouchArea &&
       handle.fieldDistance <= 16,
-    "phone: the sheet on half of the screen",
-    `top ${handle.sheetTop}, run bar ${isRunBarShownWithSheet ? "shown" : "hidden"}; after a touch on the view ${stateAfterViewTouch}; after a swipe down ${stateAfterSwipe}, run bar ${isRunBarShownAfterSwipe ? "shown" : "hidden"}; view controls and legend shown: with the sheet ${viewControlsWithSheet}, after ${viewControlsAfterSwipe}; handle bar ${handle.height} px, touch area 44 px ${handle.isTouchArea}, first field ${handle.fieldDistance} px below it`,
+    "phone: the sheet and the run bar on the lower half of the screen",
+    `top ${handle.sheetTop}, run bar ${isRunBarShownWithSheet ? "shown" : "hidden"}, settings above it ${handle.isAboveRunBar}; after a touch on the view ${stateAfterViewTouch}; after a swipe down ${stateAfterSwipe}, run bar ${isRunBarShownAfterSwipe ? "shown" : "hidden"}; view controls and legend shown: with the sheet ${viewControlsWithSheet}, after ${viewControlsAfterSwipe}; handle bar ${handle.height} px, touch area 44 px ${handle.isTouchArea}, first field ${handle.fieldDistance} px below it`,
   );
 
   for (const step of ["domain", "fractures", "transport"]) {

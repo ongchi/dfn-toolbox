@@ -1342,20 +1342,21 @@ button.step-segment:hover {
     box-shadow: none;
   }
 
-  /* The settings take half of the screen, and the run bar is hidden while they show; the handle bar can touch
-     12 px above the sheet */
-  .step-panel {
-    flex: none;
+  /* With an open step the dock (the settings and the run bar below them) is the lower half of the screen: the
+     settings do not go above the center and do not cover the run bar; the handle bar can touch 12 px above the
+     sheet */
+  .layout.has-step-panel .dock {
     height: 50dvh;
+  }
+
+  .step-panel {
+    flex: 1;
+    min-height: 0;
     max-height: none;
     overflow: visible;
   }
 
-  .has-step-panel .run-panel {
-    display: none;
-  }
-
-  /* The view controls and the legend are hidden too: the model has the upper half */
+  /* The view controls and the legend are hidden while the settings show: the model has the upper half */
   .layout.has-step-panel .viewer-toolbar,
   .layout.has-step-panel .color-panel {
     display: none;
