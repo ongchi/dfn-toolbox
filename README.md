@@ -76,7 +76,9 @@ output.
   families and the user fractures), the minimum feature size, the fluid of
   the flow (temperature and gravity), the particle tracking (seed, time unit,
   porosity, maximum time steps) and the routing of the particles at the
-  intersections.
+  intersections. The settings are in three cards, as the cards of the
+  Fractures panel: Fracture, Flow and Particle tracking. A click on the title
+  of a card opens it and closes the open one.
 
 The 3D view shows the fractures during a generation, cut at the domain (the
 mesh has the same shape). A change of a user-defined fracture shows its

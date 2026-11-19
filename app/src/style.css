@@ -704,6 +704,8 @@ input[type="radio"] {
   gap: 8px;
 }
 
+/* h3: a card of the settings dialog (index.html) */
+.family-header h3,
 .family-header h4 {
   margin: 0;
   font-size: 13px;

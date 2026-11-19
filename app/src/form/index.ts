@@ -1,7 +1,7 @@
 // The input form of the network: one section for each part of `[network]`, in
 // three step panels (the domain, the user-defined fractures, and the other
 // sections, with the stop condition, FRAM, the clusters and the triangle mesh
-// in its advanced part) and the settings dialog (the seed, the fracture shape).
+// in its advanced part) and the card "Fracture" of the settings dialog (the seed, the fracture shape).
 import { clustersSection } from "./clusters";
 import type { FormContext } from "./context";
 import { familiesSection } from "./families";
@@ -9,18 +9,18 @@ import { domainSection, type FileHandlers } from "./files";
 import { framSection } from "./fram";
 import { generationSection } from "./generation";
 import { meshSection } from "./mesh";
-import { seedSection } from "./seed";
-import { shapeSection } from "./shape";
+import { seedField } from "./seed";
+import { shapeFields } from "./shape";
 import type { FormState } from "./state";
 import { userFracturesSection } from "./userFractures";
 
-/** The containers of the three step panels of the network input, of its advanced part, and of its sections in the settings dialog */
+/** The containers of the three step panels of the network input, of its advanced part, and of its fields in the card "Fracture" of the settings dialog */
 export interface NetworkTabs {
   domain: HTMLElement;
   fractures: HTMLElement;
   network: HTMLElement;
   advanced: HTMLElement;
-  /** The first section of the settings dialog */
+  /** The first field of the card "Fracture" */
   seed: HTMLElement;
   settings: HTMLElement;
 }
@@ -36,8 +36,8 @@ export function renderForm(tabs: NetworkTabs, state: FormState, context: FormCon
   replaceSections(tabs.domain, domainSection(state, context, fileHandlers));
   replaceSections(tabs.fractures, userFracturesSection(state, context));
   replaceSections(tabs.network, familiesSection(state, context));
-  replaceSections(tabs.seed, seedSection(state, context));
-  replaceSections(tabs.settings, shapeSection(state, context));
+  replaceSections(tabs.seed, seedField(state, context));
+  replaceSections(tabs.settings, shapeFields(state, context));
   replaceSections(
     tabs.advanced,
     generationSection(state, context),

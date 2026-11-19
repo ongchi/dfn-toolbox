@@ -185,25 +185,33 @@
       <dialog id="settings-dialog" class="panel settings-dialog" aria-labelledby="settings-title">
         <form class="settings-content" method="dialog">
           <h2 id="settings-title">Settings</h2>
-          <!-- The seed of the generation (form/seed.ts) -->
-          <div id="seed-settings-form"></div>
-          <section class="form-section">
-            <h3 id="orientation-title">Orientation of the fractures</h3>
+          <!-- Three accordion cards in the style of the cards of the Fractures panel; a new render of their fields keeps the open card -->
+          <details id="fracture-settings" class="family-card settings-section" name="settings" open>
+            <summary class="family-header"><span class="card-title"><h3>Fracture</h3></span></summary>
+            <!-- The seed of the generation (form/seed.ts) -->
+            <div id="seed-settings-form"></div>
             <label class="field">
-              <select id="orientation-option" aria-labelledby="orientation-title">
+              <span class="field-label">Orientation</span>
+              <select id="orientation-option">
                 <option value="theta_phi">Theta and phi</option>
                 <option value="trend_plunge">Trend and plunge</option>
                 <option value="dip_strike">Dip and strike</option>
               </select>
               <span class="field-help">The pair of angles of the normal of each family and user fracture. A new choice changes the angles of each one to the same plane.</span>
             </label>
-          </section>
-          <!-- The section of the network input which is a setting: the fracture shape (form/index.ts) -->
-          <div id="settings-form"></div>
-          <!-- The fluid of the flow (flow/form.ts) -->
-          <div id="flow-settings-form"></div>
-          <!-- The particle tracking and the routing of the transport (transport/form.ts) -->
-          <div id="transport-settings-form"></div>
+            <!-- The fracture shape (form/shape.ts) -->
+            <div id="settings-form"></div>
+          </details>
+          <details id="flow-settings" class="family-card settings-section" name="settings">
+            <summary class="family-header"><span class="card-title"><h3>Flow</h3></span></summary>
+            <!-- The fluid of the flow (flow/form.ts) -->
+            <div id="flow-settings-form"></div>
+          </details>
+          <details id="transport-settings" class="family-card settings-section" name="settings">
+            <summary class="family-header"><span class="card-title"><h3>Particle tracking</h3></span></summary>
+            <!-- The particle tracking and the routing of the transport (transport/form.ts) -->
+            <div id="transport-settings-form"></div>
+          </details>
           <div class="dialog-buttons">
             <button class="button" value="close">Close</button>
           </div>

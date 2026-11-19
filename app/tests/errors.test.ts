@@ -75,7 +75,7 @@ test("a family region which the mesh does not have names the family and the regi
 
 test("a minimum feature size of 0 names the field of the form", () => {
   const text = networkErrorText((toml) => toml.replace("min_feature_size = 0.1", "min_feature_size = 0.0"));
-  expect(text).toBe("Minimum feature size (Settings, Fracture shape) must be greater than 0.");
+  expect(text).toBe("Minimum feature size (Settings, Fracture) must be greater than 0.");
 });
 
 test("a user fracture aperture of 0 names the fracture and the field of the form", () => {
@@ -120,12 +120,12 @@ test("a role of a surface which the domain does not have names the surface", () 
 
 test("a family with 2 points names the family", () => {
   const text = networkErrorText((toml) => toml.replace(/number_of_points = \d+/, "number_of_points = 2"));
-  expect(text).toBe("Number of points (Settings, Fracture shape) must be 3 or more.");
+  expect(text).toBe("Number of points (Settings, Fracture) must be 3 or more.");
 });
 
 test("a temperature outside the range gives the range of fehm", () => {
   const text = userText(check_flow_input(FLOW_TOML.replace("20.0", "400.0"), MESH));
-  expect(text).toBe("Temperature (Settings, Fluid) must be 15 to 360 °C.");
+  expect(text).toBe("Temperature (Settings, Flow) must be 15 to 360 °C.");
 });
 
 test("a boundary with no point names the boundary", () => {

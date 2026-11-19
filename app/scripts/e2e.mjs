@@ -829,11 +829,11 @@ try {
     `kept ${isSameView(viewPinned, viewOnHover) ? "same as hover" : "different"} (${pinnedAfterClick}), other hover ${isSameView(viewOtherHover, viewPinned) ? "unchanged" : "changed"}, back ${isSameView(viewAfterOtherHover, viewPinned) ? "kept" : "different"}, dropdown "${pinnedAfterSelect}", second click ${isSameView(viewUnpinned, viewBeforeHover) ? "removed" : "different"} (${pinnedAfterSecondClick})`,
   );
 
-  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the pressures in the Domain panel, the
-  // routing in the Transport panel; the settings dialog has the orientation, the fracture shape and the fluid. The forms
-  // have no number of points.
+  // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the pressures in the Domain panel; the
+  // settings dialog has three accordion cards: Fracture, Flow and Particle tracking (each
+  // title in a summary). The forms have no number of points.
   const sectionTitles = (selector) =>
-    page.$$eval(`${selector} .form-section > h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
+    page.$$eval(`${selector} .form-section > h3, ${selector} .settings-section h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
   const networkSections = await sectionTitles('[data-step-group="fractures"] > .form');
   const advancedSections = await sectionTitles("#network-advanced-form");
   const isAdvancedOpen = await page.$eval(".advanced-settings", (node) => node.open);
@@ -845,7 +845,7 @@ try {
     networkSections === "Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
-      settingsSections === "Random numbers, Orientation of the fractures, Fracture shape, Fluid, Particle tracking, Intersections" &&
+      settingsSections === "Fracture, Flow, Particle tracking" &&
       pointFields.join(", ") === "settings-dialog",
     "the places of the settings sections",
     `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
@@ -1725,6 +1725,12 @@ try {
   const isDialogOpen = () => page.$eval("#settings-dialog", (node) => node.open);
   const isOpenAfterClick = await isDialogOpen();
   const optionAtOpen = await page.$eval("#orientation-option", (node) => node.value);
+  // One open card: "Fracture" at the start, the one of a clicked title then
+  const openSettingsSections = () =>
+    page.$$eval("#settings-dialog details[open] h3", (nodes) => nodes.map((node) => node.textContent).join(", "));
+  const openAtStart = await openSettingsSections();
+  await page.click("#flow-settings > summary");
+  const openAfterTitleClick = await openSettingsSections();
   await page.screenshot({ path: `${screenshotDir}/e2e_settings.png` });
   await page.select("#orientation-option", "dip_strike");
   const anglesDipStrike = `${await angles("#form")} | ${await angles("#fractures-form")}`;
@@ -1744,9 +1750,11 @@ try {
       anglesDipStrike === "Dip 0, Strike 0 | Dip 90, Strike 270" &&
       anglesBack === anglesBefore &&
       !isOpenAfterEscape &&
+      openAtStart === "Fracture" &&
+      openAfterTitleClick === "Flow" &&
       !isOpenAfterBackdrop,
     "the orientation option of the settings dialog",
-    `${orientationSelects} selects; open ${isOpenAfterClick} (${optionAtOpen}); ${anglesBefore} → ${anglesDipStrike} → ${anglesBack}; closed by Escape ${!isOpenAfterEscape}, by backdrop ${!isOpenAfterBackdrop}`,
+    `${orientationSelects} selects; open ${isOpenAfterClick} (${optionAtOpen}); sections ${openAtStart} → ${openAfterTitleClick}; ${anglesBefore} → ${anglesDipStrike} → ${anglesBack}; closed by Escape ${!isOpenAfterEscape}, by backdrop ${!isOpenAfterBackdrop}`,
   );
 
   await checkPhone();

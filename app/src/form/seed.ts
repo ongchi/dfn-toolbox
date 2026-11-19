@@ -1,10 +1,10 @@
 import type { FormContext } from "./context";
-import { element, section, textField } from "./fields";
+import { element, textField } from "./fields";
 import type { FormState } from "./state";
 
 const MAX_RANDOM_SEED = 2 ** 32;
 
-export function seedSection(state: FormState, context: FormContext): HTMLElement {
+export function seedField(state: FormState, context: FormContext): HTMLElement {
   const randomButton = element("button", "button-small", "Random");
   randomButton.type = "button";
   randomButton.title = "Set a new random seed";
@@ -27,5 +27,5 @@ export function seedSection(state: FormState, context: FormContext): HTMLElement
     context.changed();
   });
 
-  return section("Random numbers", seed.field);
+  return seed.field;
 }

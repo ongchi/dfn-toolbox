@@ -20,7 +20,7 @@ const TRAJECTORY_SIZE = "the trajectories have about 1 MB for each particle";
 const MAX_RANDOM_SEED = 2 ** 32;
 
 /** The settings of the particle tracking (settings dialog): also before a flow */
-export function particleTrackingSection(state: TransportState, context: FormContext): HTMLElement {
+export function particleTrackingFields(state: TransportState, context: FormContext): HTMLElement[] {
   const randomButton = element("button", "button-small", "Random");
   randomButton.type = "button";
   randomButton.title = "Set a new random seed";
@@ -47,8 +47,7 @@ export function particleTrackingSection(state: TransportState, context: FormCont
     context.changed();
   });
 
-  return section(
-    "Particle tracking",
+  return [
     row(
       seed,
       selectField<TimeUnit>({
@@ -95,28 +94,25 @@ export function particleTrackingSection(state: TransportState, context: FormCont
         },
       }),
     ),
-  );
+  ];
 }
 
 /** The routing of the particles: also before a flow */
-export function routingSection(state: TransportState, context: FormContext): HTMLElement {
-  return section(
-    "Intersections",
-    selectField<RoutingRule>({
-      label: "Routing",
-      key: "routing",
-      help: "the rule of the particles at an intersection",
-      value: state.routing,
-      choices: [
-        ["complete_mixing", "complete mixing"],
-        ["streamline_routing", "streamline routing"],
-      ],
-      onInput: (value) => {
-        state.routing = value;
-        context.changed();
-      },
-    }),
-  );
+export function routingField(state: TransportState, context: FormContext): HTMLElement {
+  return selectField<RoutingRule>({
+    label: "Routing",
+    key: "routing",
+    help: "the rule of the particles at an intersection",
+    value: state.routing,
+    choices: [
+      ["complete_mixing", "complete mixing"],
+      ["streamline_routing", "streamline routing"],
+    ],
+    onInput: (value) => {
+      state.routing = value;
+      context.changed();
+    },
+  });
 }
 
 /** The particles start only at the release points (user decision) */

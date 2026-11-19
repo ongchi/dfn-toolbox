@@ -13,7 +13,7 @@ import {
 import { boundarySurfaceSections, showSurfaceWarnings } from "./boundaryForm";
 import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
-import { fluidSection } from "./flow/form";
+import { fluidFields } from "./flow/form";
 import { defaultFlowState, pressureOf, setDefaultInflowPressures, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
@@ -50,7 +50,7 @@ import {
 import { CHAIN_STEPS, isSameFractureInput, LiveRun, networkChangeStep, type ChainStep, type StepResult } from "./liveRun";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { regionOuterFaces } from "./regions";
-import { particleTrackingSection, renderTransportForm, routingSection, type PointPicking } from "./transport/form";
+import { particleTrackingFields, renderTransportForm, routingField, type PointPicking } from "./transport/form";
 import { defaultTransportState, type ReleasePoint, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
@@ -472,7 +472,7 @@ function render(): void {
 /** The flow settings: the pressures of the boundary surfaces (Domain panel) and the fluid (settings dialog) */
 function renderFlow(): void {
   renderBoundarySurfaces();
-  ui.flowSettingsForm.replaceChildren(fluidSection(flowState, flowContext));
+  ui.flowSettingsForm.replaceChildren(...fluidFields(flowState, flowContext));
 }
 
 const pointPicking: PointPicking = {
@@ -496,8 +496,8 @@ function renderTransport(): void {
   isPickingPoints &&= flowOutput !== null && openPanel === "transport";
   renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext, pointPicking);
   ui.transportSettingsForm.replaceChildren(
-    particleTrackingSection(transportState, transportContext),
-    routingSection(transportState, transportContext),
+    ...particleTrackingFields(transportState, transportContext),
+    routingField(transportState, transportContext),
   );
   void updateViewer((view) => {
     view.setPointPicking(isPickingPoints ? addReleasePoint : null);
