@@ -72,11 +72,10 @@ output.
 - **Transport**: the particles start only at release points. Click "Pick points", then click on a fracture of the 3D
   view: each click adds a release point and runs the particle tracking. With
   no release point, the run ends after the flow. The path of each particle
-  shows, also of a particle which does not exit. The panel has only the
-  seeding; the other transport settings are in the settings.
-- **Settings** (the gear button below the layers of the 3D view): the card
-  "Particle tracking" (seed, time unit, porosity, maximum time steps, and the
-  routing of the particles at the intersections).
+  shows, also of a particle which does not exit. The advanced part (closed at
+  the start, also before a flow) has the section "Particle tracking": seed,
+  time unit, porosity, maximum time steps, and the routing of the particles
+  at the intersections.
 
 The 3D view shows the fractures during a generation, cut at the domain (the
 mesh has the same shape). A change of a user-defined fracture shows its

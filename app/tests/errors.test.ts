@@ -137,7 +137,7 @@ test("a boundary with no point names the boundary", () => {
 
 test("a porosity above 1 names the field of the form", () => {
   const text = userText(check_transport_input(TRANSPORT_TOML.replace("porosity = 1.0", "porosity = 2.0"), FLOW_TOML, MESH));
-  expect(text).toBe("Porosity (Settings, Particle tracking) must be above 0 and at most 1.");
+  expect(text).toBe("Porosity (Transport panel, Advanced, Particle tracking) must be above 0 and at most 1.");
 });
 
 test("an error of the flow input of the transport is a text of the flow", () => {

@@ -853,25 +853,31 @@ try {
   );
 
   // The Fractures panel has the families, then the user fractures; the fracture settings (seed, orientation, shape),
-  // FRAM, clusters and mesh are in its closed advanced part, the pressures in the Domain panel; the settings dialog has
-  // one accordion card, Particle tracking (its title in a summary). The forms of the families have no number of points.
+  // FRAM, clusters and mesh are in its closed advanced part, the pressures in the Domain panel; the particle tracking is
+  // in the closed advanced part of the Transport panel, also before a flow. The forms of the families have no number of points.
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3, ${selector} .settings-section h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
   const networkSections = await sectionTitles('[data-step-group="fractures"] > .form');
   const advancedSections = await sectionTitles("#network-advanced-form");
-  const isAdvancedOpen = await page.$eval(".advanced-settings", (node) => node.open);
-  const settingsSections = await sectionTitles("#settings-dialog");
+  const isAdvancedOpen = await page.$eval('[data-step-group="fractures"] .advanced-settings', (node) => node.open);
+  const transportAdvanced = await page.$eval('[data-step-group="transport"] .advanced-settings', (node) => ({
+    isOpen: node.open,
+    sections: [...node.querySelectorAll(".form-section > h3")].map((title) => title.textContent).join(", "),
+    fields: node.querySelectorAll("#transport-settings-form .field").length,
+  }));
   const pointFields = await page.$$eval(".field-label", (nodes) =>
-    nodes.filter((node) => node.textContent === "Number of points").map((node) => (node.closest(".advanced-settings") ? "advanced" : node.closest("#settings-dialog, #form, #fractures-form")?.id)),
+    nodes.filter((node) => node.textContent === "Number of points").map((node) => (node.closest(".advanced-settings") ? "advanced" : node.closest("#form, #fractures-form")?.id)),
   );
   check(
     networkSections === "Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
-      settingsSections === "Particle tracking" &&
+      !transportAdvanced.isOpen &&
+      transportAdvanced.sections === "Particle tracking" &&
+      transportAdvanced.fields > 0 &&
       pointFields.join(", ") === "advanced",
     "the places of the settings sections",
-    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
+    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; Transport advanced (open ${transportAdvanced.isOpen}): ${transportAdvanced.sections}, ${transportAdvanced.fields} fields; number of points in ${pointFields.join(", ")}`,
   );
   // The run bar has one "Run" button, one "Reset" button and the Log button, with each panel
   const runButtons = [];
@@ -1692,12 +1698,12 @@ try {
     `center ${centerWithoutPanel?.toFixed(0)}; view with the panel ${isViewKept ? "same" : "different"}`,
   );
 
-  // The gear between the layer rail and the GitHub link opens the settings dialog. Its orientation option
-  // gives the angle fields of the families and user fractures, with the angles of the same planes.
+  // The toolbar has the layer rail and the GitHub link (no settings dialog). The orientation option gives the angle
+  // fields of the families and user fractures, with the angles of the same planes.
   const toolbarItems = await page.$$eval("#viewer-toolbar > *", (nodes) =>
     nodes.map((node) => node.id || node.classList[node.classList.length - 1]).join(", "),
   );
-  check(toolbarItems === "layer-rail, settings-button, repository-link", "the gear before the GitHub link", toolbarItems);
+  check(toolbarItems === "layer-rail, repository-link", "the layer rail and the GitHub link", toolbarItems);
   // A user-defined fracture with a normal along y
   await startOnShape(page);
   await page.evaluate(() =>
@@ -1720,35 +1726,19 @@ try {
   );
   const anglesBefore = `${await angles("#form")} | ${await angles("#fractures-form")}`;
   // The orientation option is in the advanced part of the Fractures panel
-  const optionAtOpen = await page.$eval("#orientation-option", (node) => node.value);
+  const optionAtStart = await page.$eval("#orientation-option", (node) => node.value);
   await page.select("#orientation-option", "dip_strike");
   const anglesDipStrike = `${await angles("#form")} | ${await angles("#fractures-form")}`;
   await page.select("#orientation-option", "theta_phi");
   const anglesBack = `${await angles("#form")} | ${await angles("#fractures-form")}`;
-  // The settings dialog: its one card open, closed by Escape and by a click on the backdrop
-  await page.click("#settings-button");
-  const isDialogOpen = () => page.$eval("#settings-dialog", (node) => node.open);
-  const isOpenAfterClick = await isDialogOpen();
-  const openAtStart = await page.$$eval("#settings-dialog details[open] h3", (nodes) => nodes.map((node) => node.textContent).join(", "));
-  await page.screenshot({ path: `${screenshotDir}/e2e_settings.png` });
-  await page.keyboard.press("Escape");
-  const isOpenAfterEscape = await isDialogOpen();
-  await page.click("#settings-button");
-  // A click on the backdrop, outside the content
-  await page.mouse.click(5, 5);
-  const isOpenAfterBackdrop = await isDialogOpen();
   check(
     orientationSelects === 0 &&
-      isOpenAfterClick &&
-      optionAtOpen === "theta_phi" &&
+      optionAtStart === "theta_phi" &&
       anglesBefore === "Theta 0, Phi 0 | Theta 90, Phi 90" &&
       anglesDipStrike === "Dip 0, Strike 0 | Dip 90, Strike 270" &&
-      anglesBack === anglesBefore &&
-      !isOpenAfterEscape &&
-      openAtStart === "Particle tracking" &&
-      !isOpenAfterBackdrop,
-    "the orientation option, and the settings dialog",
-    `${orientationSelects} selects (${optionAtOpen}); dialog open ${isOpenAfterClick}, open card ${openAtStart}; ${anglesBefore} → ${anglesDipStrike} → ${anglesBack}; closed by Escape ${!isOpenAfterEscape}, by backdrop ${!isOpenAfterBackdrop}`,
+      anglesBack === anglesBefore,
+    "the orientation option",
+    `${orientationSelects} selects (${optionAtStart}); ${anglesBefore} → ${anglesDipStrike} → ${anglesBack}`,
   );
 
   await checkPhone();

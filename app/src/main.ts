@@ -154,8 +154,6 @@ const ui = {
   stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
   sheetHandle: byId<HTMLButtonElement>("sheet-handle"),
   logButton: byId<HTMLButtonElement>("log-button"),
-  settingsButton: byId<HTMLButtonElement>("settings-button"),
-  settingsDialog: byId<HTMLDialogElement>("settings-dialog"),
   orientationOption: byId<HTMLSelectElement>("orientation-option"),
   logView: byId<HTMLDivElement>("log-view"),
   logEmpty: byId<HTMLParagraphElement>("log-empty"),
@@ -465,6 +463,8 @@ function render(): void {
     formContext,
     fileHandlers,
   );
+  // The orientation select is static HTML (advanced part of the Fractures panel)
+  ui.orientationOption.value = state.orientationConvention;
   updateUserFracturesInViewer();
 }
 
@@ -1471,11 +1471,6 @@ function bindSheetHandle(): void {
   });
 }
 
-function openSettings(): void {
-  ui.orientationOption.value = state.orientationConvention;
-  ui.settingsDialog.showModal();
-}
-
 /** A new pair of angles for all orientations: the angles change, each plane (and mean normal) stays */
 function setOrientationConvention(convention: OrientationConvention): void {
   const from = state.orientationConvention;
@@ -1534,28 +1529,21 @@ function bindEvents(): void {
       openStepPanel(name === openPanel ? null : name);
     });
   }
-  // Escape closes the settings of a step; the settings dialog closes itself, and a field keeps its own Escape
+  // Escape closes the settings of a step; a field keeps its own Escape
   document.addEventListener("keydown", (event) => {
     const isInField = event.target instanceof Element && event.target.matches("input, select, textarea");
-    if (event.key === "Escape" && openPanel !== null && !ui.settingsDialog.open && !isInField) {
+    if (event.key === "Escape" && openPanel !== null && !isInField) {
       closeStepPanel();
     }
   });
   bindSheetHandle();
   ui.logButton.addEventListener("click", toggleLog);
-  ui.settingsButton.addEventListener("click", openSettings);
   ui.orientationOption.addEventListener("change", () => {
     const convention = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).find(
       (candidate) => candidate === ui.orientationOption.value,
     );
     if (convention !== undefined) {
       setOrientationConvention(convention);
-    }
-  });
-  // A click on the backdrop: the target is the dialog itself, not its content
-  ui.settingsDialog.addEventListener("click", (event) => {
-    if (event.target === ui.settingsDialog) {
-      ui.settingsDialog.close();
     }
   });
   const coveredAreaObserver = new ResizeObserver(updateCoveredArea);

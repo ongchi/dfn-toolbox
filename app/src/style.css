@@ -115,7 +115,7 @@ pre {
 
 /* ---------------------------------------------------------------- layer rail and color panel */
 
-/* The top right: the layers, the settings and the link */
+/* The top right: the layers and the link */
 .viewer-toolbar {
   position: absolute;
   top: calc(var(--gap) + env(safe-area-inset-top));
@@ -182,7 +182,7 @@ pre {
   padding: 6px;
 }
 
-/* The settings button and the link to the source code: round panels below the layers, as wide as their rail */
+/* The link to the source code: a round panel below the layers, as wide as their rail */
 .round-button {
   display: inline-flex;
   align-items: center;
@@ -203,38 +203,6 @@ pre {
 .round-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-
-/* The settings of the whole input: a modal dialog in the middle of the page */
-.settings-dialog {
-  width: min(420px, calc(100% - 2 * var(--gap)));
-  padding: 0;
-  color: var(--text);
-}
-
-.settings-dialog::backdrop {
-  background: rgb(0 0 0 / 0.45);
-}
-
-.settings-content {
-  padding: 16px;
-}
-
-.settings-content h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
-}
-
-/* At the bottom of the dialog also when its sections scroll; over the padding of the content */
-.dialog-buttons {
-  position: sticky;
-  bottom: -16px;
-  display: flex;
-  justify-content: flex-end;
-  margin: 8px -16px -16px;
-  padding: 12px 16px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--panel-solid);
 }
 
 .rail-separator {
@@ -703,8 +671,6 @@ input[type="radio"] {
   gap: 8px;
 }
 
-/* h3: a card of the settings dialog (index.html) */
-.family-header h3,
 .family-header h4 {
   margin: 0;
   font-size: 13px;
