@@ -838,7 +838,6 @@ try {
   const advancedSections = await sectionTitles("#network-advanced-form");
   const isAdvancedOpen = await page.$eval(".advanced-settings", (node) => node.open);
   const settingsSections = await sectionTitles("#settings-dialog");
-  const stepSettings = await sectionTitles("#transport-settings-form");
   const pointFields = await page.$$eval(".field-label", (nodes) =>
     nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
   );
@@ -846,11 +845,10 @@ try {
     networkSections === "Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
-      settingsSections === "Random numbers, Orientation of the fractures, Fracture shape, Fluid" &&
-      stepSettings === "Intersections" &&
+      settingsSections === "Random numbers, Orientation of the fractures, Fracture shape, Fluid, Particle tracking, Intersections" &&
       pointFields.join(", ") === "settings-dialog",
     "the places of the settings sections",
-    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; transport: ${stepSettings}; number of points in ${pointFields.join(", ")}`,
+    `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
   );
   // The run bar has one "Run" button, one "Reset" button and the Log button, with each panel
   const runButtons = [];
@@ -1012,18 +1010,18 @@ try {
       `${name}: transport at a clicked point`,
       transportStatuses.join(" | "),
     );
-    // The Domain panel gives the in-flow and out-flow boundaries: the Transport panel has no section for them, and
-    // the routing follows the transport form
-    const hasTransportBoundaries = await page.$$eval("#transport-form .form-section h3", (nodes) =>
-      nodes.some((node) => node.textContent === "Boundaries"),
+    // The Domain panel gives the in-flow and out-flow boundaries, and the settings dialog the particle tracking and the
+    // routing: the Transport panel has only the seeding
+    const transportSections = await page.$$eval("#transport-form .form-section h3", (nodes) =>
+      nodes.map((node) => node.textContent).join(", "),
     );
     const hasTransportRouting = await page.$$eval("#transport-form .field-label", (nodes) =>
       nodes.some((node) => node.textContent === "Routing"),
     );
     check(
-      !hasTransportBoundaries && !hasTransportRouting,
-      `${name}: no transport boundaries, and the routing after the transport form`,
-      `boundaries ${hasTransportBoundaries}, routing ${hasTransportRouting}`,
+      transportSections === "Seeding" && !hasTransportRouting,
+      `${name}: only the seeding on the Transport panel`,
+      `sections ${transportSections}, routing ${hasTransportRouting}`,
     );
     // The path of each particle shows, also of a particle which does not exit
     const areTrajectoriesShown = await page.$eval("#show-trajectories", (node) => node.checked && !node.disabled);
@@ -1044,7 +1042,7 @@ try {
   await waitIdle(page);
   const geometriesBefore = await viewGeometryCount(page);
   for (let run = 0; run < TRANSPORT_REPEATS; run += 1) {
-    await statusesDuring(page, () => setField(page, "#transport-form", "Seed", 100 + run));
+    await statusesDuring(page, () => setField(page, "#transport-settings-form", "Seed", 100 + run));
   }
   await page.click("#run-button");
   const geometriesAfter = await viewGeometryCount(page);

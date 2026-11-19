@@ -101,8 +101,8 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "fehm.NoConvergence": (f) =>
     `The flow did not converge in ${f.iterations} iterations. Check the pressures (Domain panel), or generate another network.`,
 
-  "dfntrans.Porosity": () => "Porosity (Transport panel) must be above 0 and at most 1.",
-  "dfntrans.MaxTimeSteps": () => "Maximum time steps (Transport panel) must be 1 or more.",
+  "dfntrans.Porosity": () => "Porosity (Settings, Particle tracking) must be above 0 and at most 1.",
+  "dfntrans.MaxTimeSteps": () => "Maximum time steps (Settings, Particle tracking) must be 1 or more.",
   "dfntrans.InflowOutflowMissing": () =>
     "The network needs a point on an in-flow and on an out-flow surface. Change the roles of the surfaces (Domain panel), or generate another network.",
   "dfntrans.BoundaryInInflowAndOutflow": (f) => `The boundary ${f.boundary} cannot be in-flow and out-flow.`,

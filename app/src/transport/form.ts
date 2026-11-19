@@ -1,7 +1,8 @@
 // The transport form: one field for each key of the dfntrans input file,
 // except the output (the trajectories and the velocities are always on) and
 // the in-flow and out-flow boundaries (the roles of the Domain panel). The
-// routing shows also before a flow.
+// Transport panel has only the seeding; the particle tracking and the routing
+// are in the settings dialog, also before a flow.
 import type { FormContext } from "../form/context";
 import { element, numberField, row, section, selectField } from "../form/fields";
 import type { ReleasePoint, RoutingRule, TimeUnit, TransportState } from "./state";
@@ -18,7 +19,8 @@ const TRAJECTORY_SIZE = "the trajectories have about 1 MB for each particle";
 /** dfntrans has a u32 seed */
 const MAX_RANDOM_SEED = 2 ** 32;
 
-function generalSection(state: TransportState, context: FormContext): HTMLElement {
+/** The settings of the particle tracking (settings dialog): also before a flow */
+export function particleTrackingSection(state: TransportState, context: FormContext): HTMLElement {
   const randomButton = element("button", "button-small", "Random");
   randomButton.type = "button";
   randomButton.title = "Set a new random seed";
@@ -46,7 +48,7 @@ function generalSection(state: TransportState, context: FormContext): HTMLElemen
   });
 
   return section(
-    "General",
+    "Particle tracking",
     row(
       seed,
       selectField<TimeUnit>({
@@ -208,7 +210,6 @@ export function renderTransportForm(
   }
   container.replaceChildren(
     element("p", "form-note", "The particles go from the in-flow to the out-flow surfaces of the Domain panel."),
-    generalSection(state, context),
     seedingSection(state, context, picking),
   );
   container.scrollTop = scrollTop;

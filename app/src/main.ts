@@ -50,7 +50,7 @@ import {
 import { CHAIN_STEPS, isSameFractureInput, LiveRun, networkChangeStep, type ChainStep, type StepResult } from "./liveRun";
 import { listMeshes, loadMesh, meshDisplayName } from "./meshes";
 import { regionOuterFaces } from "./regions";
-import { renderTransportForm, routingSection, type PointPicking } from "./transport/form";
+import { particleTrackingSection, renderTransportForm, routingSection, type PointPicking } from "./transport/form";
 import { defaultTransportState, type ReleasePoint, type TimeUnit, type TransportState } from "./transport/state";
 import { transportToLibraryToml } from "./transport/toml";
 import { nodeVelocityMagnitudes } from "./transport/velocities";
@@ -495,7 +495,10 @@ function renderTransport(): void {
   // The picking needs the shown triangle mesh of a flow
   isPickingPoints &&= flowOutput !== null && openPanel === "transport";
   renderTransportForm(ui.transportForm, transportState, flowOutput !== null, transportContext, pointPicking);
-  ui.transportSettingsForm.replaceChildren(routingSection(transportState, transportContext));
+  ui.transportSettingsForm.replaceChildren(
+    particleTrackingSection(transportState, transportContext),
+    routingSection(transportState, transportContext),
+  );
   void updateViewer((view) => {
     view.setPointPicking(isPickingPoints ? addReleasePoint : null);
     view.setReleasePoints(transportState.seeding.points);

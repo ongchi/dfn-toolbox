@@ -555,11 +555,6 @@ input[type="radio"] {
   padding: 0 16px 16px;
 }
 
-/* The routing follows the form of its step */
-#transport-settings-form {
-  margin-top: -16px;
-}
-
 .form-section {
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
