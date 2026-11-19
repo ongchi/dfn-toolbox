@@ -1,6 +1,6 @@
 // The fields of the pair of angles of an orientation: for the mean normal of
 // a family and the normal of a user-defined fracture. The pair is the one of
-// the page (settings dialog).
+// the page (Fractures panel, Advanced).
 import type { FormContext } from "./context";
 import { sliderField } from "./fields";
 import { ORIENTATION_KEYS, type OrientationConvention, type PlaneOrientationState } from "./state";

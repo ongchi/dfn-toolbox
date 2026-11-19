@@ -1571,12 +1571,13 @@ try {
   await page.screenshot({ path: `${screenshotDir}/e2e_families.png` });
 
   // "Pause" after the first checkpoint (5 s) keeps the fractures; "Run" continues: the network is that of a run with
-  // no stop. Default forms, FRAM on and two families of 708 fractures: the generation of 1400 fractures takes about
-  // 25 s (WebAssembly in node on fungihouse; 1200: 8 s), longer than the first checkpoint and the pause at 9 s
+  // no stop. Default forms, FRAM on and two families of 355 fractures: the generation takes about 60 s (Chrome on
+  // fungihouse; 2 × 302: below 9 s), longer than the first checkpoint and the pause at 9 s. More fractures do not end:
+  // since 2026-11-19 dfngen-rs keeps a rejected radius and its orientation until FRAM accepts them (2 × 400 runs on)
   await startOnShape(page);
   await setFram(page, true);
   await duplicateFirstFamily(page);
-  await setFractureCount(page, 700);
+  await setFractureCount(page, 355);
   await runAll(page);
   const fullRunCount = await resultValue(page, "Final fractures");
   await page.click("#reset-button");
@@ -1613,7 +1614,7 @@ try {
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
   );
-  // The menu "More layers" at the left of its button: User fractures, Mesh and Removed; it stays open at a change,
+  // The menu "More layers" above its button: User fractures, Mesh and Removed; it stays open at a change,
   // and closes by Escape and by a click outside it
   const layerMenu = () =>
     page.evaluate(() => {
@@ -1622,7 +1623,7 @@ try {
       return {
         isOpen: !menu.hidden && button.getAttribute("aria-expanded") === "true",
         rows: [...menu.querySelectorAll(".icon-label")].map((node) => node.textContent).join(", "),
-        isLeft: menu.getBoundingClientRect().right <= button.getBoundingClientRect().left,
+        isAbove: menu.getBoundingClientRect().bottom <= button.getBoundingClientRect().top,
       };
     });
   const menuAtStart = await layerMenu();
@@ -1640,14 +1641,14 @@ try {
   check(
     !menuAtStart.isOpen &&
       menuOpen.isOpen &&
-      menuOpen.isLeft &&
+      menuOpen.isAbove &&
       menuOpen.rows.startsWith("User fractures, Mesh, Removed") &&
       menuAfterChange.isOpen &&
       isMeshOff &&
       !menuAfterEscape.isOpen &&
       !menuAfterOutside.isOpen,
     "the menu of more layers",
-    `start ${menuAtStart.isOpen}, open ${menuOpen.isOpen} (left ${menuOpen.isLeft}: ${menuOpen.rows}), after a change ${menuAfterChange.isOpen} (mesh off ${isMeshOff}), after Escape ${menuAfterEscape.isOpen}, after an outside click ${menuAfterOutside.isOpen}`,
+    `start ${menuAtStart.isOpen}, open ${menuOpen.isOpen} (above ${menuOpen.isAbove}: ${menuOpen.rows}), after a change ${menuAfterChange.isOpen} (mesh off ${isMeshOff}), after Escape ${menuAfterEscape.isOpen}, after an outside click ${menuAfterOutside.isOpen}`,
   );
   // A change in the menu, which closes again: the view without the menu
   const clickInLayerMenu = async (selector) => {

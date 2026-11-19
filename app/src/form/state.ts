@@ -107,9 +107,9 @@ export interface FormState {
   minFeatureSize: number;
   /** Name of the domain mesh file, as in the `domain` key */
   domain: string;
-  /** The pair of angles of all families and user-defined fractures (settings dialog) */
+  /** The pair of angles of all families and user-defined fractures (Fractures panel, Advanced) */
   orientationConvention: OrientationConvention;
-  /** The number of points of each family and user-defined fracture (settings dialog); 3 or more, 4 = rectangle */
+  /** The number of points of each family and user-defined fracture (Fractures panel, Advanced); 3 or more, 4 = rectangle */
   numberOfPoints: number;
   userFractures: UserFractureState[];
   generation: GenerationState;
