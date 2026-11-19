@@ -843,10 +843,10 @@ try {
     nodes.filter((node) => node.textContent === "Number of points").map((node) => node.closest("#settings-dialog, #form, #fractures-form")?.id),
   );
   check(
-    networkSections === "General, Fracture families, User-defined fractures" &&
+    networkSections === "Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
-      settingsSections === "Orientation of the fractures, Fracture shape, Fluid" &&
+      settingsSections === "Random numbers, Orientation of the fractures, Fracture shape, Fluid" &&
       stepSettings === "Intersections" &&
       pointFields.join(", ") === "settings-dialog",
     "the places of the settings sections",
@@ -1415,7 +1415,7 @@ try {
   await startOnShape(page);
   await setFram(page, true);
   await page.evaluate(() => {
-    const input = [...document.querySelectorAll("#form input")].find(
+    const input = [...document.querySelectorAll("#seed-settings-form input")].find(
       (node) => node.closest(".field")?.querySelector(".field-label")?.textContent === "Seed",
     );
     input.value = "1837757520";

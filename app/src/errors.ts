@@ -79,7 +79,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     "There is no fracture. Add a fracture family or a user-defined fracture (Fractures panel).",
   "dfngen.NoIntersectingFractures": () =>
     "No fractures intersect. Increase the number of fractures or their size (Fractures panel), or decrease Minimum feature size.",
-  "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (Fractures panel, General). Details: ${f.message}`,
+  "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (Settings, Random numbers). Details: ${f.message}`,
   "dfngen.CheckpointInputChanged": () =>
     "The input changed during the run: the network needs a new generation. Click “Reset”, then “Run”.",
 

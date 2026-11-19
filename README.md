@@ -68,8 +68,9 @@ output.
   no release point, the run ends after the flow. The path of each particle
   shows, also of a particle which does not exit. The routing of the particles
   at the intersections follows.
-- **Settings** (the gear button below the layers of the 3D view): the pair of
-  angles of all orientations (theta and phi, trend and plunge, or dip and
+- **Settings** (the gear button below the layers of the 3D view): the seed of
+  the generation ("Random" sets a new one; 0 = a random seed for each run).
+  The pair of angles of all orientations (theta and phi, trend and plunge, or dip and
   strike). A new choice changes the angles of each family and fracture to the
   same plane. Also the number of points of all fractures (one value for the
   families and the user fractures), the minimum feature size, and the fluid
