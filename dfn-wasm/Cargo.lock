@@ -110,7 +110,7 @@ dependencies = [
 [[package]]
 name = "dfngen-rs"
 version = "0.13.0"
-source = "git+https://github.com/ongchi/dfngen-rs?branch=master#135d504ff977cec7a375325ed5cd60a4dffc7a7d"
+source = "git+https://github.com/ongchi/dfngen-rs?branch=master#76733792adfa4cdfc731d8101b0b2696bdee300c"
 dependencies = [
  "i_overlay",
  "parry3d-f64",
