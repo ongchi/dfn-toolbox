@@ -125,7 +125,7 @@ test("a family with 2 points names the family", () => {
 
 test("a temperature outside the range gives the range of fehm", () => {
   const text = userText(check_flow_input(FLOW_TOML.replace("20.0", "400.0"), MESH));
-  expect(text).toBe("Temperature (Settings, Flow) must be 15 to 360 °C.");
+  expect(text).toBe("Temperature (Flow panel, Fluid) must be 15 to 360 °C.");
 });
 
 test("a boundary with no point names the boundary", () => {

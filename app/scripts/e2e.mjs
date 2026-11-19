@@ -441,7 +441,7 @@ async function checkPhone() {
     `top ${handle.sheetTop}, run bar ${isRunBarShownWithSheet ? "shown" : "hidden"}, settings above it ${handle.isAboveRunBar}; after a touch on the view ${stateAfterViewTouch}; after a swipe down ${stateAfterSwipe}, run bar ${isRunBarShownAfterSwipe ? "shown" : "hidden"}; view controls and legend shown: with the sheet ${viewControlsWithSheet}, after ${viewControlsAfterSwipe}; handle bar ${handle.height} px, touch area 44 px ${handle.isTouchArea}, first field ${handle.fieldDistance} px below it`,
   );
 
-  for (const step of ["domain", "fractures", "transport"]) {
+  for (const step of ["domain", "fractures", "flow", "transport"]) {
     await openStepPanel(page, step, true);
     const problems = await touchProblems(page);
     check(problems.length === 0, `phone: touch sizes of the ${step} panel`, problems.join(", ") || "none");
@@ -676,15 +676,17 @@ try {
     "step panels: hidden at the start, a segment opens one",
     panelStates.join(" | "),
   );
-  // The Flow segment is a status only: not a button, and a click opens no panel
-  const flowSegmentTag = await page.$eval('[data-step-panel="flow"]', (node) => node.tagName);
+  // The Flow segment opens the Flow panel: the fluid
   await page.click('[data-step-panel="flow"]');
-  const isPanelShownAfterFlowClick = await isStepPanelShown();
-  const flowGroupCount = await page.$$eval('[data-step-group="flow"]', (nodes) => nodes.length);
+  const flowPanel = await page.evaluate(() => ({
+    label: document.querySelector("#step-panel").getAttribute("aria-label"),
+    sections: [...document.querySelectorAll('[data-step-group="flow"] .form-section > h3')].map((node) => node.textContent).join(", "),
+  }));
+  await page.click('[data-step-panel="flow"]');
   check(
-    flowSegmentTag === "DIV" && !isPanelShownAfterFlowClick && flowGroupCount === 0,
-    "the Flow segment has no panel",
-    `${flowSegmentTag}, panel ${isPanelShownAfterFlowClick ? "shown" : "hidden"}, ${flowGroupCount} flow groups`,
+    flowPanel.label === "Flow" && flowPanel.sections === "Fluid",
+    "the Flow segment opens the fluid",
+    `${flowPanel.label}: ${flowPanel.sections}`,
   );
   // The run bar is one row as wide as its content: each step is an icon, with its name for the screen reader and at
   // the pointer
@@ -851,7 +853,7 @@ try {
   );
 
   // The Fractures panel has the families, then the user fractures; FRAM, clusters and mesh are in its closed advanced part, the pressures in the Domain panel; the
-  // settings dialog has three accordion cards: Fracture, Flow and Particle tracking (each
+  // settings dialog has two accordion cards: Fracture and Particle tracking (each
   // title in a summary). The forms have no number of points.
   const sectionTitles = (selector) =>
     page.$$eval(`${selector} .form-section > h3, ${selector} .settings-section h3`, (nodes) => nodes.map((node) => node.textContent).join(", "));
@@ -866,14 +868,14 @@ try {
     networkSections === "Fracture families, User-defined fractures" &&
       advancedSections === "Generation, FRAM, Clusters, Triangle mesh for the flow" &&
       !isAdvancedOpen &&
-      settingsSections === "Fracture, Flow, Particle tracking" &&
+      settingsSections === "Fracture, Particle tracking" &&
       pointFields.join(", ") === "settings-dialog",
     "the places of the settings sections",
     `Fractures panel: ${networkSections}; advanced (open ${isAdvancedOpen}): ${advancedSections}; settings: ${settingsSections}; number of points in ${pointFields.join(", ")}`,
   );
   // The run bar has one "Run" button, one "Reset" button and the Log button, with each panel
   const runButtons = [];
-  for (const step of ["domain", "fractures", "transport"]) {
+  for (const step of ["domain", "fractures", "flow", "transport"]) {
     await openStepPanel(page, step);
     runButtons.push(
       await page.$$eval(".player > button", (nodes) => nodes.map((node) => node.getAttribute("aria-label")).join(" ")),
@@ -1725,7 +1727,7 @@ try {
   const openSettingsSections = () =>
     page.$$eval("#settings-dialog details[open] h3", (nodes) => nodes.map((node) => node.textContent).join(", "));
   const openAtStart = await openSettingsSections();
-  await page.click("#flow-settings > summary");
+  await page.click("#transport-settings > summary");
   const openAfterTitleClick = await openSettingsSections();
   await page.screenshot({ path: `${screenshotDir}/e2e_settings.png` });
   await page.select("#orientation-option", "dip_strike");
@@ -1747,7 +1749,7 @@ try {
       anglesBack === anglesBefore &&
       !isOpenAfterEscape &&
       openAtStart === "Fracture" &&
-      openAfterTitleClick === "Flow" &&
+      openAfterTitleClick === "Particle tracking" &&
       !isOpenAfterBackdrop,
     "the orientation option of the settings dialog",
     `${orientationSelects} selects; open ${isOpenAfterClick} (${optionAtOpen}); sections ${openAtStart} → ${openAfterTitleClick}; ${anglesBefore} → ${anglesDipStrike} → ${anglesBack}; closed by Escape ${!isOpenAfterEscape}, by backdrop ${!isOpenAfterBackdrop}`,

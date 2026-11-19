@@ -61,9 +61,8 @@ output.
   The advanced part (closed at the start) has the stop condition, the FRAM
   rules of the generation, the choice of the clusters and the size of the
   triangles of the mesh for the flow.
-- **Flow**: the segment of the run bar shows the state of the flow; it has
-  no settings panel. The pressures are on the Domain panel, the fluid in the
-  settings.
+- **Flow**: the fluid of the flow (temperature and gravity). The pressures
+  are on the Domain panel.
 - **Transport**: the particles start only at release points. Click "Pick points", then click on a fracture of the 3D
   view: each click adds a release point and runs the particle tracking. With
   no release point, the run ends after the flow. The path of each particle
@@ -74,11 +73,10 @@ output.
   The pair of angles of all orientations (theta and phi, trend and plunge, or dip and
   strike). A new choice changes the angles of each family and fracture to the
   same plane. Also the number of points of all fractures (one value for the
-  families and the user fractures), the minimum feature size, the fluid of
-  the flow (temperature and gravity), the particle tracking (seed, time unit,
+  families and the user fractures), the minimum feature size, the particle tracking (seed, time unit,
   porosity, maximum time steps) and the routing of the particles at the
-  intersections. The settings are in three cards, as the cards of the
-  Fractures panel: Fracture, Flow and Particle tracking. A click on the title
+  intersections. The settings are in two cards, as the cards of the
+  Fractures panel: Fracture and Particle tracking. A click on the title
   of a card opens it and closes the open one.
 
 The 3D view shows the fractures during a generation, cut at the domain (the

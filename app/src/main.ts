@@ -13,12 +13,12 @@ import {
 import { boundarySurfaceSections, showSurfaceWarnings } from "./boundaryForm";
 import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
-import { fluidFields } from "./flow/form";
+import { fluidSection } from "./flow/form";
 import { defaultFlowState, pressureOf, setDefaultInflowPressures, type FlowState } from "./flow/state";
 import { flowToLibraryToml } from "./flow/toml";
 import { renderForm } from "./form";
 import type { FormContext } from "./form/context";
-import { clearPinnedItem, getPinnedItem, resetOpenCards, type HighlightItem } from "./form/fields";
+import { clearPinnedItem, element, getPinnedItem, resetOpenCards, type HighlightItem } from "./form/fields";
 import type { FileHandlers } from "./form/files";
 import { defaultFormState, ORIENTATION_KEYS, type FormState, type OrientationConvention } from "./form/state";
 import { InputFormError, networkToLibraryToml } from "./form/toml";
@@ -82,12 +82,13 @@ const NO_RELEASE_POINT = "To track particles, click “Pick points” (Transport
 // The steps of the run bar; the domain and the fractures are the network input
 const STEP_SEGMENTS = ["domain", "fractures", "flow", "transport"] as const;
 type StepSegment = (typeof STEP_SEGMENTS)[number];
-// The steps with a panel of their settings: the flow has none (its fluid is in the settings dialog)
-const STEP_PANELS = ["domain", "fractures", "transport"] as const satisfies readonly StepSegment[];
+// The steps with a panel of their settings: all
+const STEP_PANELS = ["domain", "fractures", "flow", "transport"] as const satisfies readonly StepSegment[];
 type StepPanel = (typeof STEP_PANELS)[number];
 const STEP_PANEL_TITLES: Record<StepPanel, string> = {
   domain: "Domain",
   fractures: "Fractures",
+  flow: "Flow",
   transport: "Transport",
 };
 /** The steps of the live run of each segment of the run bar; the domain has none */
@@ -122,7 +123,7 @@ const ui = {
   networkAdvancedForm: byId<HTMLDivElement>("network-advanced-form"),
   seedSettingsForm: byId<HTMLDivElement>("seed-settings-form"),
   settingsForm: byId<HTMLDivElement>("settings-form"),
-  flowSettingsForm: byId<HTMLDivElement>("flow-settings-form"),
+  flowForm: byId<HTMLDivElement>("flow-form"),
   transportSettingsForm: byId<HTMLDivElement>("transport-settings-form"),
   transportForm: byId<HTMLDivElement>("transport-form"),
   runButton: byId<HTMLButtonElement>("run-button"),
@@ -149,7 +150,6 @@ const ui = {
   dock: byId<HTMLDivElement>("dock"),
   runPanel: byId<HTMLDivElement>("run-panel"),
   stepPanel: byId<HTMLElement>("step-panel"),
-  // The Flow segment is a status only: not a button
   stepSegments: [...document.querySelectorAll<HTMLElement>("[data-step-panel]")],
   stepGroups: [...document.querySelectorAll<HTMLElement>("[data-step-group]")],
   sheetHandle: byId<HTMLButtonElement>("sheet-handle"),
@@ -468,10 +468,13 @@ function render(): void {
   updateUserFracturesInViewer();
 }
 
-/** The flow settings: the pressures of the boundary surfaces (Domain panel) and the fluid (settings dialog) */
+/** The flow settings: the pressures of the boundary surfaces (Domain panel) and the fluid (Flow panel) */
 function renderFlow(): void {
   renderBoundarySurfaces();
-  ui.flowSettingsForm.replaceChildren(...fluidFields(flowState, flowContext));
+  ui.flowForm.replaceChildren(
+    element("p", "form-note", "The pressures of the in-flow and out-flow surfaces are on the Domain panel."),
+    fluidSection(flowState, flowContext),
+  );
 }
 
 const pointPicking: PointPicking = {

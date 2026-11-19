@@ -109,6 +109,9 @@
                 <div id="network-advanced-form" class="form"></div>
               </details>
             </div>
+            <div data-step-group="flow">
+              <div id="flow-form" class="form"></div>
+            </div>
             <div data-step-group="transport">
               <div id="transport-form" class="form"></div>
             </div>
@@ -125,7 +128,7 @@
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14L8 12z" /></svg>
             </button>
             <span class="player-separator" aria-hidden="true"></span>
-            <!-- One icon for each step: its state strip, its name at the pointer; a click opens its settings (not the flow) -->
+            <!-- One icon for each step: its state strip, its name at the pointer; a click opens its settings -->
             <div class="timeline" role="group" aria-label="Steps">
               <button class="step-segment" type="button" data-step-panel="domain" data-step-state="empty" aria-expanded="false" aria-controls="step-panel" aria-label="Domain" title="Domain">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5L12 12l8-4.5M12 12v9" /></svg>
@@ -136,11 +139,10 @@
                 <span class="step-strip"></span><span class="step-label" aria-hidden="true">Fractures</span>
                 <progress id="progress" max="1" value="0" hidden></progress>
               </button>
-              <!-- The flow has no settings panel (its fluid is in the settings dialog): a status only -->
-              <div class="step-segment" role="img" data-step-panel="flow" data-step-state="stale" aria-label="Flow" title="Flow">
+              <button class="step-segment" type="button" data-step-panel="flow" data-step-state="stale" aria-expanded="false" aria-controls="step-panel" aria-label="Flow" title="Flow">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0M3 17c3-2 6 2 9 0s6-2 9 0" /></svg>
                 <span class="step-strip"></span><span class="step-label" aria-hidden="true">Flow</span>
-              </div>
+              </button>
               <button class="step-segment" type="button" data-step-panel="transport" data-step-state="stale" aria-expanded="false" aria-controls="step-panel" aria-label="Transport" title="Transport">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path stroke-dasharray="0.5 3.5" d="M3 20C9 20 7 6 14 6h4" /><path d="M16 3l4 3-4 3" /></svg>
                 <span class="step-strip"></span><span class="step-label" aria-hidden="true">Transport</span>
@@ -192,11 +194,6 @@
             </label>
             <!-- The fracture shape (form/shape.ts) -->
             <div id="settings-form"></div>
-          </details>
-          <details id="flow-settings" class="family-card settings-section" name="settings">
-            <summary class="family-header"><span class="card-title"><h3>Flow</h3></span></summary>
-            <!-- The fluid of the flow (flow/form.ts) -->
-            <div id="flow-settings-form"></div>
           </details>
           <details id="transport-settings" class="family-card settings-section" name="settings">
             <summary class="family-header"><span class="card-title"><h3>Particle tracking</h3></span></summary>

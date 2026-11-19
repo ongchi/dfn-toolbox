@@ -953,11 +953,6 @@ input[type="radio"] {
   cursor: pointer;
 }
 
-/* A status only (the flow): no click */
-div.step-segment {
-  cursor: default;
-}
-
 button.step-segment:hover {
   background: var(--surface);
   color: var(--text);

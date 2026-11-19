@@ -83,7 +83,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
   "dfngen.CheckpointInputChanged": () =>
     "The input changed during the run: the network needs a new generation. Click “Reset”, then “Run”.",
 
-  "fehm.TemperatureRange": (f) => `Temperature (Settings, Flow) must be ${f.min} to ${f.max} °C.`,
+  "fehm.TemperatureRange": (f) => `Temperature (Flow panel, Fluid) must be ${f.min} to ${f.max} °C.`,
   "fehm.NoBoundaryDefined": () =>
     "The network has no point on an in-flow or out-flow surface. Change the roles of the surfaces (Domain panel), or generate another network.",
   "fehm.PressureRange": (f) => `The pressure of the boundary ${f.boundary} (Domain panel) must be ${f.min} to ${f.max} MPa.`,

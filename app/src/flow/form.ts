@@ -1,12 +1,13 @@
-// The flow form: the fluid of the fehm input file, in the settings dialog.
+// The flow form: the fluid of the fehm input file, on the Flow panel.
 // The pressure boundaries are on the Domain panel (`boundaryForm.ts`).
 import type { FormContext } from "../form/context";
-import { checkboxField, numberField, row } from "../form/fields";
+import { checkboxField, numberField, row, section } from "../form/fields";
 import type { FlowState } from "./state";
 
-/** The fluid of the flow (settings dialog) */
-export function fluidFields(state: FlowState, context: FormContext): HTMLElement[] {
-  return [
+/** The fluid of the flow (Flow panel) */
+export function fluidSection(state: FlowState, context: FormContext): HTMLElement {
+  return section(
+    "Fluid",
     row(
       numberField({
         label: "Temperature (°C)",
@@ -29,5 +30,5 @@ export function fluidFields(state: FlowState, context: FormContext): HTMLElement
         context.changed();
       },
     }),
-  ];
+  );
 }
