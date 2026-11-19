@@ -565,7 +565,6 @@ export class NetworkViewer {
   private lastFrameTime: number | null = null;
   private colorArray: ColorArray | null = null;
   private isLogScale = false;
-  private isScalarBarShown = true;
   /** The camera moved: the next animation frame draws */
   private isDrawPending = false;
   private coveredArea: CoveredArea = { left: 0, top: 0, bottom: 0 };
@@ -827,12 +826,6 @@ export class NetworkViewer {
     return this.layers.get("final")?.shapes.cellArrays.map(([name]) => name) ?? [];
   }
 
-  /** The user's choice; a view with one color has no scalar bar in any case */
-  setScalarBarShown(isShown: boolean): void {
-    this.isScalarBarShown = isShown;
-    this.updateScalarBar();
-  }
-
   private colorValues(colorArray: ColorArray): Float64Array {
     const shapes = this.layers.get("final")?.shapes;
     const arrays = colorArray.association === "cell" ? shapes?.cellArrays : shapes?.pointArrays;
@@ -845,7 +838,7 @@ export class NetworkViewer {
 
   /** The scalar bar of the color array; the arrays of `SCALAR_BAR_UNITS` have a unit */
   private updateScalarBar(): void {
-    if (this.colorArray === null || !this.layers.has("final") || !this.isScalarBarShown) {
+    if (this.colorArray === null || !this.layers.has("final")) {
       this.scalarBar.hide();
       return;
     }

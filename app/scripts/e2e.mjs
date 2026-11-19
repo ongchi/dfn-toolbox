@@ -429,7 +429,8 @@ async function checkPhone() {
       stateAfterSwipe === "closed" &&
       isRunBarShownAfterSwipe &&
       viewControlsWithSheet === "false false" &&
-      viewControlsAfterSwipe === "true true" &&
+      // No result yet: no color panel
+      viewControlsAfterSwipe === "true false" &&
       handle.height <= 20 &&
       handle.isTouchArea &&
       handle.fieldDistance <= 16,
@@ -683,6 +684,9 @@ try {
     `${flowSegmentTag}, panel ${isPanelShownAfterFlowClick ? "shown" : "hidden"}, ${flowGroupCount} flow groups`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_start.png` });
+  // No result at the start: no color panel
+  const isColorPanelHiddenAtStart = await page.$eval("#color-panel", (node) => getComputedStyle(node).display === "none");
+  check(isColorPanelHiddenAtStart, "no color panel at the start", `hidden ${isColorPanelHiddenAtStart}`);
   const statesBeforeRun = await segmentStates(page);
   check(
     statesBeforeRun === "domain=done fractures=stale flow=stale transport=stale",
@@ -954,6 +958,7 @@ try {
       const select = panel.querySelector("#color-select").getBoundingClientRect();
       const legend = panel.querySelector(".color-legend");
       return {
+        isShown: getComputedStyle(panel).display !== "none",
         hasParts: panel.contains(document.querySelector("#log-scale")) && legend !== null && !legend.hidden,
         // No "Color by" text and no legend title: the unit is in the row of the select
         texts: [...panel.querySelectorAll(".color-panel-row > :not(select)")].map((node) => node.textContent.trim()).join(" | "),
@@ -963,7 +968,8 @@ try {
       };
     });
     check(
-      colorPanel.hasParts &&
+      colorPanel.isShown &&
+        colorPanel.hasParts &&
         colorPanel.texts === "MPa | Log" &&
         colorPanel.isLegendBelowSelect &&
         colorPanel.rightGap <= 16 &&
@@ -1599,24 +1605,29 @@ try {
   check(hoverLabel === "1", "icon label at the pointer", `${hoverLabel} after ${Date.now() - hoverStart} ms`);
   await page.screenshot({ path: `${screenshotDir}/e2e_icons.png` });
 
-  // The color bar goes off and comes back; the choice stays through a new color
+  // The color bar (the whole color panel) goes off and comes back; the choice stays through a new color
+  const isColorPanelShown = () => page.$eval("#color-panel", (node) => getComputedStyle(node).display !== "none");
   await page.mouse.move(0, 0);
   const viewWithColorBar = await viewerScreenshot();
   await page.click("#show-color-bar");
+  const isPanelShownWhenOff = await isColorPanelShown();
   const viewWithoutColorBar = await viewerScreenshot();
   await page.select("#color-select", "cell:area");
   const viewWithoutColorBarNewColor = await viewerScreenshot();
   await page.click("#show-color-bar");
+  const isPanelShownWhenOn = await isColorPanelShown();
   const viewNewColor = await viewerScreenshot();
   await page.click("#show-color-bar");
   const viewAgainWithoutColorBar = await viewerScreenshot();
   await page.click("#show-color-bar");
   check(
-    !isSameView(viewWithoutColorBar, viewWithColorBar) &&
+    !isPanelShownWhenOff &&
+      isPanelShownWhenOn &&
+      !isSameView(viewWithoutColorBar, viewWithColorBar) &&
       !isSameView(viewNewColor, viewWithoutColorBarNewColor) &&
       isSameView(viewAgainWithoutColorBar, viewWithoutColorBarNewColor),
     "color bar toggle",
-    "changed",
+    `panel off ${isPanelShownWhenOff ? "shown" : "hidden"}, on ${isPanelShownWhenOn ? "shown" : "hidden"}`,
   );
 
   // The Log panel stays open during a run, and the settings of a step too

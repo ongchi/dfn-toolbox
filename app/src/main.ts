@@ -659,6 +659,7 @@ async function releaseView(): Promise<void> {
     return;
   }
   isViewHeld = false;
+  updateColorPanel();
   if (!viewer) {
     return;
   }
@@ -1026,6 +1027,7 @@ function clearOutput(): void {
   ui.results.hidden = true;
   ui.logEmpty.hidden = false;
   ui.colorSelect.disabled = true;
+  updateColorPanel();
   ui.logScale.disabled = true;
   const view = outputViewer();
   if (view) {
@@ -1036,6 +1038,14 @@ function clearOutput(): void {
   }
   clearFlowOutput();
   renderFlow();
+}
+
+/**
+ * The color panel shows with a result (a color choice) while the layer button
+ * "Color bar" is on; a held view keeps its panel
+ */
+function updateColorPanel(): void {
+  ui.colorPanel.hidden = !ui.showColorBar.checked || (ui.colorSelect.disabled && !isViewHeld);
 }
 
 /**
@@ -1320,6 +1330,7 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
   ui.colorSelect.value =
     [selected, previous, DEFAULT_COLOR_OPTION].find((value) => value !== null && values.includes(value)) ?? "";
   ui.colorSelect.disabled = false;
+  updateColorPanel();
   applyColorChoice(view);
   view.render();
 }
@@ -1501,7 +1512,7 @@ function bindEvents(): void {
   for (const checkbox of [ui.showMesh, ui.showUserFractures, ui.showDiscarded, ui.showTrajectories, ui.showParticles]) {
     checkbox.addEventListener("change", () => updateViewer(applyLayerVisibility));
   }
-  ui.showColorBar.addEventListener("change", () => updateViewer((view) => view.setScalarBarShown(ui.showColorBar.checked)));
+  ui.showColorBar.addEventListener("change", updateColorPanel);
   ui.resetCamera.addEventListener("click", () => updateViewer((view) => view.resetCamera()));
 
   for (const segment of ui.stepSegments.filter((candidate) => candidate instanceof HTMLButtonElement)) {
