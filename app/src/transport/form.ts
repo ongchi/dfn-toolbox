@@ -1,8 +1,8 @@
 // The transport form: one field for each key of the dfntrans input file,
 // except the output (the trajectories and the velocities are always on) and
 // the in-flow and out-flow boundaries (the roles of the Domain panel). The
-// Transport panel has the seeding, and the particle tracking and the routing
-// in its advanced part, also before a flow.
+// Transport panel has the release points, and the particle tracking, the
+// particles per point and the routing in its advanced part, also before a flow.
 import type { FormContext } from "../form/context";
 import { element, numberField, row, section, selectField } from "../form/fields";
 import type { ReleasePoint, RoutingRule, TimeUnit, TransportState } from "./state";
@@ -94,6 +94,20 @@ export function particleTrackingFields(state: TransportState, context: FormConte
         },
       }),
     ),
+    row(
+      numberField({
+        label: "Particles per point",
+        key: "particles_per_point",
+        help: `1 or more; ${TRAJECTORY_SIZE}`,
+        value: state.seeding.particlesPerPoint,
+        isInteger: true,
+        min: 1,
+        onInput: (value) => {
+          state.seeding.particlesPerPoint = value;
+          context.changed();
+        },
+      }),
+    ),
   ];
 }
 
@@ -165,24 +179,7 @@ function releasePointFields(state: TransportState, context: FormContext, picking
       ? element("p", "form-note", "No release point. Click “Pick points”, then click on a fracture of the 3D view.")
       : list;
 
-  return [
-    row(
-      numberField({
-        label: "Particles per point",
-        key: "particles_per_point",
-        help: `1 or more; ${TRAJECTORY_SIZE}`,
-        value: seeding.particlesPerPoint,
-        isInteger: true,
-        min: 1,
-        onInput: (value) => {
-          seeding.particlesPerPoint = value;
-          context.changed();
-        },
-      }),
-    ),
-    buttons,
-    note,
-  ];
+  return [buttons, note];
 }
 
 /** Shows the transport form; `hasFlow` = there is a flow output */
