@@ -124,23 +124,29 @@
             <button id="reset-button" class="player-button" type="button" aria-label="Reset" title="Reset: remove all results; the next run starts from the seed">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5v14L8 12z" /></svg>
             </button>
-            <!-- One segment for each step: its state, and a click opens its settings (not the flow) -->
+            <span class="player-separator" aria-hidden="true"></span>
+            <!-- One icon for each step: its state strip, its name at the pointer; a click opens its settings (not the flow) -->
             <div class="timeline" role="group" aria-label="Steps">
-              <button class="step-segment" type="button" data-step-panel="domain" data-step-state="empty" aria-expanded="false" aria-controls="step-panel">
-                <span class="step-label">Domain</span><span class="step-strip"></span>
+              <button class="step-segment" type="button" data-step-panel="domain" data-step-state="empty" aria-expanded="false" aria-controls="step-panel" aria-label="Domain" title="Domain">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5L12 12l8-4.5M12 12v9" /></svg>
+                <span class="step-strip"></span><span class="step-label" aria-hidden="true">Domain</span>
               </button>
-              <button class="step-segment" type="button" data-step-panel="fractures" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
-                <span class="step-label">Fractures</span><span class="step-strip"></span>
+              <button class="step-segment" type="button" data-step-panel="fractures" data-step-state="stale" aria-expanded="false" aria-controls="step-panel" aria-label="Fractures" title="Fractures">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20H7l-4-8 4-7h9l5 7-5 8z" /></svg>
+                <span class="step-strip"></span><span class="step-label" aria-hidden="true">Fractures</span>
                 <progress id="progress" max="1" value="0" hidden></progress>
               </button>
               <!-- The flow has no settings panel (its fluid is in the settings dialog): a status only -->
-              <div class="step-segment" data-step-panel="flow" data-step-state="stale">
-                <span class="step-label">Flow</span><span class="step-strip"></span>
+              <div class="step-segment" role="img" data-step-panel="flow" data-step-state="stale" aria-label="Flow" title="Flow">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0M3 17c3-2 6 2 9 0s6-2 9 0" /></svg>
+                <span class="step-strip"></span><span class="step-label" aria-hidden="true">Flow</span>
               </div>
-              <button class="step-segment" type="button" data-step-panel="transport" data-step-state="stale" aria-expanded="false" aria-controls="step-panel">
-                <span class="step-label">Transport</span><span class="step-strip"></span>
+              <button class="step-segment" type="button" data-step-panel="transport" data-step-state="stale" aria-expanded="false" aria-controls="step-panel" aria-label="Transport" title="Transport">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path stroke-dasharray="0.5 3.5" d="M3 20C9 20 7 6 14 6h4" /><path d="M16 3l4 3-4 3" /></svg>
+                <span class="step-strip"></span><span class="step-label" aria-hidden="true">Transport</span>
               </button>
             </div>
+            <span class="player-separator" aria-hidden="true"></span>
             <button id="log-button" class="player-button" type="button" aria-label="Log" title="Log" aria-expanded="false" aria-controls="log-view">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
             </button>

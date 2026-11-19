@@ -15,11 +15,12 @@ show the direction and the speed of the flow.
 
 ## Use
 
-The run bar at the bottom is a media player. Its timeline has one segment
-for each step of the workflow; the segment shows the state of its step (not
-run, running with its progress, done, or failed). A click on a segment opens
-the settings of its step above the bar (the panel has no title: the open
-segment shows the step); a second click or Escape closes them. At the start, no settings show. One "Run" button (▶) runs
+The run bar at the bottom is a small media player. It has one icon for each
+step of the workflow (Domain, Fractures, Flow, Transport; the name shows at
+the pointer); the strip under the icon shows the state of its step (not
+run, running with its progress, done, or failed). A click on a step opens
+the settings of its step above the bar (the panel has no title: the icon
+of the open step is highlighted); a second click or Escape closes them. At the start, no settings show. One "Run" button (▶) runs
 all steps: the fractures, their triangle mesh, the flow and the transport.
 While the run is on (the pause button ❚❚ shows), a change of a setting runs the steps again from the
 first step which the change affects, 0.5 s after the last change; the results
@@ -92,7 +93,7 @@ the legend in one panel) at the bottom right, the run bar at the bottom left wit
 Log has the status of the steps (progress, results, warnings and errors); a
 red or yellow dot on the Log button shows an error or a warning. The
 settings of a step cover the view and do not move it. On a phone, the run bar
-is at the bottom over the full width, and the settings of a step are a sheet
+is one row at the bottom over the full width, and the settings of a step are a sheet
 on half of the screen; the run bar, the view controls and the colors are
 hidden while it shows. A tap or a
 swipe down on the handle bar at its top closes it. One finger turns the model, two fingers zoom it, and a

@@ -7,7 +7,6 @@
   --panel-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
   --gap: 12px;
   --settings-width: 420px;
-  --run-bar-width: 760px;
   --title-height: 48px;
   --scalar-bar-width: 300px;
   /* The icons of the layer rail, its padding and its border */
@@ -500,11 +499,11 @@ input[type="radio"] {
   position: absolute;
   left: calc(var(--gap) + env(safe-area-inset-left));
   bottom: calc(var(--gap) + env(safe-area-inset-bottom));
-  width: min(var(--run-bar-width), calc(100% - 3 * var(--gap) - var(--scalar-bar-width)));
+  max-width: calc(100% - 3 * var(--gap) - var(--scalar-bar-width));
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px;
+  padding: 6px;
 }
 
 /* The results, above the run bar, at the right of the settings of a step */
@@ -822,11 +821,19 @@ input[type="radio"] {
 
 /* ---------------------------------------------------------------- run bar */
 
-/* A media player: run or pause, reset, the steps as the timeline, the log */
+/* A media player: run or pause, reset, the steps as icons, the log; as wide as its content */
 .player {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+}
+
+.player-separator {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  margin: 0 2px;
+  background: var(--border);
 }
 
 .player-button {
@@ -834,8 +841,8 @@ input[type="radio"] {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 50%;
@@ -896,8 +903,8 @@ input[type="radio"] {
 
 /* Run: the main button */
 .player-play {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   background: var(--accent);
   color: var(--accent-text);
 }
@@ -920,25 +927,23 @@ input[type="radio"] {
   display: none;
 }
 
-/* The steps: one segment each, as the chapters of a timeline */
+/* The steps: one icon each, with its state strip below it */
 .timeline {
-  flex: 1;
-  min-width: 0;
+  flex: none;
   display: flex;
-  gap: 3px;
-  margin: 0 4px;
+  gap: 2px;
 }
 
 .step-segment {
   position: relative;
   -webkit-tap-highlight-color: transparent;
-  flex: 1;
-  min-width: 0;
+  flex: none;
+  width: 40px;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 5px;
-  padding: 6px 4px 4px;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 4px 4px;
   border: none;
   border-radius: var(--radius);
   background: none;
@@ -948,10 +953,9 @@ input[type="radio"] {
   cursor: pointer;
 }
 
-/* A status only (the flow): no click, the text centered as in a button */
+/* A status only (the flow): no click */
 div.step-segment {
   cursor: default;
-  text-align: center;
 }
 
 button.step-segment:hover {
@@ -964,15 +968,39 @@ button.step-segment:hover {
   color: var(--accent-strong);
 }
 
+.step-segment[data-step-state="failed"] {
+  color: var(--error);
+}
+
+.step-segment[data-step-state="running"] {
+  color: var(--text);
+}
+
+/* The name of the step above its icon, at the pointer or the keyboard focus (as the labels of the layer rail) */
 .step-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  color: var(--text);
   white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.step-segment:hover .step-label,
+.step-segment:focus-visible .step-label {
+  opacity: 1;
 }
 
 /* The state of the step: gray (not run), the accent (done: as the played part of a timeline), red (failed) */
 .step-strip {
-  height: 4px;
+  align-self: stretch;
+  height: 3px;
   border-radius: 2px;
   background: var(--border);
 }
@@ -985,14 +1013,6 @@ button.step-segment:hover {
   background: var(--error);
 }
 
-.step-segment[data-step-state="failed"] .step-label {
-  color: var(--error);
-}
-
-.step-segment[data-step-state="running"] .step-label {
-  color: var(--text);
-}
-
 /* The progress of the running step, over its strip */
 .step-segment progress {
   position: absolute;
@@ -1000,7 +1020,7 @@ button.step-segment:hover {
   right: 4px;
   bottom: 4px;
   width: calc(100% - 8px);
-  height: 4px;
+  height: 3px;
   accent-color: var(--accent);
 }
 
@@ -1251,9 +1271,20 @@ button.step-segment:hover {
     height: 44px;
   }
 
+  .player-play {
+    width: 44px;
+    height: 44px;
+  }
+
   .step-segment {
+    width: 44px;
     min-height: 44px;
     justify-content: center;
+  }
+
+  /* No pointer over a touch screen: the steps have no name label */
+  .step-label {
+    display: none;
   }
 
   /* No pointer over a touch screen: the icons have no label */
@@ -1371,19 +1402,9 @@ button.step-segment:hover {
     padding: 8px var(--gap) calc(8px + env(safe-area-inset-bottom));
   }
 
-  /* The timeline over the full width, the buttons below it: Run and Reset at the left, the log at the right */
+  /* One row over the full width: Run and Reset at the left, the steps in the middle, the log at the right */
   .player {
-    flex-wrap: wrap;
-  }
-
-  .timeline {
-    order: -1;
-    flex-basis: 100%;
-    margin: 0;
-  }
-
-  #log-button {
-    margin-left: auto;
+    justify-content: space-between;
   }
 
 

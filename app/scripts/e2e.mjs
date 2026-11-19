@@ -682,6 +682,24 @@ try {
     "the Flow segment has no panel",
     `${flowSegmentTag}, panel ${isPanelShownAfterFlowClick ? "shown" : "hidden"}, ${flowGroupCount} flow groups`,
   );
+  // The run bar is one row as wide as its content: each step is an icon, with its name for the screen reader and at
+  // the pointer
+  const runBar = await page.evaluate(() => ({
+    width: Math.round(document.querySelector("#run-panel").getBoundingClientRect().width),
+    names: [...document.querySelectorAll("[data-step-panel]")].map((node) => node.getAttribute("aria-label")).join(" "),
+    hasIcons: [...document.querySelectorAll("[data-step-panel]")].every((node) => node.querySelector("svg.icon") !== null),
+  }));
+  await page.hover('[data-step-panel="transport"]');
+  await page
+    .waitForFunction(() => getComputedStyle(document.querySelector('[data-step-panel="transport"] .step-label')).opacity === "1", { timeout: 3000 })
+    .catch(() => {});
+  const isNameShownAtPointer = await page.$eval('[data-step-panel="transport"] .step-label', (node) => getComputedStyle(node).opacity === "1");
+  await page.mouse.move(0, 0);
+  check(
+    runBar.width <= 360 && runBar.names === "Domain Fractures Flow Transport" && runBar.hasIcons && isNameShownAtPointer,
+    "run bar: step icons with names",
+    `${runBar.width} px, ${runBar.names}, icons ${runBar.hasIcons}, name at the pointer ${isNameShownAtPointer}`,
+  );
   await page.screenshot({ path: `${screenshotDir}/e2e_start.png` });
   // The color panel shows always, also with no result (no button hides it)
   const isColorPanelShownAtStart = await page.$eval("#color-panel", (node) => getComputedStyle(node).display !== "none");
