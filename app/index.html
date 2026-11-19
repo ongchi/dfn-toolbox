@@ -16,7 +16,7 @@
       </div>
 
       <!-- The colors of the view: the array, the scale, and the legend (viewer.ts) while an array colors the mesh -->
-      <div id="color-panel" class="panel color-panel" hidden>
+      <div id="color-panel" class="panel color-panel">
         <div class="color-panel-row">
           <select id="color-select" class="color-select" aria-label="Color by" title="Color by" disabled>
             <option value="">One color</option>
@@ -32,21 +32,6 @@
 
       <div id="viewer-toolbar" class="viewer-toolbar">
         <div class="panel layer-rail">
-          <label class="icon-toggle" title="Color bar">
-            <input id="show-color-bar" type="checkbox" checked aria-label="Color bar" />
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <linearGradient id="color-bar-gradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#ff0000" />
-                <stop offset="0.33" stop-color="#ffff00" />
-                <stop offset="0.67" stop-color="#00ffff" />
-                <stop offset="1" stop-color="#0000ff" />
-              </linearGradient>
-              <rect x="8" y="3" width="7" height="18" rx="1" fill="url(#color-bar-gradient)" />
-              <path d="M17.5 7H20M17.5 12H20M17.5 17H20" />
-            </svg>
-            <span class="icon-label">Color bar</span>
-          </label>
-          <span class="rail-separator"></span>
           <label class="icon-toggle" title="Domain">
             <input id="show-domain" type="checkbox" checked aria-label="Domain" />
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5L12 12l8-4.5M12 12v9" /></svg>

@@ -429,8 +429,7 @@ async function checkPhone() {
       stateAfterSwipe === "closed" &&
       isRunBarShownAfterSwipe &&
       viewControlsWithSheet === "false false" &&
-      // No result yet: no color panel
-      viewControlsAfterSwipe === "true false" &&
+      viewControlsAfterSwipe === "true true" &&
       handle.height <= 20 &&
       handle.isTouchArea &&
       handle.fieldDistance <= 16,
@@ -684,9 +683,9 @@ try {
     `${flowSegmentTag}, panel ${isPanelShownAfterFlowClick ? "shown" : "hidden"}, ${flowGroupCount} flow groups`,
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_start.png` });
-  // No result at the start: no color panel
-  const isColorPanelHiddenAtStart = await page.$eval("#color-panel", (node) => getComputedStyle(node).display === "none");
-  check(isColorPanelHiddenAtStart, "no color panel at the start", `hidden ${isColorPanelHiddenAtStart}`);
+  // The color panel shows always, also with no result (no button hides it)
+  const isColorPanelShownAtStart = await page.$eval("#color-panel", (node) => getComputedStyle(node).display !== "none");
+  check(isColorPanelShownAtStart, "color panel at the start", `shown ${isColorPanelShownAtStart}`);
   const statesBeforeRun = await segmentStates(page);
   check(
     statesBeforeRun === "domain=done fractures=stale flow=stale transport=stale",
@@ -1538,7 +1537,7 @@ try {
   );
 
 
-  // The icons of the 3D view, the color bar first: each has a name, and a computer shows its label only at the pointer
+  // The icons of the 3D view, the domain first: each has a name, and a computer shows its label only at the pointer
   await page.mouse.move(0, 0);
   const iconControls = await page.$$eval(".viewer-toolbar .icon-toggle", (nodes) =>
     nodes.map((node) => ({
@@ -1548,8 +1547,8 @@ try {
     })),
   );
   check(
-    iconControls.length === 8 &&
-      iconControls[0].name === "Color bar" &&
+    iconControls.length === 7 &&
+      iconControls[0].name === "Domain" &&
       iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
@@ -1602,31 +1601,6 @@ try {
   const hoverLabel = await page.$eval("#reset-camera .icon-label", (node) => getComputedStyle(node).opacity);
   check(hoverLabel === "1", "icon label at the pointer", `${hoverLabel} after ${Date.now() - hoverStart} ms`);
   await page.screenshot({ path: `${screenshotDir}/e2e_icons.png` });
-
-  // The color bar (the whole color panel) goes off and comes back; the choice stays through a new color
-  const isColorPanelShown = () => page.$eval("#color-panel", (node) => getComputedStyle(node).display !== "none");
-  await page.mouse.move(0, 0);
-  const viewWithColorBar = await viewerScreenshot();
-  await page.click("#show-color-bar");
-  const isPanelShownWhenOff = await isColorPanelShown();
-  const viewWithoutColorBar = await viewerScreenshot();
-  await page.select("#color-select", "cell:area");
-  const viewWithoutColorBarNewColor = await viewerScreenshot();
-  await page.click("#show-color-bar");
-  const isPanelShownWhenOn = await isColorPanelShown();
-  const viewNewColor = await viewerScreenshot();
-  await page.click("#show-color-bar");
-  const viewAgainWithoutColorBar = await viewerScreenshot();
-  await page.click("#show-color-bar");
-  check(
-    !isPanelShownWhenOff &&
-      isPanelShownWhenOn &&
-      !isSameView(viewWithoutColorBar, viewWithColorBar) &&
-      !isSameView(viewNewColor, viewWithoutColorBarNewColor) &&
-      isSameView(viewAgainWithoutColorBar, viewWithoutColorBarNewColor),
-    "color bar toggle",
-    `panel off ${isPanelShownWhenOff ? "shown" : "hidden"}, on ${isPanelShownWhenOn ? "shown" : "hidden"}`,
-  );
 
   // The Log panel stays open during a run, and the settings of a step too
   await openStepPanel(page, "fractures");

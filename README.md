@@ -88,7 +88,7 @@ user fractures, removed and rejected fractures, and particle paths.
 
 The 3D view fills the page, and the controls float over it: the title at the
 top left, the layers at the top right, the colors (the array select, the scale and
-the legend in one panel; only with a result) at the bottom right, the run bar at the bottom left with the settings of the open step above it, and the Log. The
+the legend in one panel) at the bottom right, the run bar at the bottom left with the settings of the open step above it, and the Log. The
 Log has the status of the steps (progress, results, warnings and errors); a
 red or yellow dot on the Log button shows an error or a warning. The
 settings of a step cover the view and do not move it. On a phone, the run bar
