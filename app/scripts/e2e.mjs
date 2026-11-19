@@ -557,6 +557,23 @@ async function checkPhone() {
     JSON.stringify(landscape),
   );
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_landscape.png` });
+
+  // A tablet in portrait (820 px): the panels float as on a computer (no sheet, the title shown); the view controls
+  // are at the bottom right, the color panel above them (the open step of the landscape check stays open)
+  await page.setViewport({ width: 820, height: 1180, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const tablet = await page.evaluate(() => {
+    const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+    const [panel, runBar, rail, color, title] = ["#step-panel", "#run-panel", ".layer-rail", "#color-panel", "#title-panel"].map(box);
+    return {
+      isPanelFloating: panel.left > 0 && panel.bottom <= runBar.top && panel.width === 340,
+      isRunBarNarrow: runBar.left > 0 && runBar.right < window.innerWidth / 2,
+      isColorAboveRail: color.bottom <= rail.top && rail.bottom === runBar.bottom && window.innerWidth - rail.right <= 8 && window.innerWidth - color.right <= 8,
+      isTitleShown: title.width > 0,
+    };
+  });
+  check(Object.values(tablet).every(Boolean), "tablet: floating panels, the color panel above the view controls", JSON.stringify(tablet));
+  await page.screenshot({ path: `${screenshotDir}/e2e_tablet.png` });
   await page.close();
 }
 

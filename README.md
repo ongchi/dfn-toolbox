@@ -92,7 +92,9 @@ code at the top right, the colors (the array
 select, the scale and the legend in one panel) at the bottom right, and the Log. The
 Log has the status of the steps (progress, results, warnings and errors); a
 red or yellow dot on the Log button shows an error or a warning. The
-settings of a step cover the view and do not move it. On a phone, the run bar
+settings of a step cover the view and do not move it. On a medium width (a
+tablet in portrait, 660 to 959 px), the layers are at the bottom right and the
+colors above them. On a phone (below 660 px), the run bar
 is one row at the bottom over the full width, the layers are one row above it
 and the colors above the layers, and the settings of a step are a sheet
 above it: the sheet and the run bar take the lower half of the screen, and

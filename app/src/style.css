@@ -1216,12 +1216,6 @@ button.step-segment:hover {
     --settings-width: 340px;
     --scalar-bar-width: 220px;
     --rail-width: calc(44px + 2 * 6px + 2px);
-    --title-height: 0px;
-  }
-
-  /* The title takes no place on a small screen */
-  .title-panel {
-    display: none;
   }
 
   .subtitle {
@@ -1320,6 +1314,15 @@ button.step-segment:hover {
 /* A low landscape screen: the run bar, the view controls and the color panel do not fit in one row: the view
    controls are at the top, at the left of the link to the source code */
 @media (max-height: 500px) and (orientation: landscape) {
+  /* The title takes no place on a small screen */
+  :root {
+    --title-height: 0px;
+  }
+
+  .title-panel {
+    display: none;
+  }
+
   .viewer-toolbar {
     top: calc(var(--gap) + env(safe-area-inset-top));
     right: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-right));
@@ -1344,10 +1347,37 @@ button.step-segment:hover {
 
 }
 
+/* A medium width (a tablet in portrait, a narrow window): the panels float as on a computer, but only the run bar
+   and the view controls fit in one row (650 px with touch sizes): the view controls are at the bottom right, the
+   color panel above them, and the Log above the color panel */
+@media (min-width: 660px) and (max-width: 959px) and (min-height: 501px) {
+  .viewer-toolbar {
+    left: auto;
+    right: calc(var(--gap) + env(safe-area-inset-right));
+  }
+
+  .color-panel {
+    bottom: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-bottom));
+  }
+
+  .log-view {
+    bottom: calc(3 * var(--gap) + var(--color-panel-height, 44px) + var(--rail-width) + env(safe-area-inset-bottom));
+  }
+}
+
 /* A phone in portrait: the run bar is at the bottom over the full width, the
    settings of the open step are a bottom sheet above it, and the 3D view fills
    the screen above them */
-@media (max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px) {
+@media (max-width: 659px) and (orientation: portrait), (max-width: 659px) and (min-height: 501px) {
+  /* The title takes no place on a small screen */
+  :root {
+    --title-height: 0px;
+  }
+
+  .title-panel {
+    display: none;
+  }
+
   .dock {
     position: absolute;
     left: 0;

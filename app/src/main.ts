@@ -102,7 +102,7 @@ const STEP_PANEL_CHAIN_STEPS: Record<StepSegment, ChainStep[]> = {
 type SegmentState = "empty" | "stale" | "running" | "failed" | "done";
 
 /** The screens with the settings in a bottom sheet: the condition of this layout in `style.css` */
-const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait), (max-width: 900px) and (min-height: 501px)";
+const SHEET_QUERY = "(max-width: 659px) and (orientation: portrait), (max-width: 659px) and (min-height: 501px)";
 /** The vertical move (pixels) of a swipe down on the handle bar of the sheet */
 const SHEET_SWIPE_DISTANCE = 30;
 
@@ -1511,6 +1511,7 @@ function updateCoveredArea(): void {
   ui.layout.style.setProperty("--covered-bottom", `${coveredBottom}px`);
   ui.layout.style.setProperty("--run-panel-height", `${ui.runPanel.offsetHeight}px`);
   ui.layout.style.setProperty("--run-panel-width", `${ui.runPanel.offsetWidth}px`);
+  ui.layout.style.setProperty("--color-panel-height", `${ui.colorPanel.offsetHeight}px`);
   viewer?.setCoveredArea({
     left: 0,
     top: isSheet ? 0 : ui.titlePanel.getBoundingClientRect().bottom,
@@ -1568,7 +1569,7 @@ function bindEvents(): void {
     }
   });
   const coveredAreaObserver = new ResizeObserver(updateCoveredArea);
-  for (const panel of [ui.dock, ui.runPanel, ui.viewerToolbar]) {
+  for (const panel of [ui.dock, ui.runPanel, ui.viewerToolbar, ui.colorPanel]) {
     coveredAreaObserver.observe(panel);
   }
   window.addEventListener("resize", updateCoveredArea);
