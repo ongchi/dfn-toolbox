@@ -470,9 +470,10 @@ async function checkPhone() {
     JSON.stringify(logBox),
   );
 
-  // The view controls are always on the view; the icons have no label on a touch screen
+  // The view controls are always on the view; the icons of the rail have no label on a touch screen (the rows of the
+  // layer menu have their names)
   const phoneLabels = await page.$$eval(".viewer-toolbar .icon-label", (nodes) =>
-    nodes.filter((node) => getComputedStyle(node).display !== "none").length,
+    nodes.filter((node) => !node.closest(".layer-menu-list") && getComputedStyle(node).display !== "none").length,
   );
   check(phoneLabels === 0, "phone: no labels of the icons", String(phoneLabels));
   const box = await page.$eval("#viewer-canvas", (node) => {
@@ -1569,7 +1570,7 @@ try {
 
   // The icons of the 3D view, the domain first: each has a name, and a computer shows its label only at the pointer
   await page.mouse.move(0, 0);
-  const iconControls = await page.$$eval(".viewer-toolbar .icon-toggle", (nodes) =>
+  const iconControls = await page.$$eval(".layer-rail > .icon-toggle, .layer-menu > .icon-toggle", (nodes) =>
     nodes.map((node) => ({
       name: node.querySelector("input")?.getAttribute("aria-label") ?? node.getAttribute("aria-label"),
       hasTitle: node.title !== "",
@@ -1577,12 +1578,55 @@ try {
     })),
   );
   check(
-    iconControls.length === 7 &&
+    iconControls.length === 5 &&
       iconControls[0].name === "Domain" &&
+      iconControls[1].name === "More layers" &&
       iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
   );
+  // The menu "More layers" at the left of its button: User fractures, Mesh and Removed; it stays open at a change,
+  // and closes by Escape and by a click outside it
+  const layerMenu = () =>
+    page.evaluate(() => {
+      const menu = document.querySelector("#layer-menu");
+      const button = document.querySelector("#layer-menu-button");
+      return {
+        isOpen: !menu.hidden && button.getAttribute("aria-expanded") === "true",
+        rows: [...menu.querySelectorAll(".icon-label")].map((node) => node.textContent).join(", "),
+        isLeft: menu.getBoundingClientRect().right <= button.getBoundingClientRect().left,
+      };
+    });
+  const menuAtStart = await layerMenu();
+  await page.click("#layer-menu-button");
+  const menuOpen = await layerMenu();
+  await page.click("#show-mesh");
+  const menuAfterChange = await layerMenu();
+  const isMeshOff = await page.$eval("#show-mesh", (node) => !node.checked);
+  await page.click("#show-mesh");
+  await page.keyboard.press("Escape");
+  const menuAfterEscape = await layerMenu();
+  await page.click("#layer-menu-button");
+  await page.mouse.click(5, 5);
+  const menuAfterOutside = await layerMenu();
+  check(
+    !menuAtStart.isOpen &&
+      menuOpen.isOpen &&
+      menuOpen.isLeft &&
+      menuOpen.rows.startsWith("User fractures, Mesh, Removed") &&
+      menuAfterChange.isOpen &&
+      isMeshOff &&
+      !menuAfterEscape.isOpen &&
+      !menuAfterOutside.isOpen,
+    "the menu of more layers",
+    `start ${menuAtStart.isOpen}, open ${menuOpen.isOpen} (left ${menuOpen.isLeft}: ${menuOpen.rows}), after a change ${menuAfterChange.isOpen} (mesh off ${isMeshOff}), after Escape ${menuAfterEscape.isOpen}, after an outside click ${menuAfterOutside.isOpen}`,
+  );
+  // A change in the menu, which closes again: the view without the menu
+  const clickInLayerMenu = async (selector) => {
+    await page.click("#layer-menu-button");
+    await page.click(selector);
+    await page.click("#layer-menu-button");
+  };
   // One button shows the removed fractures (the network of the last run has some) and the rejected ones
   const removedCount = await page.$eval("#results-stats", (node) => {
     const values = Object.fromEntries([...node.querySelectorAll("dt")].map((term) => [term.textContent, Number(term.nextElementSibling?.textContent)]));
@@ -1590,10 +1634,10 @@ try {
   });
   await page.mouse.move(0, 0);
   const viewWithoutDiscarded = await viewerScreenshot();
-  await page.click("#show-discarded");
+  await clickInLayerMenu("#show-discarded");
   await page.mouse.move(0, 0);
   const viewWithDiscarded = await viewerScreenshot();
-  await page.click("#show-discarded");
+  await clickInLayerMenu("#show-discarded");
   await page.mouse.move(0, 0);
   const viewAfterDiscarded = await viewerScreenshot();
   check(

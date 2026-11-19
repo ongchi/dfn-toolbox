@@ -81,7 +81,9 @@ The 3D view shows the fractures during a generation, cut at the domain (the
 mesh has the same shape). A change of a user-defined fracture shows its
 whole polygon until the next network. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,
-user fractures, removed and rejected fractures, and particle paths.
+user fractures, removed and rejected fractures, and particle paths. The user
+fractures, the mesh and the removed fractures are in the menu "More layers"
+of the layer buttons; the menu stays open while you change them.
 
 The 3D view fills the page, and the controls float over it: the title at the
 top left, the layers at the top right, the colors (the array select, the scale and

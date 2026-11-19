@@ -139,6 +139,8 @@ const ui = {
   showUserFractures: byId<HTMLInputElement>("show-user-fractures"),
   /** The removed and the rejected fractures: one layer button */
   showDiscarded: byId<HTMLInputElement>("show-discarded"),
+  layerMenuButton: byId<HTMLButtonElement>("layer-menu-button"),
+  layerMenu: byId<HTMLDivElement>("layer-menu"),
   showParticles: byId<HTMLInputElement>("show-particles"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
@@ -1233,6 +1235,12 @@ async function showTransportInViewer(): Promise<void> {
   view.render();
 }
 
+/** Opens or closes the menu of more layers; it stays open at a change of a layer */
+function toggleLayerMenu(isOpen: boolean): void {
+  ui.layerMenu.hidden = !isOpen;
+  ui.layerMenuButton.setAttribute("aria-expanded", String(isOpen));
+}
+
 /** The layer button of the discarded fractures: the rejected ones only after a network with FRAM on */
 function showDiscardedLabel(): void {
   const label = generatedNetwork?.isFramOn ? "Removed and rejected" : "Removed";
@@ -1529,8 +1537,13 @@ function bindEvents(): void {
       openStepPanel(name === openPanel ? null : name);
     });
   }
-  // Escape closes the settings of a step; a field keeps its own Escape
+  // Escape closes the menu of more layers first, then the settings of a step; a field keeps its own Escape
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !ui.layerMenu.hidden) {
+      toggleLayerMenu(false);
+      ui.layerMenuButton.focus();
+      return;
+    }
     const isInField = event.target instanceof Element && event.target.matches("input, select, textarea");
     if (event.key === "Escape" && openPanel !== null && !isInField) {
       closeStepPanel();
@@ -1538,6 +1551,13 @@ function bindEvents(): void {
   });
   bindSheetHandle();
   ui.logButton.addEventListener("click", toggleLog);
+  ui.layerMenuButton.addEventListener("click", () => toggleLayerMenu(ui.layerMenu.hidden !== false));
+  // A pointer down outside the menu and its button closes the menu
+  document.addEventListener("pointerdown", (event) => {
+    if (!ui.layerMenu.hidden && event.target instanceof Node && !ui.layerMenu.parentElement?.contains(event.target)) {
+      toggleLayerMenu(false);
+    }
+  });
   ui.orientationOption.addEventListener("change", () => {
     const convention = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).find(
       (candidate) => candidate === ui.orientationOption.value,
