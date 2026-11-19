@@ -1,7 +1,7 @@
 // The input form of the network: one section for each part of `[network]`, in
 // three step panels (the domain, the user-defined fractures, and the other
 // sections, with the stop condition, FRAM, the clusters and the triangle mesh
-// in its advanced part) and the card "Fracture" of the settings dialog (the seed, the fracture shape).
+// in its advanced part, with the seed and the fracture shape in its section "Fracture").
 import { clustersSection } from "./clusters";
 import type { FormContext } from "./context";
 import { familiesSection } from "./families";
@@ -14,13 +14,13 @@ import { shapeFields } from "./shape";
 import type { FormState } from "./state";
 import { userFracturesSection } from "./userFractures";
 
-/** The containers of the three step panels of the network input, of its advanced part, and of its fields in the card "Fracture" of the settings dialog */
+/** The containers of the three step panels of the network input, of its advanced part, and of the fields of its section "Fracture" */
 export interface NetworkTabs {
   domain: HTMLElement;
   fractures: HTMLElement;
   network: HTMLElement;
   advanced: HTMLElement;
-  /** The first field of the card "Fracture" */
+  /** The first field of the section "Fracture" of the advanced part */
   seed: HTMLElement;
   settings: HTMLElement;
 }

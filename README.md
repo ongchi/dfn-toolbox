@@ -58,9 +58,15 @@ output.
   new choice moves the highlight to the new region. The network keeps only
   the clusters which connect an in-flow and an out-flow surface. If there is
   no such cluster, a warning shows, and the run stops after the fractures.
-  The advanced part (closed at the start) has the stop condition, the FRAM
-  rules of the generation, the choice of the clusters and the size of the
-  triangles of the mesh for the flow.
+  The advanced part (closed at the start) has the section "Fracture": the
+  seed of the generation ("Random" sets a new one; 0 = a random seed for each
+  run), the pair of angles of all orientations (theta and phi, trend and
+  plunge, or dip and strike; a new choice changes the angles of each family
+  and fracture to the same plane), the number of points of all fractures
+  (one value for the families and the user fractures) and the minimum
+  feature size. Then the stop condition, the FRAM rules of the generation,
+  the choice of the clusters and the size of the triangles of the mesh for
+  the flow.
 - **Flow**: the fluid of the flow (temperature and gravity). The pressures
   are on the Domain panel.
 - **Transport**: the particles start only at release points. Click "Pick points", then click on a fracture of the 3D
@@ -68,16 +74,9 @@ output.
   no release point, the run ends after the flow. The path of each particle
   shows, also of a particle which does not exit. The panel has only the
   seeding; the other transport settings are in the settings.
-- **Settings** (the gear button below the layers of the 3D view): the seed of
-  the generation ("Random" sets a new one; 0 = a random seed for each run).
-  The pair of angles of all orientations (theta and phi, trend and plunge, or dip and
-  strike). A new choice changes the angles of each family and fracture to the
-  same plane. Also the number of points of all fractures (one value for the
-  families and the user fractures), the minimum feature size, the particle tracking (seed, time unit,
-  porosity, maximum time steps) and the routing of the particles at the
-  intersections. The settings are in two cards, as the cards of the
-  Fractures panel: Fracture and Particle tracking. A click on the title
-  of a card opens it and closes the open one.
+- **Settings** (the gear button below the layers of the 3D view): the card
+  "Particle tracking" (seed, time unit, porosity, maximum time steps, and the
+  routing of the particles at the intersections).
 
 The 3D view shows the fractures during a generation, cut at the domain (the
 mesh has the same shape). A change of a user-defined fracture shows its

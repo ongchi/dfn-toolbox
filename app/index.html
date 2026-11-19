@@ -103,10 +103,29 @@
             <div data-step-group="fractures">
               <div id="form" class="form"></div>
               <div id="fractures-form" class="form"></div>
-              <!-- The sections of the network input which most runs keep (form/index.ts) -->
+              <!-- The sections of the network input which most runs keep: the seed and the fracture shape (static, with the
+                   containers of form/seed.ts and form/shape.ts), then those of form/index.ts -->
               <details class="advanced-settings">
-                <summary>Advanced: FRAM, clusters, triangle mesh</summary>
-                <div id="network-advanced-form" class="form"></div>
+                <summary>Advanced</summary>
+                <div class="form">
+                  <section class="form-section">
+                    <h3>Fracture</h3>
+                    <!-- The seed of the generation (form/seed.ts) -->
+                    <div id="seed-settings-form"></div>
+                    <label class="field">
+                      <span class="field-label">Orientation</span>
+                      <select id="orientation-option">
+                        <option value="theta_phi">Theta and phi</option>
+                        <option value="trend_plunge">Trend and plunge</option>
+                        <option value="dip_strike">Dip and strike</option>
+                      </select>
+                      <span class="field-help">The pair of angles of the normal of each family and user fracture. A new choice changes the angles of each one to the same plane.</span>
+                    </label>
+                    <!-- The fracture shape (form/shape.ts) -->
+                    <div id="settings-form"></div>
+                  </section>
+                  <div id="network-advanced-form"></div>
+                </div>
               </details>
             </div>
             <div data-step-group="flow">
@@ -178,24 +197,8 @@
       <dialog id="settings-dialog" class="panel settings-dialog" aria-labelledby="settings-title">
         <form class="settings-content" method="dialog">
           <h2 id="settings-title">Settings</h2>
-          <!-- Three accordion cards in the style of the cards of the Fractures panel; a new render of their fields keeps the open card -->
-          <details id="fracture-settings" class="family-card settings-section" name="settings" open>
-            <summary class="family-header"><span class="card-title"><h3>Fracture</h3></span></summary>
-            <!-- The seed of the generation (form/seed.ts) -->
-            <div id="seed-settings-form"></div>
-            <label class="field">
-              <span class="field-label">Orientation</span>
-              <select id="orientation-option">
-                <option value="theta_phi">Theta and phi</option>
-                <option value="trend_plunge">Trend and plunge</option>
-                <option value="dip_strike">Dip and strike</option>
-              </select>
-              <span class="field-help">The pair of angles of the normal of each family and user fracture. A new choice changes the angles of each one to the same plane.</span>
-            </label>
-            <!-- The fracture shape (form/shape.ts) -->
-            <div id="settings-form"></div>
-          </details>
-          <details id="transport-settings" class="family-card settings-section" name="settings">
+          <!-- An accordion card in the style of the cards of the Fractures panel; a new render of its fields keeps it open -->
+          <details id="transport-settings" class="family-card settings-section" name="settings" open>
             <summary class="family-header"><span class="card-title"><h3>Particle tracking</h3></span></summary>
             <!-- The particle tracking and the routing of the transport (transport/form.ts) -->
             <div id="transport-settings-form"></div>

@@ -35,12 +35,12 @@ const APERTURE_VALUES =
 
 /** The text of each kind which the user can cause */
 const TEXTS: Record<string, (fields: Fields) => string> = {
-  "dfngen.MinFeatureSize": () => "Minimum feature size (Settings, Fracture) must be greater than 0.",
+  "dfngen.MinFeatureSize": () => "Minimum feature size (Fractures panel, Advanced, Fracture) must be greater than 0.",
   "dfngen.Family.UnknownRegion": (f) => `${FAMILY(f)}: the domain has no region ${f.region}. Choose another region.`,
   "dfngen.Family.EmptyRegion": (f) =>
     `${FAMILY(f)}: the region ${f.region} has no cell in the domain. Choose another region.`,
-  // One value for all fractures (settings dialog): the family is the first one which dfngen checks
-  "dfngen.Family.NumberOfPoints": () => "Number of points (Settings, Fracture) must be 3 or more.",
+  // One value for all fractures (Fractures panel, Advanced): the family is the first one which dfngen checks
+  "dfngen.Family.NumberOfPoints": () => "Number of points (Fractures panel, Advanced, Fracture) must be 3 or more.",
   "dfngen.Family.AspectRatio": (f) => `${FAMILY(f)}: Aspect ratio must be greater than 0.`,
   "dfngen.Family.OrientationPair": (f) => `${FAMILY(f)}: the orientation must have one pair of angles.`,
   "dfngen.Family.P32TargetMissing": (f) =>
@@ -79,7 +79,7 @@ const TEXTS: Record<string, (fields: Fields) => string> = {
     "There is no fracture. Add a fracture family or a user-defined fracture (Fractures panel).",
   "dfngen.NoIntersectingFractures": () =>
     "No fractures intersect. Increase the number of fractures or their size (Fractures panel), or decrease Minimum feature size.",
-  "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (Settings, Fracture). Details: ${f.message}`,
+  "dfngen.Mesh": (f) => `The triangle mesh of the network failed. Try another seed (Fractures panel, Advanced, Fracture). Details: ${f.message}`,
   "dfngen.CheckpointInputChanged": () =>
     "The input changed during the run: the network needs a new generation. Click “Reset”, then “Run”.",
 
