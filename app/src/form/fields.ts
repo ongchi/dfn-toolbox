@@ -117,7 +117,8 @@ function bindHighlight(target: HTMLElement, highlight: (item: HighlightItem | nu
   markPin(target);
   target.addEventListener("click", (event) => {
     const item = targetItem(target);
-    if (event.target instanceof HTMLSelectElement || event.target instanceof HTMLInputElement || item === null) {
+    // Also an <option> of a select (Firefox)
+    if ((event.target instanceof Element && event.target.closest("select, input") !== null) || item === null) {
       return;
     }
     // The label does not focus its input: on a phone that opens the keyboard

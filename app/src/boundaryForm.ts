@@ -53,11 +53,19 @@ function pressureRow(name: string, handlers: BoundarySurfaceHandlers): HTMLEleme
   });
   row.classList.add("boundary-row");
   row.append(element("span", "unit", "MPa"), roleSelect(name, handlers));
-  if (!handlers.hasPoints(name)) {
-    row.append(element("span", "field-help is-warning", "The network has no point on this surface: the flow does not use it."));
-  }
+  const warning = element("span", "field-help is-warning", "The network has no point on this surface: the flow does not use it.");
+  warning.dataset.noPointsWarning = name;
+  warning.hidden = handlers.hasPoints(name);
+  row.append(warning);
   bindSurfaceHighlight(row, name, handlers.onHover);
   return row;
+}
+
+/** Shows the warning of each in-flow and out-flow surface with no point, without a new panel */
+export function showSurfaceWarnings(container: HTMLElement, hasPoints: (name: string) => boolean): void {
+  for (const warning of container.querySelectorAll<HTMLElement>("[data-no-points-warning]")) {
+    warning.hidden = hasPoints(warning.dataset.noPointsWarning ?? "");
+  }
 }
 
 /** A no-flow surface: its name and its role */
@@ -85,7 +93,7 @@ function groupSection(role: SurfaceRole, title: string, names: string[], handler
 export function boundarySurfaceSections(names: string[], handlers: BoundarySurfaceHandlers): HTMLElement[] {
   const help = helpText(
     undefined,
-    "The pointer over a surface highlights it in the 3D view, and a click (a tap) on its name keeps it highlighted until a second click. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure (0.001 to 110 MPa) on each of them; a point on two surfaces keeps the pressure of the higher surface in this panel. The particles go from the in-flow to the out-flow surfaces.",
+    "The pointer over a surface highlights it in the 3D view, and a click (a tap) on its name keeps it highlighted until a second click. The network keeps only the clusters which connect an in-flow and an out-flow surface. The flow has a pressure (0.001 to 110 MPa) on each of them; a point on two surfaces with different pressures keeps the pressure of the higher surface in this panel. The particles go from the in-flow to the out-flow surfaces.",
   );
   return [...GROUPS.map(([role, title]) => groupSection(role, title, names, handlers)), ...(help ? [help] : [])];
 }

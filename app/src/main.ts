@@ -10,7 +10,7 @@ import {
   surfacesWithPoints,
   type BoundaryRoles,
 } from "./boundaryRoles";
-import { boundarySurfaceSections } from "./boundaryForm";
+import { boundarySurfaceSections, showSurfaceWarnings } from "./boundaryForm";
 import { boundarySurfaceCells, domainBoundarySurfaceNames, domainWireframe } from "./boundarySurfaces";
 import { toolErrorText } from "./errors";
 import { fluidSection } from "./flow/form";
@@ -537,16 +537,28 @@ function showHighlight(view: NetworkViewer, item: HighlightItem | null): void {
   view.highlightRegion(item?.kind === "region" ? item.name : null);
 }
 
-function renderBoundarySurfaces(): void {
+/** The boundary surfaces with a point in the triangle mesh; before a triangle mesh, all (no warning) */
+function boundarySurfacesWithPoints(): string[] {
   const mesh = flowMesh();
-  // Before a triangle mesh, no surface shows a warning
-  const withPoints = mesh === null ? boundarySurfaceNames : surfacesWithPoints(mesh.boundaries, boundarySurfaceNames);
+  return mesh === null ? boundarySurfaceNames : surfacesWithPoints(mesh.boundaries, boundarySurfaceNames);
+}
+
+/** A new mesh or no mesh: the warnings of the Domain panel change in place, thus a field keeps its focus */
+function updateSurfaceWarnings(): void {
+  const withPoints = boundarySurfacesWithPoints();
+  showSurfaceWarnings(ui.boundarySurfaces, (name) => withPoints.includes(name));
+}
+
+function renderBoundarySurfaces(): void {
+  const withPoints = boundarySurfacesWithPoints();
   ui.boundarySurfaces.replaceChildren(
     ...boundarySurfaceSections(boundarySurfaceNames, {
       roleOf: (name) => roleOf(boundaryRoles, name),
       onRole: (name, role) => {
         setRole(boundaryRoles, name, role, boundarySurfaceNames);
         renderBoundarySurfaces();
+        // The row under the pointer is gone, without a mouseleave
+        highlight(getPinnedItem());
         // The network keeps the clusters which connect the in-flow and out-flow surfaces
         networkChanged();
       },
@@ -932,10 +944,15 @@ function flowInput(): FlowInput | string {
   if (mesh === null) {
     return "The flow needs the triangle mesh of a network.";
   }
-  if (ui.boundarySurfaces.querySelector(".is-invalid")) {
+  const surfaces = surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles));
+  // An invalid pressure of a surface which the flow does not use is no error
+  const isInvalid = [...ui.boundarySurfaces.querySelectorAll(".is-invalid")].some((field) =>
+    surfaces.includes(field.closest<HTMLElement>("[data-highlight-surface]")?.dataset.highlightSurface ?? ""),
+  );
+  if (isInvalid) {
     return "A pressure of the Domain panel has an invalid value (red border). Correct it first.";
   }
-  return { toml: flowToLibraryToml(flowState, surfacesWithPoints(mesh.boundaries, flowSurfaces(boundaryRoles))), mesh };
+  return { toml: flowToLibraryToml(flowState, surfaces), mesh };
 }
 
 async function runFlow(): Promise<StepResult> {
@@ -1037,7 +1054,7 @@ function clearOutput(): void {
     view.render();
   }
   clearFlowOutput();
-  renderFlow();
+  updateSurfaceWarnings();
 }
 
 /**
@@ -1134,7 +1151,7 @@ async function showOutput(result: GenerationOutput): Promise<void> {
   output = result;
   ui.logEmpty.hidden = true;
   ui.results.hidden = false;
-  renderFlow();
+  updateSurfaceWarnings();
 
   showStats(ui.resultsStats, [
     ["Final fractures", String(result.finalCount)],
