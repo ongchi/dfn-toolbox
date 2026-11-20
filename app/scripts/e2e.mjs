@@ -1266,14 +1266,16 @@ try {
   );
   await pickReleasePoint(page);
 
-  // "Reset" removes all results; the next run starts from the seed, and its new network removes the release point
+  // "Reset" removes all results and the release points; the next run starts from the seed
   await page.mouse.move(0, 0);
   const viewBeforeReset = await stableViewerScreenshot();
   await page.click("#reset-button");
   const afterReset = await page.evaluate(() => ({
     hasResults: !document.querySelector("#results").hidden,
     runText: document.querySelector("#run-button").getAttribute("aria-label"),
+    pointCount: document.querySelectorAll("#release-points li").length,
   }));
+  check(afterReset.pointCount === 0, "reset removes the release points", `${afterReset.pointCount} points`);
   await page.mouse.move(0, 0);
   const resetView = await stableViewerScreenshot();
   const resetStatuses = await statusesDuring(page, () => page.click("#run-button"));

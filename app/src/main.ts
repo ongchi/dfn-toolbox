@@ -353,7 +353,7 @@ function toggleLiveRun(): void {
   liveRun.stop();
 }
 
-/** "Reset": all results go; the next run starts from the seed. The forms stay. */
+/** "Reset": all results and the release points go; the next run starts from the seed. The other forms stay. */
 function resetAll(): void {
   isKeepRequested = false;
   failedChainStep = null;
@@ -361,6 +361,7 @@ function resetAll(): void {
   savedGeneration = null;
   meshedInput = null;
   viewer?.clearGenerationFractures();
+  clearReleasePoints();
   clearOutput();
   showStatus("");
 }
@@ -379,7 +380,7 @@ function networkChanged(): void {
   }
 }
 
-/** The release points are on one network: a change of the network or of the domain removes them */
+/** The release points are on one network: a change of the network or of the domain, or "Reset", removes them */
 function clearReleasePoints(): void {
   if (transportState.seeding.points.length === 0) {
     return;

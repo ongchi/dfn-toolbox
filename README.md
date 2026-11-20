@@ -28,8 +28,8 @@ of the steps before it stay. For example, a new pressure runs only the flow
 and the transport, and a new user-defined fracture keeps the stochastic
 fractures of the last run (FRAM does not check them again). "Pause" during the
 generation keeps the fractures until the last checkpoint (each 5 s); the next
-"Run" adds the others. "Reset" (⏮) removes all results: the next run starts from
-the seed. All input is in the page: the app does not save the input or the
+"Run" adds the others. "Reset" (⏮) removes all results and the release
+points: the next run starts from the seed. All input is in the page: the app does not save the input or the
 output.
 
 - **Domain**: select a predefined domain shape. At the start, the page has
