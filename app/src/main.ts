@@ -376,8 +376,18 @@ function networkChanged(): void {
   }
   const step = networkChangeStep(current, generatedNetwork?.input ?? null, meshedInput);
   if (step !== null) {
+    clearReleasePoints();
     liveRun.changed(step);
   }
+}
+
+/** The release points are on one network: a change of the network or of the domain removes them */
+function clearReleasePoints(): void {
+  if (transportState.seeding.points.length === 0) {
+    return;
+  }
+  transportState.seeding.points = [];
+  renderTransport();
 }
 
 // ---------------------------------------------------------------- form
@@ -416,6 +426,7 @@ const fileHandlers: FileHandlers = {
       state.domain = name;
       boundaryRoles = defaultBoundaryRoles(domainBoundarySurfaceNames(mesh.text));
       setDefaultInflowPressures(flowState, boundaryRoles.inflow);
+      clearReleasePoints();
       await setMesh(mesh);
       render();
       ui.form.dataset.shape = name;
@@ -782,7 +793,8 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
       : "Generating…",
   );
   // The view shows the new fractures during the run, not the old network;
-  // a restart shows the fractures until its checkpoint again
+  // a restart shows the fractures until its checkpoint again. The release points are on the old network.
+  clearReleasePoints();
   clearOutput();
   outputViewer()?.clearGenerationFractures();
   const fractures: FractureBatch[] = from === null ? [] : [from.fractures];

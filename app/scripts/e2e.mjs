@@ -1228,7 +1228,7 @@ try {
   );
   await pickReleasePoint(page);
 
-  // "Reset" removes all results; the next run starts from the seed
+  // "Reset" removes all results; the next run starts from the seed, and its new network removes the release point
   await page.mouse.move(0, 0);
   const viewBeforeReset = await stableViewerScreenshot();
   await page.click("#reset-button");
@@ -1241,7 +1241,7 @@ try {
   const resetStatuses = await statusesDuring(page, () => page.click("#run-button"));
   await page.click("#run-button");
   check(
-    !afterReset.hasResults && afterReset.runText === "Run" && resetStatuses[0] === "Generating…" && isDone(resetStatuses),
+    !afterReset.hasResults && afterReset.runText === "Run" && resetStatuses[0] === "Generating…" && isFlowDone(resetStatuses),
     "reset, then a run from the seed",
     `results ${afterReset.hasResults}, button ${afterReset.runText}; ${resetStatuses.join(" | ")}`,
   );
