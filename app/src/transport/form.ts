@@ -1,8 +1,9 @@
 // The transport form: one field for each key of the dfntrans input file,
 // except the output (the trajectories and the velocities are always on) and
 // the in-flow and out-flow boundaries (the roles of the Domain panel). The
-// Transport panel has the release points, and the particle tracking, the
-// particles per point and the routing in its advanced part, also before a flow.
+// Transport panel has the release points (also before a flow, with the buttons
+// disabled), and the particle tracking, the particles per point and the routing
+// in its advanced part, also before a flow.
 import type { FormContext } from "../form/context";
 import { element, numberField, row, section, selectField } from "../form/fields";
 import type { ReleasePoint, RoutingRule, TimeUnit, TransportState } from "./state";
@@ -129,9 +130,14 @@ export function routingField(state: TransportState, context: FormContext): HTMLE
   });
 }
 
-/** The particles start only at the release points (user decision) */
-function seedingSection(state: TransportState, context: FormContext, picking: PointPicking): HTMLElement {
-  return section("Seeding", ...releasePointFields(state, context, picking));
+/** The particles start only at the release points (user decision); the buttons need a flow */
+function seedingSection(
+  state: TransportState,
+  hasFlow: boolean,
+  context: FormContext,
+  picking: PointPicking,
+): HTMLElement {
+  return section("Seeding", ...releasePointFields(state, hasFlow, context, picking));
 }
 
 /** Text of a release point: 4 significant digits */
@@ -139,18 +145,24 @@ function pointText(point: ReleasePoint): string {
   return point.map((value) => value.toPrecision(4)).join(", ");
 }
 
-function releasePointFields(state: TransportState, context: FormContext, picking: PointPicking): HTMLElement[] {
+function releasePointFields(
+  state: TransportState,
+  hasFlow: boolean,
+  context: FormContext,
+  picking: PointPicking,
+): HTMLElement[] {
   const seeding = state.seeding;
   const pickButton = element("button", "button-small", picking.isOn ? "Stop picking" : "Pick points");
   pickButton.type = "button";
   pickButton.id = "pick-points";
   pickButton.title = "Click on a fracture of the 3D view to add a release point";
+  pickButton.disabled = !hasFlow;
   pickButton.setAttribute("aria-pressed", String(picking.isOn));
   pickButton.classList.toggle("is-pinned", picking.isOn);
   pickButton.addEventListener("click", () => picking.setOn(!picking.isOn));
   const clearButton = element("button", "button-small", "Clear points");
   clearButton.type = "button";
-  clearButton.disabled = seeding.points.length === 0;
+  clearButton.disabled = !hasFlow || seeding.points.length === 0;
   clearButton.addEventListener("click", () => {
     seeding.points = [];
     context.rerender();
@@ -166,6 +178,7 @@ function releasePointFields(state: TransportState, context: FormContext, picking
     const removeButton = element("button", "button-small", "Remove");
     removeButton.type = "button";
     removeButton.title = `Remove release point ${index + 1}`;
+    removeButton.disabled = !hasFlow;
     removeButton.addEventListener("click", () => {
       seeding.points.splice(index, 1);
       context.rerender();
@@ -191,19 +204,9 @@ export function renderTransportForm(
   picking: PointPicking,
 ): void {
   const scrollTop = container.scrollTop;
-  if (!hasFlow) {
-    container.replaceChildren(
-      element(
-        "p",
-        "form-note",
-        "Click Run (▶): the particle tracking uses the flow and its triangle mesh.",
-      ),
-    );
-    return;
-  }
-  container.replaceChildren(
-    element("p", "form-note", "The particles go from the in-flow to the out-flow surfaces of the Domain panel."),
-    seedingSection(state, context, picking),
-  );
+  const note = hasFlow
+    ? "The particles go from the in-flow to the out-flow surfaces of the Domain panel."
+    : "Click Run (▶): the particle tracking uses the flow and its triangle mesh.";
+  container.replaceChildren(element("p", "form-note", note), seedingSection(state, hasFlow, context, picking));
   container.scrollTop = scrollTop;
 }
