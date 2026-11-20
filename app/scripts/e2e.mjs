@@ -470,23 +470,23 @@ async function checkPhone() {
     JSON.stringify(logBox),
   );
 
-  // The view controls are always on the view; the icons of the rail have no label on a touch screen (the rows of the
-  // layer menu have their names)
+  // The view controls are always on the view; the icons of the rail have no label on a touch screen
   const phoneLabels = await page.$$eval(".viewer-toolbar .icon-label", (nodes) =>
-    nodes.filter((node) => !node.closest(".layer-menu-list") && getComputedStyle(node).display !== "none").length,
+    nodes.filter((node) => getComputedStyle(node).display !== "none").length,
   );
   check(phoneLabels === 0, "phone: no labels of the icons", String(phoneLabels));
-  // The view controls are one row above the run bar, the color panel above them; the GitHub link at the top right
+  // The view controls are one row over the full width at the top, the GitHub link below them at the right, and the
+  // color panel directly above the run bar
   const phoneOrder = await page.evaluate(() => {
     const box = (selector) => document.querySelector(selector).getBoundingClientRect();
     const [color, rail, link, runBar] = ["#color-panel", ".layer-rail", ".repository-link", "#run-panel"].map(box);
     return {
-      isLinkTopRight: link.top <= 16 && window.innerWidth - link.right <= 16,
-      isColorAbove: color.bottom <= rail.top,
-      isRunBarBelow: rail.bottom <= runBar.top,
+      isRailTopRow: rail.top <= 16 && rail.left <= 16 && window.innerWidth - rail.right <= 16,
+      isLinkBelowRail: link.top >= rail.bottom && window.innerWidth - link.right <= 16,
+      isColorAboveRunBar: color.bottom <= runBar.top && runBar.top - color.bottom <= 16,
     };
   });
-  check(Object.values(phoneOrder).every(Boolean), "phone: the color panel, the view controls, the run bar", JSON.stringify(phoneOrder));
+  check(Object.values(phoneOrder).every(Boolean), "phone: the view controls at the top, the color panel above the run bar", JSON.stringify(phoneOrder));
   const box = await page.$eval("#viewer-canvas", (node) => {
     const { x, y, width, height } = node.getBoundingClientRect();
     return { x, y, width, height };
@@ -559,20 +559,22 @@ async function checkPhone() {
   await page.screenshot({ path: `${screenshotDir}/e2e_phone_landscape.png` });
 
   // A tablet in portrait (820 px): the panels float as on a computer (no sheet, the title shown); the view controls
-  // are at the bottom right, the color panel above them (the open step of the landscape check stays open)
+  // are at the top, between the title and the GitHub link, and the color panel is at the bottom right, in the row of
+  // the run bar (the open step of the landscape check stays open)
   await page.setViewport({ width: 820, height: 1180, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await new Promise((resolve) => setTimeout(resolve, 500));
   const tablet = await page.evaluate(() => {
     const box = (selector) => document.querySelector(selector).getBoundingClientRect();
-    const [panel, runBar, rail, color, title] = ["#step-panel", "#run-panel", ".layer-rail", "#color-panel", "#title-panel"].map(box);
+    const [panel, runBar, rail, color, title, link] = ["#step-panel", "#run-panel", ".layer-rail", "#color-panel", "#title-panel", ".repository-link"].map(box);
     return {
-      isPanelFloating: panel.left > 0 && panel.bottom <= runBar.top && panel.width === 340,
+      isPanelFloating: panel.left > 0 && panel.bottom <= runBar.top && panel.width === 340 && panel.top >= rail.bottom,
       isRunBarNarrow: runBar.left > 0 && runBar.right < window.innerWidth / 2,
-      isColorAboveRail: color.bottom <= rail.top && rail.bottom === runBar.bottom && window.innerWidth - rail.right <= 8 && window.innerWidth - color.right <= 8,
+      isRailAtTop: rail.top <= 16 && rail.left > title.right && rail.right < link.left,
+      isColorInRunBarRow: color.bottom === runBar.bottom && color.left > runBar.right && window.innerWidth - color.right <= 8,
       isTitleShown: title.width > 0,
     };
   });
-  check(Object.values(tablet).every(Boolean), "tablet: floating panels, the color panel above the view controls", JSON.stringify(tablet));
+  check(Object.values(tablet).every(Boolean), "tablet: floating panels, the view controls at the top", JSON.stringify(tablet));
   await page.screenshot({ path: `${screenshotDir}/e2e_tablet.png` });
   await page.close();
 }
@@ -1598,8 +1600,9 @@ try {
 
 
   // The icons of the 3D view, the domain first: each has a name, and a computer shows its label only at the pointer
+  // (the last network has FRAM on: the name of the removed fractures has the rejected ones)
   await page.mouse.move(0, 0);
-  const iconControls = await page.$$eval(".layer-rail > .icon-toggle, .layer-menu > .icon-toggle", (nodes) =>
+  const iconControls = await page.$$eval(".layer-rail > .icon-toggle", (nodes) =>
     nodes.map((node) => ({
       name: node.querySelector("input")?.getAttribute("aria-label") ?? node.getAttribute("aria-label"),
       hasTitle: node.title !== "",
@@ -1607,55 +1610,12 @@ try {
     })),
   );
   check(
-    iconControls.length === 5 &&
-      iconControls[0].name === "Domain" &&
-      iconControls[1].name === "More layers" &&
+    iconControls.map(({ name }) => name).join(", ") ===
+      "Domain, User fractures, Removed and rejected fractures, Mesh, Moving particles, Trajectories, Reset view" &&
       iconControls.every(({ name, hasTitle, isLabelShown }) => name && hasTitle && !isLabelShown),
     "icons of the 3D view",
     iconControls.map(({ name }) => name).join(", "),
   );
-  // The menu "More layers" above its button: User fractures, Mesh and Removed; it stays open at a change,
-  // and closes by Escape and by a click outside it
-  const layerMenu = () =>
-    page.evaluate(() => {
-      const menu = document.querySelector("#layer-menu");
-      const button = document.querySelector("#layer-menu-button");
-      return {
-        isOpen: !menu.hidden && button.getAttribute("aria-expanded") === "true",
-        rows: [...menu.querySelectorAll(".icon-label")].map((node) => node.textContent).join(", "),
-        isAbove: menu.getBoundingClientRect().bottom <= button.getBoundingClientRect().top,
-      };
-    });
-  const menuAtStart = await layerMenu();
-  await page.click("#layer-menu-button");
-  const menuOpen = await layerMenu();
-  await page.click("#show-mesh");
-  const menuAfterChange = await layerMenu();
-  const isMeshOff = await page.$eval("#show-mesh", (node) => !node.checked);
-  await page.click("#show-mesh");
-  await page.keyboard.press("Escape");
-  const menuAfterEscape = await layerMenu();
-  await page.click("#layer-menu-button");
-  await page.mouse.click(5, 5);
-  const menuAfterOutside = await layerMenu();
-  check(
-    !menuAtStart.isOpen &&
-      menuOpen.isOpen &&
-      menuOpen.isAbove &&
-      menuOpen.rows.startsWith("User fractures, Mesh, Removed") &&
-      menuAfterChange.isOpen &&
-      isMeshOff &&
-      !menuAfterEscape.isOpen &&
-      !menuAfterOutside.isOpen,
-    "the menu of more layers",
-    `start ${menuAtStart.isOpen}, open ${menuOpen.isOpen} (above ${menuOpen.isAbove}: ${menuOpen.rows}), after a change ${menuAfterChange.isOpen} (mesh off ${isMeshOff}), after Escape ${menuAfterEscape.isOpen}, after an outside click ${menuAfterOutside.isOpen}`,
-  );
-  // A change in the menu, which closes again: the view without the menu
-  const clickInLayerMenu = async (selector) => {
-    await page.click("#layer-menu-button");
-    await page.click(selector);
-    await page.click("#layer-menu-button");
-  };
   // One button shows the removed fractures (the network of the last run has some) and the rejected ones
   const removedCount = await page.$eval("#results-stats", (node) => {
     const values = Object.fromEntries([...node.querySelectorAll("dt")].map((term) => [term.textContent, Number(term.nextElementSibling?.textContent)]));
@@ -1663,10 +1623,10 @@ try {
   });
   await page.mouse.move(0, 0);
   const viewWithoutDiscarded = await viewerScreenshot();
-  await clickInLayerMenu("#show-discarded");
+  await page.click("#show-discarded");
   await page.mouse.move(0, 0);
   const viewWithDiscarded = await viewerScreenshot();
-  await clickInLayerMenu("#show-discarded");
+  await page.click("#show-discarded");
   await page.mouse.move(0, 0);
   const viewAfterDiscarded = await viewerScreenshot();
   check(
@@ -1689,9 +1649,9 @@ try {
   await runAll(page);
   const labelWithoutFram = await discardedLabel();
   check(
-    labelWithFram === "Removed and rejected (Removed and rejected, Removed and rejected, cross true)" &&
+    labelWithFram === "Removed and rejected fractures (Removed and rejected fractures, Removed and rejected fractures, cross true)" &&
       labelBeforeRun === labelWithFram &&
-      labelWithoutFram === "Removed (Removed, Removed, cross false)",
+      labelWithoutFram === "Removed fractures (Removed fractures, Removed fractures, cross false)",
     "the label of the removed fractures button",
     `FRAM on: ${labelWithFram}; FRAM off, before the run: ${labelBeforeRun}; after: ${labelWithoutFram}`,
   );

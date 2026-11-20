@@ -139,8 +139,6 @@ const ui = {
   showUserFractures: byId<HTMLInputElement>("show-user-fractures"),
   /** The removed and the rejected fractures: one layer button */
   showDiscarded: byId<HTMLInputElement>("show-discarded"),
-  layerMenuButton: byId<HTMLButtonElement>("layer-menu-button"),
-  layerMenu: byId<HTMLDivElement>("layer-menu"),
   showParticles: byId<HTMLInputElement>("show-particles"),
   showTrajectories: byId<HTMLInputElement>("show-trajectories"),
   resetCamera: byId<HTMLButtonElement>("reset-camera"),
@@ -1247,15 +1245,9 @@ async function showTransportInViewer(): Promise<void> {
   view.render();
 }
 
-/** Opens or closes the menu of more layers; it stays open at a change of a layer */
-function toggleLayerMenu(isOpen: boolean): void {
-  ui.layerMenu.hidden = !isOpen;
-  ui.layerMenuButton.setAttribute("aria-expanded", String(isOpen));
-}
-
 /** The layer button of the discarded fractures: the rejected ones only after a network with FRAM on */
 function showDiscardedLabel(): void {
-  const label = generatedNetwork?.isFramOn ? "Removed and rejected" : "Removed";
+  const label = generatedNetwork?.isFramOn ? "Removed and rejected fractures" : "Removed fractures";
   const toggle = ui.showDiscarded.closest("label");
   if (toggle === null) {
     return;
@@ -1522,11 +1514,13 @@ function updateCoveredArea(): void {
   const coveredBottom = pageHeight - (isSheet ? ui.dock : ui.runPanel).getBoundingClientRect().top;
   ui.layout.style.setProperty("--covered-bottom", `${coveredBottom}px`);
   ui.layout.style.setProperty("--run-panel-height", `${ui.runPanel.offsetHeight}px`);
-  ui.layout.style.setProperty("--run-panel-width", `${ui.runPanel.offsetWidth}px`);
   ui.layout.style.setProperty("--color-panel-height", `${ui.colorPanel.offsetHeight}px`);
+  // The layer rail at the top center stays at the right of the title (0 when hidden)
+  ui.layout.style.setProperty("--title-right", `${ui.titlePanel.getBoundingClientRect().right}px`);
   viewer?.setCoveredArea({
     left: 0,
-    top: isSheet ? 0 : ui.titlePanel.getBoundingClientRect().bottom,
+    // The layer rail at the top (hidden under an open sheet: bottom 0), and the title beside it
+    top: Math.max(ui.viewerToolbar.getBoundingClientRect().bottom, isSheet ? 0 : ui.titlePanel.getBoundingClientRect().bottom),
     bottom: coveredBottom,
   });
 }
@@ -1551,13 +1545,8 @@ function bindEvents(): void {
       openStepPanel(name === openPanel ? null : name);
     });
   }
-  // Escape closes the menu of more layers first, then the settings of a step; a field keeps its own Escape
+  // Escape closes the settings of a step; a field keeps its own Escape
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !ui.layerMenu.hidden) {
-      toggleLayerMenu(false);
-      ui.layerMenuButton.focus();
-      return;
-    }
     const isInField = event.target instanceof Element && event.target.matches("input, select, textarea");
     if (event.key === "Escape" && openPanel !== null && !isInField) {
       closeStepPanel();
@@ -1565,13 +1554,6 @@ function bindEvents(): void {
   });
   bindSheetHandle();
   ui.logButton.addEventListener("click", toggleLog);
-  ui.layerMenuButton.addEventListener("click", () => toggleLayerMenu(ui.layerMenu.hidden !== false));
-  // A pointer down outside the menu and its button closes the menu
-  document.addEventListener("pointerdown", (event) => {
-    if (!ui.layerMenu.hidden && event.target instanceof Node && !ui.layerMenu.parentElement?.contains(event.target)) {
-      toggleLayerMenu(false);
-    }
-  });
   ui.orientationOption.addEventListener("change", () => {
     const convention = (Object.keys(ORIENTATION_KEYS) as OrientationConvention[]).find(
       (candidate) => candidate === ui.orientationOption.value,
@@ -1581,7 +1563,7 @@ function bindEvents(): void {
     }
   });
   const coveredAreaObserver = new ResizeObserver(updateCoveredArea);
-  for (const panel of [ui.dock, ui.runPanel, ui.viewerToolbar, ui.colorPanel]) {
+  for (const panel of [ui.dock, ui.runPanel, ui.viewerToolbar, ui.colorPanel, ui.titlePanel]) {
     coveredAreaObserver.observe(panel);
   }
   window.addEventListener("resize", updateCoveredArea);

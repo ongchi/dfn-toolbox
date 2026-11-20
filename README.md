@@ -81,22 +81,20 @@ The 3D view shows the fractures during a generation, cut at the domain (the
 mesh has the same shape). A change of a user-defined fracture shows its
 whole polygon until the next network. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,
-user fractures, removed and rejected fractures, and particle paths. The user
-fractures, the mesh and the removed fractures are in the menu "More layers"
-of the layer buttons; the menu stays open while you change them.
+user fractures, removed and rejected fractures, and particle paths.
 
 The 3D view fills the page, and the controls float over it: the title at the
 top left, the run bar at the bottom left with the settings of the open step above
-it, the layers in one row at the right of the run bar, the link to the source
-code at the top right, the colors (the array
+it, the layers in one row at the top center (at the right of the title if
+the screen is too narrow), the link to the source code at the top right, the colors (the array
 select, the scale and the legend in one panel) at the bottom right, and the Log. The
 Log has the status of the steps (progress, results, warnings and errors); a
 red or yellow dot on the Log button shows an error or a warning. The
 settings of a step cover the view and do not move it. On a medium width (a
-tablet in portrait, 660 to 959 px), the layers are at the bottom right and the
-colors above them. On a phone (below 660 px), the run bar
-is one row at the bottom over the full width, the layers are one row above it
-and the colors above the layers, and the settings of a step are a sheet
+tablet in portrait, 660 to 959 px), the Log is above the colors. On a phone
+(below 660 px), the run bar is one row at the bottom over the full width and
+the colors are above it, the layers are one row over the full width at the
+top with the link to the source code below them, and the settings of a step are a sheet
 above it: the sheet and the run bar take the lower half of the screen, and
 the view controls and the colors are hidden while it shows. A tap or a
 swipe down on the handle bar at its top closes it. One finger turns the model, two fingers zoom it, and a

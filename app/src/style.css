@@ -115,12 +115,15 @@ pre {
 
 /* ---------------------------------------------------------------- layer rail and color panel */
 
-/* The bottom, at the right of the run bar (its width from main.ts): the layers in one row */
+/* The top center of the view: the layers in one row. The box has the same margin at both sides, the right end of the
+   title (from main.ts): the rail is at the center of the page, or at the right of the title if it does not fit */
 .viewer-toolbar {
   position: absolute;
-  left: calc(2 * var(--gap) + var(--run-panel-width, 310px) + env(safe-area-inset-left));
-  bottom: calc(var(--gap) + env(safe-area-inset-bottom));
+  top: calc(var(--gap) + env(safe-area-inset-top));
+  left: calc(var(--title-right, 0px) + var(--gap));
+  right: calc(var(--title-right, 0px) + var(--gap));
   display: flex;
+  justify-content: safe center;
   align-items: flex-end;
   gap: var(--gap);
   pointer-events: none;
@@ -216,7 +219,7 @@ pre {
 
 /* A checkbox or a button with an icon. The checkbox is invisible over the icon:
    it keeps its state, its disabled state and the keyboard. The label shows
-   above the icon at the pointer, as the step names of the run bar. */
+   below the icon at the pointer (the rail is at the top of the view). */
 .icon-toggle {
   position: relative;
   display: inline-flex;
@@ -293,7 +296,7 @@ pre {
 
 .icon-label {
   position: absolute;
-  bottom: calc(100% + 10px);
+  top: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
   padding: 3px 8px;
@@ -310,61 +313,6 @@ pre {
 .icon-toggle:hover .icon-label,
 .icon-toggle:has(:focus-visible) .icon-label,
 .icon-toggle:focus-visible .icon-label {
-  opacity: 1;
-}
-
-/* The menu of more layers: above its button, left aligned with the rail */
-.layer-menu {
-  position: relative;
-}
-
-.icon-toggle[aria-expanded="true"] {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-}
-
-/* No label at the pointer over the open menu */
-.icon-toggle[aria-expanded="true"] .icon-label {
-  opacity: 0;
-}
-
-.layer-menu-list {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: -6px;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 200px;
-  padding: 6px;
-  /* Solid: the blur of a panel in the rail panel has no effect, and the menu covers the color panel on a phone */
-  background: var(--panel-solid);
-}
-
-.layer-menu-list[hidden] {
-  display: none;
-}
-
-/* A row of the menu: the icon and the name as text */
-.layer-menu-list .icon-toggle {
-  justify-content: flex-start;
-  gap: 10px;
-  width: 100%;
-  height: auto;
-  min-height: 36px;
-  padding: 0 12px 0 8px;
-  border-radius: var(--radius);
-}
-
-.layer-menu-list .icon-label {
-  position: static;
-  display: inline;
-  padding: 0;
-  transform: none;
-  background: none;
-  color: inherit;
-  font-size: 13px;
   opacity: 1;
 }
 
@@ -1284,10 +1232,6 @@ button.step-segment:hover {
     height: 44px;
   }
 
-  .layer-menu-list .icon-toggle {
-    min-height: 44px;
-  }
-
   .player-play {
     width: 44px;
     height: 44px;
@@ -1311,8 +1255,8 @@ button.step-segment:hover {
 
 }
 
-/* A low landscape screen: the run bar, the view controls and the color panel do not fit in one row: the view
-   controls are at the top, at the left of the link to the source code */
+/* A low landscape screen: no title; the view controls are centered between the settings and the link to the source
+   code, and wrap there */
 @media (max-height: 500px) and (orientation: landscape) {
   /* The title takes no place on a small screen */
   :root {
@@ -1324,44 +1268,29 @@ button.step-segment:hover {
   }
 
   .viewer-toolbar {
-    top: calc(var(--gap) + env(safe-area-inset-top));
+    left: calc(2 * var(--gap) + var(--settings-width) + env(safe-area-inset-left));
     right: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-right));
-    bottom: auto;
-    left: auto;
-  }
-
-  /* The menu opens below its button */
-  .layer-menu-list {
-    top: calc(100% + 12px);
-    right: -6px;
-    bottom: auto;
-    left: auto;
   }
 
   .layer-rail {
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: flex-end;
-    max-width: calc(100vw - 3 * var(--gap) - var(--settings-width));
+    justify-content: center;
+    min-width: 0;
   }
 
 }
 
-/* A medium width (a tablet in portrait, a narrow window): the panels float as on a computer, but only the run bar
-   and the view controls fit in one row (650 px with touch sizes): the view controls are at the bottom right, the
-   color panel above them, and the Log above the color panel */
+/* A medium width (a tablet in portrait, a narrow window): the panels float as on a computer; the settings stay below
+   the layer rail, which is higher than the title and above them; the Log is above the color panel, which it would
+   cover in the row of the run bar */
 @media (min-width: 660px) and (max-width: 959px) and (min-height: 501px) {
-  .viewer-toolbar {
-    left: auto;
-    right: calc(var(--gap) + env(safe-area-inset-right));
-  }
-
-  .color-panel {
-    bottom: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-bottom));
+  .step-panel {
+    max-height: calc(100% - var(--run-panel-height, 60px) - 4 * var(--gap) - var(--rail-width) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 
   .log-view {
-    bottom: calc(3 * var(--gap) + var(--color-panel-height, 44px) + var(--rail-width) + env(safe-area-inset-bottom));
+    bottom: calc(2 * var(--gap) + var(--color-panel-height, 44px) + env(safe-area-inset-bottom));
   }
 }
 
@@ -1473,26 +1402,42 @@ button.step-segment:hover {
   }
 
 
-  /* The view controls: one row above the run bar, at the left */
+  /* The view controls: one row over the full width at the top, with no gaps and no separators (7 icons of 44 px
+     fit in 360 px); the link to the source code below it at the right */
   .viewer-toolbar {
     left: calc(var(--gap) + env(safe-area-inset-left));
-    bottom: calc(var(--covered-bottom, 0px) + var(--gap));
+    right: calc(var(--gap) + env(safe-area-inset-right));
   }
 
+  .layer-rail {
+    flex: 1;
+    justify-content: space-between;
+    gap: 0;
+  }
+
+  .rail-separator {
+    display: none;
+  }
+
+  .repository-link {
+    top: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-top));
+  }
+
+  /* Below the row of the view controls */
   .log-view {
     left: var(--gap);
     right: var(--gap);
-    top: calc(var(--gap) + env(safe-area-inset-top));
+    top: calc(2 * var(--gap) + var(--rail-width) + env(safe-area-inset-top));
     bottom: auto;
     width: auto;
     max-height: 45%;
     z-index: 1;
   }
 
-  /* Above the row of the view controls (as high as the rail width) */
+  /* Above the run bar */
   .color-panel {
     left: calc(var(--gap) + env(safe-area-inset-left));
     right: auto;
-    bottom: calc(var(--covered-bottom, 0px) + 2 * var(--gap) + var(--rail-width));
+    bottom: calc(var(--covered-bottom, 0px) + var(--gap));
   }
 }
