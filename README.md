@@ -13,94 +13,27 @@ It runs three libraries in the browser (WebAssembly), and there is no server:
 The 3D view uses [three.js](https://threejs.org/). After the flow, moving particles
 show the direction and the speed of the flow.
 
-## Use
+## Features
 
-The run bar at the bottom is a small media player. It has one icon for each
-step of the workflow (Domain, Fractures, Flow, Transport; the name shows at
-the pointer); the strip under the icon shows the state of its step (not
-run, running with its progress, done, or failed). A click on a step opens
-the settings of its step above the bar (the panel has no title: the icon
-of the open step is highlighted); a second click or Escape closes them. At the start, no settings show. One "Run" button (▶) runs
-all steps: the fractures, their triangle mesh, the flow and the transport.
-While the run is on (the pause button ❚❚ shows), a change of a setting runs the steps again from the
-first step which the change affects, 0.5 s after the last change; the results
-of the steps before it stay. For example, a new pressure runs only the flow
-and the transport, and a new user-defined fracture keeps the stochastic
-fractures of the last run (FRAM does not check them again). "Pause" during the
-generation keeps the fractures until the last checkpoint (each 5 s); the next
-"Run" adds the others. "Reset" (⏮) removes all results and the release
-points: the next run starts from the seed. All input is in the page: the app does not save the input or the
-output.
-
-- **Domain**: select a predefined domain shape. At the start, the page has
-  the first shape with the default values of all forms. The boundary
-  surfaces are in three groups: in-flow, out-flow and no flow. Give each
-  surface a role with its dropdown: the surface moves to that group. A new
-  shape gets the default roles: the first surface is in-flow, the second
-  out-flow. Each in-flow and out-flow surface has the pressure of the flow
-  (default: 11.0 MPa for the default in-flow surface, 10.0 MPa for the
-  others); after a run, a surface with no point in the triangle mesh shows a
-  warning: the flow does not use it. The pointer over a surface highlights
-  it in the 3D view; a click on its name keeps it highlighted until a second
-  click.
-- **Fractures**: set the fracture families and the user-defined fractures.
-  With the stop condition (advanced part) "Number of fractures of each
-  family", each family has its number of fractures: the run stops at the
-  total, and the family of each new fracture is random with the share of its
-  number, thus the number of a family is an expected value. With the stop
-  condition "P32 target of each family", each family has its P32 target, and
-  all families have the same chance. Each user-defined fracture has a region,
-  center, shape, aperture and orientation. The cards of the families and of
-  the user fractures are an accordion: a click on the header of a card opens
-  it and closes the others; a closed card shows its main values in its
-  header. The pointer over a Region field highlights its region in the 3D
-  view; a click on its name keeps it highlighted until a second click, and a
-  new choice moves the highlight to the new region. The network keeps only
-  the clusters which connect an in-flow and an out-flow surface. If there is
-  no such cluster, a warning shows, and the run stops after the fractures.
-  The advanced part (closed at the start) has the section "Fracture": the
-  seed of the generation ("Random" sets a new one; 0 = a random seed for each
-  run), the pair of angles of all orientations (theta and phi, trend and
-  plunge, or dip and strike; a new choice changes the angles of each family
-  and fracture to the same plane), the number of points of all fractures
-  (one value for the families and the user fractures) and the minimum
-  feature size. Then the stop condition, the FRAM rules of the generation,
-  the choice of the clusters and the size of the triangles of the mesh for
-  the flow.
-- **Flow**: the fluid of the flow (temperature and gravity). The pressures
-  are on the Domain panel.
-- **Transport**: the particles start only at release points. Click "Pick points", then click on a fracture of the 3D
-  view: each click adds a release point and runs the particle tracking. With
-  no release point, the run ends after the flow. The path of each particle
-  shows, also of a particle which does not exit. The advanced part (closed at
-  the start, also before a flow) has the section "Particle tracking": seed,
-  time unit, porosity, maximum time steps, particles per point, and the
-  routing of the particles at the intersections.
-
-The 3D view shows the fractures during a generation, cut at the domain (the
-mesh has the same shape). The polygons of the user-defined fractures show
-over the network (layer "User fractures"); a changed fracture is orange, also
-with that layer off, until the next network has it. Color the mesh by a
-property, the pressure or a velocity, and show or hide the layers: mesh, domain,
-user fractures, removed and rejected fractures, and particle paths.
-
-The 3D view fills the page, and the controls float over it: the title at the
-top left, the run bar at the bottom left with the settings of the open step above
-it, the layers in one row at the top center (at the right of the title if
-the screen is too narrow), the link to the source code at the top right, the colors (the array
-select, the scale and the legend in one panel) at the bottom right, and the Log. The
-Log has the status of the steps (progress, results, warnings and errors); a
-red or yellow dot on the Log button shows an error or a warning. The
-settings of a step cover the view and do not move it. On a medium width (a
-tablet in portrait, 660 to 959 px), the Log is above the colors. On a phone
-(below 660 px), the run bar is one row at the bottom over the full width and
-the colors are above it, the layers are one row over the full width at the
-top with the link to the source code below them, and the settings of a step are a sheet
-above it: the sheet and the run bar take the lower half of the screen, and
-the view controls and the colors are hidden while it shows. A tap or a
-swipe down on the handle bar at its top closes it. One finger turns the model, two fingers zoom it, and a
-tap on the row of a boundary surface keeps the surface highlighted until a
-second tap.
+- **Workflow** in four steps: Domain, Fractures, Flow and Transport. The run
+  bar at the bottom runs all steps and shows the state of each step; a click
+  on a step opens its settings.
+- **Live run**: while the run is on, a change of a setting runs again only the
+  steps which it affects.
+- **Domain**: predefined domain shapes. Each boundary surface is in-flow,
+  out-flow or no flow, and the in-flow and out-flow surfaces have a pressure.
+- **Fractures**: stochastic fracture families (number of fractures or P32
+  target) and user-defined fractures. The advanced settings have the seed,
+  the FRAM rules, the cluster selection and the triangle mesh for the flow.
+- **Flow**: steady water flow, with temperature and gravity.
+- **Transport**: particle tracking from release points, picked on the
+  fractures in the 3D view.
+- **3D view**: the fractures during the generation, the mesh colored by
+  pressure or velocity, moving particles that show the flow, the particle
+  paths, and layers to show or hide.
+- **Layouts** for computers, tablets and phones.
+- **No server**: all runs in the browser, and the app does not save the input
+  or the output.
 
 For the same input and seed, the network and the mesh are those of the `dfngen`
 binary. The flow agrees with the `fehm` binary within 1e-9. The particles of
