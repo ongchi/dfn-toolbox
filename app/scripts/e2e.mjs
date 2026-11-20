@@ -29,6 +29,11 @@ const MINIMUM_SURFACE_PIXEL_SHARE = 0.05;
 // a few pixels which differ by at most this value in each channel (0 to 255)
 const MAXIMUM_NOISE = 2;
 const MAXIMUM_NOISY_PIXEL_SHARE = 0.0001;
+// The edges of the polygons of the user fractures and of the changed one (USER_EDGE_COLOR, HIGHLIGHT_COLOR of
+// viewer.ts), and the largest sum of the channel differences of a pixel at that color (0 to 255 each)
+const USER_EDGE_PIXEL = [115, 153, 255];
+const EDITED_USER_EDGE_PIXEL = [255, 138, 92];
+const EDGE_COLOR_DISTANCE = 30;
 // The end of the status of a run with no release point: the transport runs only with one
 const NO_POINT_HINT = "To track particles, click “Pick points” (Transport panel), then click on a fracture.";
 
@@ -206,6 +211,37 @@ async function boundaryLabels(page, formSelector, sectionTitle) {
     },
     sectionTitle,
   );
+}
+
+/** The view below the layer rail, at the right of the open step panel, above the run bar and the color panel */
+async function viewBelowRail(page) {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const clip = await page.evaluate(() => {
+    const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+    const panel = document.querySelector("#step-panel");
+    const left = panel.hidden ? 0 : Math.ceil(panel.getBoundingClientRect().right);
+    const top = Math.ceil(box(".layer-rail").bottom);
+    const bottom = Math.floor(Math.min(box("#run-panel").top, box("#color-panel").top));
+    return { x: left, y: top, width: window.innerWidth - left, height: bottom - top };
+  });
+  return Buffer.from(await page.screenshot({ clip }));
+}
+
+/** The pixels of a picture of the view at the edge colors of the user fractures (blue) and of the changed one (orange) */
+function userFractureEdgePixels(image) {
+  const { data } = PNG.sync.read(image);
+  const isNear = (index, [red, green, blue]) =>
+    Math.abs(data[index] - red) + Math.abs(data[index + 1] - green) + Math.abs(data[index + 2] - blue) <= EDGE_COLOR_DISTANCE;
+  let blue = 0;
+  let orange = 0;
+  for (let index = 0; index < data.length; index += 4) {
+    if (isNear(index, USER_EDGE_PIXEL)) {
+      blue++;
+    } else if (isNear(index, EDITED_USER_EDGE_PIXEL)) {
+      orange++;
+    }
+  }
+  return { blue, orange };
 }
 
 /** The number of geometries of the view on the graphics card */
@@ -1403,22 +1439,40 @@ try {
   });
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture.png` });
-  // The network shows the user fracture in the domain (half of it is outside), without the polygon of the
-  // change; a new change shows that polygon again, until the next network
+  // The network shows the user fracture in the domain (half of it is outside) and the polygons of all user fractures;
+  // a change gives the polygon of the changed fracture the edit color until the next network; the layer button hides
+  // only the others. Without the domain and the mesh, the edges of the polygons have their own colors.
   await runAll(page);
   await page.mouse.move(0, 0);
   await new Promise((resolve) => setTimeout(resolve, 500));
   await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture_network.png` });
-  const networkGeometries = await viewGeometryCount(page);
+  await page.click("#show-domain");
+  await page.click("#show-mesh");
+  await page.mouse.move(0, 0);
+  const networkPixels = userFractureEdgePixels(await viewBelowRail(page));
   await setField(page, "#fractures-form", "Radius (m)", 3);
-  await page.waitForFunction((count) => Number(document.querySelector("#viewer-canvas").dataset.geometryCount) !== count, {}, networkGeometries);
-  const previewGeometries = await viewGeometryCount(page);
+  const changePixels = userFractureEdgePixels(await viewBelowRail(page));
+  await page.screenshot({ path: `${screenshotDir}/e2e_user_fracture_edited.png` });
+  await page.click("#show-user-fractures");
+  await page.mouse.move(0, 0);
+  const hiddenPixels = userFractureEdgePixels(await viewBelowRail(page));
+  await page.click("#show-user-fractures");
   await runAll(page);
-  const nextNetworkGeometries = await viewGeometryCount(page);
+  await page.mouse.move(0, 0);
+  const nextNetworkPixels = userFractureEdgePixels(await viewBelowRail(page));
+  await page.click("#show-domain");
+  await page.click("#show-mesh");
   check(
-    previewGeometries > networkGeometries && nextNetworkGeometries === networkGeometries,
-    "the polygon of a changed user fracture shows until the next network",
-    `network ${networkGeometries}, change ${previewGeometries}, next network ${nextNetworkGeometries} geometries`,
+    networkPixels.blue > 0 &&
+      networkPixels.orange === 0 &&
+      changePixels.blue === 0 &&
+      changePixels.orange > 0 &&
+      hiddenPixels.blue === 0 &&
+      hiddenPixels.orange > 0 &&
+      nextNetworkPixels.blue > 0 &&
+      nextNetworkPixels.orange === 0,
+    "the polygons of the user fractures, the changed one in the edit color until the next network",
+    JSON.stringify({ network: networkPixels, change: changePixels, hidden: hiddenPixels, nextNetwork: nextNetworkPixels }),
   );
 
   // Bad input: a family region of the L-shape mesh is not in the Box mesh: an error of the library

@@ -146,8 +146,11 @@ const FAMILY_COLORS: readonly (readonly [number, number, number])[] = [
   [0.55, 0.45, 0.3],
 ];
 
-/** "user": the polygons of the user-defined fractures of the form, before the generation */
-export type FractureLayer = "final" | "removed" | "rejected" | "user";
+/**
+ * "user": the polygons of the user-defined fractures of the form; "editedUser": the polygon of the user-defined
+ * fracture whose card changed, until the next network has it
+ */
+export type FractureLayer = "final" | "removed" | "rejected" | "user" | "editedUser";
 
 /** A data array of the triangle mesh of the final fractures, with one component */
 export interface ColorArray {
@@ -736,7 +739,7 @@ export class NetworkViewer {
 
   /**
    * Shows the shapes of a layer, or removes the layer (null). The layers
-   * "final" and "user" show their edges.
+   * "final", "user" and "editedUser" show their edges.
    */
   setLayer(layer: FractureLayer, shapes: LayerShapes | null): void {
     const old = this.layers.get(layer);
@@ -756,12 +759,9 @@ export class NetworkViewer {
     const { geometry, origin } = triangleGeometry(shapes.points, triangles);
     const mesh = placed(new Mesh(geometry, NetworkViewer.layerMaterial(layer)), origin);
     group.add(mesh);
-    if (layer === "final" || layer === "user") {
+    if (layer === "final" || layer === "user" || layer === "editedUser") {
       const edges = edgeGeometry(shapes.points, cellEdges(shapes, shapes.points.length / 3));
-      const lines = new LineSegments(
-        edges.geometry,
-        layer === "user" ? lineMaterial(USER_EDGE_COLOR) : lineMaterial(EDGE_COLOR, FRACTURE_EDGE_OPACITY),
-      );
+      const lines = new LineSegments(edges.geometry, NetworkViewer.edgeMaterial(layer));
       group.add(placed(lines, edges.origin));
     }
     this.scene.add(group);
@@ -779,8 +779,21 @@ export class NetworkViewer {
         return surfaceMaterial(REJECTED_COLOR, REJECTED_OPACITY);
       case "user":
         return surfaceMaterial(USER_COLOR, USER_OPACITY);
+      case "editedUser":
+        return surfaceMaterial(HIGHLIGHT_COLOR, HIGHLIGHT_OPACITY);
       case "final":
         return surfaceMaterial(FRACTURE_COLOR, FRACTURE_OPACITY);
+    }
+  }
+
+  private static edgeMaterial(layer: "final" | "user" | "editedUser"): LineBasicMaterial {
+    switch (layer) {
+      case "user":
+        return lineMaterial(USER_EDGE_COLOR);
+      case "editedUser":
+        return lineMaterial(HIGHLIGHT_COLOR);
+      case "final":
+        return lineMaterial(EDGE_COLOR, FRACTURE_EDGE_OPACITY);
     }
   }
 

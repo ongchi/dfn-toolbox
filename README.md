@@ -78,8 +78,9 @@ output.
   routing of the particles at the intersections.
 
 The 3D view shows the fractures during a generation, cut at the domain (the
-mesh has the same shape). A change of a user-defined fracture shows its
-whole polygon until the next network. Color the mesh by a
+mesh has the same shape). The polygons of the user-defined fractures show
+over the network (layer "User fractures"); a changed fracture is orange, also
+with that layer off, until the next network has it. Color the mesh by a
 property, the pressure or a velocity, and show or hide the layers: mesh, domain,
 user fractures, removed and rejected fractures, and particle paths.
 

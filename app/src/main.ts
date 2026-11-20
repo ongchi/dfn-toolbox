@@ -867,7 +867,8 @@ async function generate(input: GenerationInput, restart: GenerationRestart | nul
     };
     meshedInput = null;
     showDiscardedLabel();
-    // The network shows the user-defined fractures, in the domain; a held view keeps the placeholder until its new mesh
+    // The network has the edited user-defined fracture: its polygon gets the color of the others; a held view keeps the
+    // edit color until its new mesh
     previewedUserFracture = null;
     if (!isViewHeld) {
       updateUserFracturesInViewer();
@@ -1264,6 +1265,8 @@ function showDiscardedLabel(): void {
 function applyLayerVisibility(view: NetworkViewer): void {
   view.setVisible("final", ui.showMesh.checked);
   view.setVisible("user", ui.showUserFractures.checked);
+  // The fracture which the user edits shows also with the button off (user decision)
+  view.setVisible("editedUser", true);
   // A network without rejected fractures (FRAM keeps none) shows only the removed ones
   view.setVisible("removed", ui.showDiscarded.checked);
   view.setVisible("rejected", ui.showDiscarded.checked);
@@ -1366,8 +1369,8 @@ async function showOutputInViewer(selected: string | null = null): Promise<void>
 // same time could both add their polygons
 let userFracturesUpdate: Promise<void> = Promise.resolve();
 /**
- * The user-defined fracture whose card changed: the layer "user" shows only
- * its polygon, until the next network shows the fractures (user decision)
+ * The user-defined fracture whose card changed: its polygon has the edit color
+ * (layer "editedUser"), until the next network has it (user decision)
  */
 let previewedUserFracture: number | null = null;
 
@@ -1383,16 +1386,26 @@ function polygonLayerShapes(vtpText: string): LayerShapes {
   };
 }
 
-/** Shows the polygon of the previewed user-defined fracture, if it has a region of the mesh */
+/** The polygons of the user-defined fractures, or null with none */
+function userFractureLayerShapes(fractures: FormState["userFractures"]): LayerShapes | null {
+  return fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, state, regionNames));
+}
+
+/**
+ * Shows the polygons of all user-defined fractures with a region of the mesh
+ * (user decision), the previewed one in the edit color
+ */
 function updateUserFracturesInViewer(): void {
   userFracturesUpdate = userFracturesUpdate
     .then(async () => {
       if (!viewer) {
         return;
       }
+      const shown = state.userFractures.filter((fracture) => regionNames.includes(fracture.region));
       const previewed = previewedUserFracture === null ? undefined : state.userFractures[previewedUserFracture];
-      const fractures = previewed !== undefined && regionNames.includes(previewed.region) ? [previewed] : [];
-      viewer.setLayer("user", fractures.length === 0 ? null : polygonLayerShapes(userFracturesToVtp(fractures, state, regionNames)));
+      const edited = previewed !== undefined && shown.includes(previewed) ? [previewed] : [];
+      viewer.setLayer("user", userFractureLayerShapes(shown.filter((fracture) => fracture !== previewed)));
+      viewer.setLayer("editedUser", userFractureLayerShapes(edited));
       applyLayerVisibility(viewer);
       viewer.render();
     })
