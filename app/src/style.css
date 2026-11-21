@@ -10,7 +10,7 @@
   --title-height: 48px;
   --scalar-bar-width: 300px;
   /* The icons of the layer rail, its padding and its border */
-  --rail-width: calc(36px + 2 * 6px + 2px);
+  --rail-width: calc(44px + 2 * 6px + 2px);
   --surface: rgb(255 255 255 / 0.07);
   --surface-hover: rgb(255 255 255 / 0.13);
   --border: rgb(255 255 255 / 0.16);
@@ -226,8 +226,8 @@ pre {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 1px solid transparent;
   border-radius: 50%;
   background: var(--surface);
@@ -813,8 +813,8 @@ input[type="radio"] {
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 50%;
@@ -875,8 +875,6 @@ input[type="radio"] {
 
 /* Run: the main button */
 .player-play {
-  width: 36px;
-  height: 36px;
   background: var(--accent);
   color: var(--accent-text);
 }
@@ -910,10 +908,12 @@ input[type="radio"] {
   position: relative;
   -webkit-tap-highlight-color: transparent;
   flex: none;
-  width: 40px;
+  width: 44px;
+  min-height: 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   padding: 5px 4px 4px;
   border: none;
@@ -1162,8 +1162,6 @@ button.step-segment:hover {
   :root {
     --gap: 8px;
     --settings-width: 340px;
-    --scalar-bar-width: 220px;
-    --rail-width: calc(44px + 2 * 6px + 2px);
   }
 
   .subtitle {
@@ -1205,8 +1203,18 @@ button.step-segment:hover {
     margin: 0;
   }
 
-  .domain-source label,
-  .toolbar-field {
+  /* The color panel keeps the size of a computer screen; its select keeps the 16 px text */
+  .color-panel select {
+    min-height: 0;
+  }
+
+  .color-panel input[type="checkbox"] {
+    width: auto;
+    height: auto;
+    margin: revert;
+  }
+
+  .domain-source label {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1224,23 +1232,6 @@ button.step-segment:hover {
   .field-row {
     flex-direction: column;
     gap: 0;
-  }
-
-  .icon-toggle,
-  .player-button {
-    width: 44px;
-    height: 44px;
-  }
-
-  .player-play {
-    width: 44px;
-    height: 44px;
-  }
-
-  .step-segment {
-    width: 44px;
-    min-height: 44px;
-    justify-content: center;
   }
 
   /* No pointer over a touch screen: the steps have no name label */

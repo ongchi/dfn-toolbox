@@ -363,9 +363,16 @@ async function touchProblems(page) {
     const controls = document.querySelectorAll(
       "button, select, input:not([type=checkbox], [type=radio]), label:has(> input[type=checkbox], > input[type=radio])",
     );
-    // The handle bar of the sheet is thin: its touch area has its own check
+    // The handle bar of the sheet is thin: its touch area has its own check. The color panel has the size of a
+    // computer screen at all widths (user decision)
     const small = [...controls]
-      .filter((node) => isShown(node) && node.id !== "sheet-handle" && node.getBoundingClientRect().height < 44)
+      .filter(
+        (node) =>
+          isShown(node) &&
+          node.id !== "sheet-handle" &&
+          !node.closest("#color-panel") &&
+          node.getBoundingClientRect().height < 44,
+      )
       .map((node) => `${node.id || node.textContent.trim().slice(0, 20)} ${node.getBoundingClientRect().height}`);
     const smallText = [...document.querySelectorAll("select, input[type=number], input[type=text]")]
       .filter((node) => isShown(node) && Number.parseFloat(getComputedStyle(node).fontSize) < 16)
